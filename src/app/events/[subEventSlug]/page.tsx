@@ -2,20 +2,28 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, notFound } from 'next/navigation';
+import { useParams, notFound, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { subEventsData } from '@/data/subEvents';
 import type { SubEvent } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, CalendarDays, ExternalLink, Info, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, CalendarDays, ExternalLink, Info, Image as ImageIcon, CheckCircle, Loader2, UserCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { useAuth } from '@/hooks/use-auth';
+import { useToast } from '@/hooks/use-toast';
 
 export default function SubEventDetailPage() {
   const params = useParams();
   const { subEventSlug } = params;
   const [event, setEvent] = useState<SubEvent | null>(null);
+  const { authUser, userProfile, setUserProfile, loading: authLoading } = useAuth();
+  const { toast } = useToast();
+  const router = useRouter();
+
+  const [isRegistered, setIsRegistered] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
 
   useEffect(() => {
     if (subEventSlug) {
@@ -28,10 +36,50 @@ export default function SubEventDetailPage() {
     }
   }, [subEventSlug]);
 
-  if (!event) {
-    // This will typically be handled by notFound() redirecting, 
-    // but as a fallback or during initial load:
-    return <div className="flex justify-center items-center min-h-[calc(100vh-10rem)] text-xl text-muted-foreground">Loading event details...</div>;
+  useEffect(() => {
+    if (event && userProfile && (userProfile.role === 'student' || userProfile.role === 'test')) {
+      setIsRegistered(userProfile.registeredEventSlugs?.includes(event.slug) || false);
+    }
+  }, [userProfile, event]);
+
+  const handleRegister = async () => {
+    if (!userProfile || !event || !setUserProfile) return;
+    
+    // Ensure it's a student or test user trying to register
+    if (userProfile.role !== 'student' && userProfile.role !== 'test') {
+        toast({
+            title: "Registration Failed",
+            description: "Only students can register for events.",
+            variant: "destructive",
+        });
+        return;
+    }
+
+    setIsRegistering(true);
+    
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    setUserProfile(prevProfile => {
+      if (!prevProfile) return null;
+      const newSlugs = Array.from(new Set([...(prevProfile.registeredEventSlugs || []), event.slug]));
+      return { ...prevProfile, registeredEventSlugs: newSlugs };
+    });
+
+    setIsRegistered(true); // This will be re-confirmed by the useEffect when userProfile updates
+    setIsRegistering(false);
+    toast({
+      title: "Registration Successful!",
+      description: `You have successfully registered for ${event.title}.`,
+      // Not destructive, so will appear as success/info
+    });
+     // Optionally redirect to dashboard or show a success message on page
+    // router.push('/dashboard'); 
+  };
+
+
+  if (authLoading || !event) {
+    return <div className="flex justify-center items-center min-h-[calc(100vh-10rem)] text-xl text-muted-foreground"><Loader2 className="h-8 w-8 animate-spin mr-2" />Loading event details...</div>;
   }
 
   return (
@@ -110,13 +158,37 @@ export default function SubEventDetailPage() {
                 Registration Deadline: <strong>{new Date(event.deadline).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</strong>
               </p>
             )}
-            <Button size="lg" asChild className="w-full md:w-auto bg-accent hover:bg-accent/90 text-accent-foreground text-lg py-3 px-6">
-              <Link href={event.registrationLink}>
-                Register Now <ExternalLink className="ml-2 h-5 w-5" />
-              </Link>
-            </Button>
+
+            {!authUser ? (
+              <Button size="lg" asChild className="w-full md:w-auto bg-accent hover:bg-accent/90 text-accent-foreground text-lg py-3 px-6">
+                <Link href={`/login?redirect=/events/${event.slug}`}>
+                  Register Now / Login <ExternalLink className="ml-2 h-5 w-5" />
+                </Link>
+              </Button>
+            ) : (userProfile && (userProfile.role === 'student' || userProfile.role === 'test')) ? (
+              isRegistered ? (
+                <div className="text-center py-4">
+                  <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-500" />
+                  <p className="font-semibold text-foreground">You are already registered for this event.</p>
+                  <Button variant="link" asChild className="mt-1 text-primary"><Link href="/dashboard">View in Dashboard</Link></Button>
+                </div>
+              ) : (
+                <Button 
+                  size="lg" 
+                  onClick={handleRegister} 
+                  disabled={isRegistering}
+                  className="w-full md:w-auto bg-green-500 hover:bg-green-600 text-white text-lg py-3 px-6"
+                >
+                  {isRegistering ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <UserCheck className="mr-2 h-5 w-5" />}
+                  Confirm Registration &amp; Proceed to Mock Payment
+                </Button>
+              )
+            ) : (
+              <p className="text-muted-foreground text-center py-4">Only students can register for events. Organizers and other roles manage events through their dashboard.</p>
+            )}
+            
             <CardDescription className="text-sm text-muted-foreground pt-2">
-              Don't miss out! Secure your spot for {event.title}.
+              Register for: {event.title}. (Mock payment simulation after confirmation)
             </CardDescription>
           </CardContent>
         </Card>
@@ -124,3 +196,4 @@ export default function SubEventDetailPage() {
     </div>
   );
 }
+
