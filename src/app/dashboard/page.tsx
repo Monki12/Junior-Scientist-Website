@@ -7,10 +7,11 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/hooks/use-auth';
 import { subEventsData } from '@/data/subEvents';
-import type { UserRole, SubEvent, UserProfileData } from '@/types'; // UserProfileData might be needed for type hint
+import type { UserRole, SubEvent, Task } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import {
   Loader2,
   BarChartBig,
@@ -29,18 +30,49 @@ import {
   Info,
   Briefcase,
   Newspaper,
-  Award // Added Trophy icon
+  Award,
+  Star,
+  CheckCircle,
+  ClipboardList,
+  TrendingUp,
+  Building, // Department Icon
+  Activity, // Credibility Score Icon
+  ShieldCheck // Points Icon
 } from 'lucide-react';
-
-// Placeholder stats for organizers
-const organizerStats = [
-  { title: 'Total Events', value: '12', icon: <BarChartBig className="h-6 w-6 text-primary" />, color: 'text-primary' },
-  { title: 'Active Registrations', value: '345', icon: <Users className="h-6 w-6 text-green-500" />, color: 'text-green-500' },
-  { title: 'Pending Tasks', value: '8', icon: <Edit className="h-6 w-6 text-yellow-500" />, color: 'text-yellow-500' },
-];
 
 interface RegisteredEventDisplay extends SubEvent {
   teamName?: string;
+}
+
+function TaskCard({ task }: { task: Task }) {
+  const getStatusColor = (status: Task['status']) => {
+    switch (status) {
+      case 'pending': return 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30';
+      case 'in-progress': return 'bg-blue-500/10 text-blue-600 border-blue-500/30';
+      case 'completed': return 'bg-green-500/10 text-green-600 border-green-500/30';
+      case 'overdue': return 'bg-red-500/10 text-red-600 border-red-500/30';
+      default: return 'bg-muted text-muted-foreground border-border';
+    }
+  };
+  return (
+    <Card className={`shadow-md hover:shadow-lg transition-shadow ${getStatusColor(task.status)}`}>
+      <CardHeader className="pb-2 pt-3 px-4">
+        <div className="flex justify-between items-start">
+          <CardTitle className="text-md line-clamp-1">{task.title}</CardTitle>
+          <Badge variant="outline" className={`text-xs ${getStatusColor(task.status)} border-current`}>{task.status}</Badge>
+        </div>
+        {task.eventSlug && (
+          <CardDescription className="text-xs">Event: {subEventsData.find(e => e.slug === task.eventSlug)?.title || task.eventSlug}</CardDescription>
+        )}
+      </CardHeader>
+      <CardContent className="px-4 pb-3 pt-1">
+        <p className="text-xs text-muted-foreground line-clamp-2 mb-1">{task.description}</p>
+        {task.deadline && <p className="text-xs">Deadline: {new Date(task.deadline).toLocaleDateString()}</p>}
+        {task.points && <p className="text-xs">Points: {task.points}</p>}
+         {task.assignedByName && <p className="text-xs mt-1">Assigned by: {task.assignedByName}</p>}
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function DashboardPage() {
@@ -86,16 +118,10 @@ export default function DashboardPage() {
             <div>
               <h1 className="text-3xl md:text-4xl font-bold text-primary">{userProfile.displayName || 'Student Dashboard'}</h1>
               <p className="text-muted-foreground mt-1">{userProfile.email}</p>
-              {userProfile.school && (
-                <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                  <School className="h-4 w-4" /> {userProfile.school}
-                </p>
-              )}
-              {userProfile.grade && (
-                <p className="text-sm text-muted-foreground flex items-center gap-1">
-                  <GraduationCap className="h-4 w-4" /> {userProfile.grade}
-                </p>
-              )}
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mt-1">
+                {userProfile.school && ( <p className="flex items-center gap-1"><School className="h-4 w-4" /> {userProfile.school}</p>)}
+                {userProfile.grade && ( <p className="flex items-center gap-1"><GraduationCap className="h-4 w-4" /> {userProfile.grade}</p>)}
+              </div>
             </div>
           </div>
           <Button asChild className="bg-accent hover:bg-accent/90 text-accent-foreground mt-4 md:mt-0">
@@ -153,6 +179,20 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </section>
+        
+        { (userProfile.role === 'test' && userProfile.tasks && userProfile.tasks.length > 0) && (
+            <section>
+            <Card className="shadow-lg">
+                <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-xl"><ClipboardList className="h-5 w-5 text-primary"/>My Tasks</CardTitle>
+                <CardDescription>Tasks assigned to you.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                {userProfile.tasks.map(task => <TaskCard key={task.id} task={task} />)}
+                </CardContent>
+            </Card>
+            </section>
+        )}
 
         <section>
           <Card className="shadow-lg">
@@ -195,96 +235,194 @@ export default function DashboardPage() {
     );
   }
 
-  // Organizer/Admin Dashboard (existing logic)
+  // Organizer/Admin/Representative Dashboard
   let dashboardTitle = "User Dashboard";
-  let welcomeMessage = `Welcome back, ${userProfile.displayName || authUser.email}! Role: ${role}`;
-  let currentStats = organizerStats; // Default to organizer stats
   let quickActions = [];
+  
+  const assignedEvent = role === 'event_representative' && userProfile.assignedEventSlug 
+    ? subEventsData.find(e => e.slug === userProfile.assignedEventSlug) 
+    : null;
 
-  if (role === 'organizer' || role === 'overall_head' || role === 'admin' || role === 'event_representative') {
-    dashboardTitle = "Organizer Dashboard";
-    quickActions = [
-      { href: '/organizer/events/manage', label: 'Manage Events', icon: Briefcase }, 
-      { href: '/organizer/registrations', label: 'View Registrations', icon: Users }, 
-      { href: '/ocr-tool', label: 'Scan Forms (OCR)', icon: FileScan },
-      { href: '/profile', label: 'My Profile', icon: UserCircle }, 
-    ];
-     if (role === 'overall_head' || role === 'admin') {
-        quickActions.push({ href: '/admin/tasks', label: 'Task Management', icon: ListChecks}); 
-     }
+  const assignedOrganizerEvents = role === 'organizer' && userProfile.assignedEventSlugs
+    ? userProfile.assignedEventSlugs.map(slug => subEventsData.find(e => e.slug === slug)?.title).filter(Boolean)
+    : [];
+
+  switch(role) {
+    case 'event_representative':
+      dashboardTitle = "Event Representative Dashboard";
+      quickActions = [
+        { href: '/profile', label: 'My Profile', icon: UserCircle },
+        { href: '/notifications', label: 'Notifications', icon: Bell },
+      ];
+      if (assignedEvent) {
+        quickActions.unshift({ href: `/organizer/events/manage/${assignedEvent.slug}`, label: 'Manage My Event', icon: Briefcase});
+        quickActions.splice(1,0, { href: `/organizer/event-tasks`, label: 'Event Tasks', icon: ListChecks});
+      } else {
+         quickActions.unshift({ href: '#', label: 'No Event Assigned', icon: Briefcase, disabled: true });
+      }
+      break;
+    case 'organizer':
+      dashboardTitle = "Organizer Dashboard";
+      quickActions = [
+        { href: '/profile', label: 'My Profile', icon: UserCircle },
+        { href: '/notifications', label: 'Notifications', icon: Bell },
+        { href: '/ocr-tool', label: 'Scan Forms (OCR)', icon: FileScan },
+      ];
+      break;
+    case 'overall_head':
+      dashboardTitle = "Overall Head Dashboard";
+       quickActions = [
+        { href: '/admin/tasks', label: 'Global Task Mgmt', icon: Settings},
+        { href: '/organizer/events/manage', label: 'Manage All Events', icon: Briefcase }, 
+        { href: '/organizer/registrations', label: 'View Registrations', icon: Users }, 
+        { href: '/ocr-tool', label: 'Scan Forms (OCR)', icon: FileScan },
+        { href: '/profile', label: 'My Profile', icon: UserCircle }, 
+        { href: '/notifications', label: 'Notifications', icon: Bell },
+      ];
+      break;
+    case 'admin':
+      dashboardTitle = "Admin Dashboard";
+       quickActions = [
+        { href: '/admin/tasks', label: 'Global Task Mgmt', icon: Settings},
+        { href: '/organizer/events/manage', label: 'Manage All Events', icon: Briefcase }, 
+        { href: '/organizer/registrations', label: 'View Registrations', icon: Users }, 
+        { href: '/admin/users', label: 'Manage Users', icon: Users}, // Placeholder link
+        { href: '/ocr-tool', label: 'Scan Forms (OCR)', icon: FileScan },
+        { href: '/profile', label: 'My Profile', icon: UserCircle }, 
+        { href: '/notifications', label: 'Notifications', icon: Bell },
+      ];
+      break;
+    default:
+      dashboardTitle = "User Dashboard"; // Should not happen if role is defined
   }
+
 
   return (
     <div className="space-y-8 animate-fade-in-up">
-      <header className="flex flex-col md:flex-row justify-between items-center gap-4">
-        <div>
-          <h1 className="text-3xl md:text-4xl font-bold text-primary">{dashboardTitle}</h1>
-          <p className="text-muted-foreground mt-1">{welcomeMessage}</p>
+      <header className="flex flex-col md:flex-row justify-between items-start gap-4">
+        <div className="flex items-center gap-4">
+           <Avatar className="h-20 w-20 border-2 border-primary">
+            <AvatarImage src={userProfile.photoURL || undefined} alt={userProfile.displayName || 'User'} />
+            <AvatarFallback className="text-2xl">{(userProfile.displayName || userProfile.email || 'U')[0].toUpperCase()}</AvatarFallback>
+          </Avatar>
+          <div>
+            <h1 className="text-3xl md:text-4xl font-bold text-primary">{userProfile.displayName || dashboardTitle}</h1>
+            <p className="text-muted-foreground mt-1">{userProfile.email}</p>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mt-1">
+                <p className="flex items-center gap-1"><ShieldCheck className="h-4 w-4" /> Role: <span className="font-medium text-foreground capitalize">{userProfile.role.replace('_', ' ')}</span></p>
+                {userProfile.department && <p className="flex items-center gap-1"><Building className="h-4 w-4" /> {userProfile.department}</p>}
+            </div>
+          </div>
         </div>
         {(role === 'organizer' || role === 'overall_head' || role === 'admin') && (
-          <Button asChild className="bg-accent hover:bg-accent/90 text-accent-foreground">
+          <Button asChild className="bg-accent hover:bg-accent/90 text-accent-foreground mt-4 md:mt-0">
             <Link href="/organizer/events/create">Create New Event</Link>
           </Button>
         )}
       </header>
 
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {currentStats.map((stat) => (
-          <Card key={stat.title} className="shadow-lg hover:shadow-xl transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{stat.title}</CardTitle>
-              {stat.icon}
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {userProfile.points !== undefined && (
+            <Card className="shadow-md">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">My Points</CardTitle>
+                    <Award className="h-5 w-5 text-yellow-500" />
+                </CardHeader>
+                <CardContent>
+                    <div className="text-2xl font-bold text-yellow-600">{userProfile.points}</div>
+                </CardContent>
+            </Card>
+        )}
+        {userProfile.credibilityScore !== undefined && (
+            <Card className="shadow-md">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Credibility Score</CardTitle>
+                    <Activity className="h-5 w-5 text-green-500" />
+                </CardHeader>
+                <CardContent>
+                    <div className="text-2xl font-bold text-green-600">{userProfile.credibilityScore}%</div>
+                </CardContent>
+            </Card>
+        )}
+         {(userProfile.tasks && userProfile.tasks.length > 0) && (
+            <Card className="shadow-md">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Pending Tasks</CardTitle>
+                    <ClipboardList className="h-5 w-5 text-blue-500" />
+                </CardHeader>
+                <CardContent>
+                    <div className="text-2xl font-bold text-blue-600">{userProfile.tasks.filter(t => t.status === 'pending' || t.status === 'in-progress').length}</div>
+                </CardContent>
+            </Card>
+        )}
+      </section>
+      
+      {role === 'event_representative' && assignedEvent && (
+        <Card className="shadow-lg">
+            <CardHeader>
+                <CardTitle className="text-xl text-primary">Managing: {assignedEvent.title}</CardTitle>
+                <CardDescription>{assignedEvent.shortDescription}</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className={`text-3xl font-bold ${stat.color}`}>{stat.value}</div>
-              <p className="text-xs text-muted-foreground mt-1">+X% from last month (mock)</p>
+                <Link href={`/events/${assignedEvent.slug}`} target="_blank" rel="noopener noreferrer">
+                    <Button variant="outline">View Event Page <ExternalLink className="ml-2 h-4 w-4" /></Button>
+                </Link>
+            </CardContent>
+        </Card>
+      )}
+
+      {role === 'organizer' && assignedOrganizerEvents.length > 0 && (
+        <Card className="shadow-lg">
+            <CardHeader>
+                <CardTitle className="text-xl text-primary">My Assigned Events</CardTitle>
+                <CardDescription>Events you are contributing to.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+                {assignedOrganizerEvents.map(title => (
+                    <Badge key={title} variant="secondary" className="mr-2">{title}</Badge>
+                ))}
+            </CardContent>
+        </Card>
+      )}
+
+
+      {userProfile.tasks && userProfile.tasks.length > 0 && (
+        <section>
+          <Card className="shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-xl"><ClipboardList className="h-5 w-5 text-primary"/>My Tasks</CardTitle>
+              <CardDescription>Tasks assigned to you. Click to see details (feature coming soon).</CardDescription>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {userProfile.tasks.map(task => <TaskCard key={task.id} task={task} />)}
             </CardContent>
           </Card>
-        ))}
-      </section>
+        </section>
+      )}
 
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <section>
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle>Quick Actions</CardTitle>
             <CardDescription>Access common tasks quickly.</CardDescription>
           </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
+          <CardContent className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             {quickActions.map(action => (
-              <Button variant="outline" asChild key={action.href}>
+              <Button variant="outline" asChild key={action.href} disabled={(action as any).disabled}>
                 <Link href={action.href} className="flex items-center gap-2">
                   <action.icon className="h-4 w-4" /> {action.label}
                 </Link>
               </Button>
             ))}
-             <Button variant="outline" asChild>
-                <Link href="/notifications" className="flex items-center gap-2">
-                  <Bell className="h-4 w-4" /> Notifications
-                </Link>
-              </Button>
-          </CardContent>
-        </Card>
-        
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>Overview of recent activities (placeholder).</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-3">
-              <li className="text-sm text-muted-foreground">New registration for 'Tech Conference 2024'.</li>
-              <li className="text-sm text-muted-foreground">'Art Workshop' event updated.</li>
-              <li className="text-sm text-muted-foreground">5 new tasks assigned for organizers.</li>
-            </ul>
           </CardContent>
         </Card>
       </section>
-
-      {(role === 'organizer' || role === 'overall_head' || role === 'admin' || role === 'event_representative') && (
-        <section>
+      
+      {(role === 'organizer' || role === 'overall_head' || role === 'admin') && (
+         <section>
           <Card className="shadow-lg">
               <CardHeader>
-                  <CardTitle>Upcoming Events Overview</CardTitle>
+                  <CardTitle>Upcoming Events Overview (Mock)</CardTitle>
                   <CardDescription>A quick look at events you are managing.</CardDescription>
               </CardHeader>
               <CardContent>

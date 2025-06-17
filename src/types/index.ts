@@ -10,6 +10,22 @@ export type UserRole =
   | 'admin' 
   | 'test';
 
+export interface Task {
+  id: string;
+  title: string;
+  description: string;
+  assignedToName?: string; // Name of the user it's assigned to (for display)
+  assignedToUid?: string;   // UID of the user it's assigned to
+  assignedByName?: string; // Name of the user who assigned it (for display)
+  assignedByUid?: string;   // UID of the user who assigned it
+  eventSlug?: string;       // Optional, if task is event-specific
+  deadline?: string;        // ISO date string
+  points?: number;
+  status: 'pending' | 'in-progress' | 'completed' | 'overdue';
+  createdAt: string;         // ISO date string
+  updatedAt: string;         // ISO date string
+}
+
 // Interface for custom user profile data stored in Firestore
 export interface UserProfileData {
   uid: string;
@@ -19,10 +35,16 @@ export interface UserProfileData {
   photoURL?: string | null; 
   school?: string; 
   grade?: string; 
-  registeredEvents?: Array<{ // Changed from registeredEventSlugs
+  registeredEvents?: Array<{
     eventSlug: string;
-    teamName?: string; // Added for team-based events
-  }>; 
+    teamName?: string; 
+  }>;
+  department?: string; // e.g., "Marketing", "Logistics"
+  assignedEventSlug?: string; // For event_representative: the slug of the event they manage
+  assignedEventSlugs?: string[]; // For organizers: slugs of events they are part of
+  tasks?: Task[]; // Tasks assigned to this user
+  points?: number; // Gamification points
+  credibilityScore?: number; // Calculated score
 }
 
 // This Event interface seems to be for a generic event, not the sub-events.
@@ -53,7 +75,7 @@ export interface SubEvent {
   galleryImages?: Array<{ src: string; alt: string; dataAiHint: string }>;
   registrationLink: string;
   deadline?: string; 
-  isTeamEvent?: boolean; // Added to mark team-based events
+  isTeamEvent?: boolean; 
 }
 
 export interface SignUpFormData {
@@ -75,4 +97,3 @@ export interface StudentData {
   contactNumber: string;
   email: string;
 }
-
