@@ -7,7 +7,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Loader2, BarChartBig, Edit, Users, FileScan, Settings, BookUser, Trophy, ListChecks } from 'lucide-react';
+import { Loader2, BarChartBig, Edit, Users, FileScan, Settings, BookUser, Trophy, ListChecks, CalendarDays, UserCircle, Bell } from 'lucide-react';
 import type { UserRole } from '@/types';
 
 // Placeholder stats - these could be dynamic based on role
