@@ -33,20 +33,22 @@ export default function ProfilePage() {
     if (!loading && !authUser) {
       router.push('/login?redirect=/profile');
     }
-    if (authUser && (userProfile?.displayName || authUser.displayName)) {
-      setDisplayName(userProfile?.displayName || authUser.displayName || '');
-    }
-    if (userProfile && (userProfile.role === 'student' || userProfile.role === 'test') && userProfile.registeredEvents) {
-      const fullEvents = userProfile.registeredEvents
-        .map(registeredInfo => {
-          const eventDetail = subEventsData.find(event => event.slug === registeredInfo.eventSlug);
-          if (eventDetail) {
-            return { ...eventDetail, teamName: registeredInfo.teamName };
-          }
-          return null;
-        })
-        .filter(event => event !== null) as RegisteredEventDisplay[];
-      setStudentRegisteredFullEvents(fullEvents);
+    if (userProfile) { // Ensure userProfile exists before accessing its properties
+      setDisplayName(userProfile.displayName || ''); // Default to empty string if displayName is null
+      if ((userProfile.role === 'student' || userProfile.role === 'test') && userProfile.registeredEvents) {
+        const fullEvents = userProfile.registeredEvents
+          .map(registeredInfo => {
+            const eventDetail = subEventsData.find(event => event.slug === registeredInfo.eventSlug);
+            if (eventDetail) {
+              return { ...eventDetail, teamName: registeredInfo.teamName };
+            }
+            return null;
+          })
+          .filter(event => event !== null) as RegisteredEventDisplay[];
+        setStudentRegisteredFullEvents(fullEvents);
+      }
+    } else if (authUser && authUser.displayName) { // Fallback to authUser.displayName if userProfile is not yet loaded or doesn't have one
+        setDisplayName(authUser.displayName);
     }
   }, [authUser, userProfile, loading, router]);
 
@@ -65,14 +67,16 @@ export default function ProfilePage() {
   };
   
   const handleProfileUpdate = async () => {
-    if (!authUser || !userProfile) return;
+    if (!authUser || !userProfile || !setUserProfile) return; // Added !setUserProfile check
     setIsUpdating(true);
     
     await new Promise(resolve => setTimeout(resolve, 500)); 
-    if (setUserProfile) {
-        // @ts-ignore
-        setUserProfile(prev => prev ? {...prev, displayName } : null);
-    }
+    
+    setUserProfile(prev => { // Use functional update for setUserProfile
+        if (!prev) return null;
+        return {...prev, displayName };
+    });
+
     toast({
       title: 'Profile Updated (Mock)',
       description: 'Your display name has been updated locally for this session.',
@@ -89,7 +93,7 @@ export default function ProfilePage() {
   }
   
   const displayEmail = authUser.email || userProfile.email;
-  const avatarFallback = displayName?.[0].toUpperCase() || displayEmail?.[0].toUpperCase() || 'U';
+  const avatarFallback = (displayName?.[0])?.toUpperCase() || (displayEmail?.[0])?.toUpperCase() || 'U';
   const currentPhotoURL = userProfile?.photoURL || authUser.photoURL;
 
   return (
@@ -167,8 +171,8 @@ export default function ProfilePage() {
                         <Image
                           src={event.mainImage.src}
                           alt={event.mainImage.alt}
-                          layout="fill"
-                          objectFit="cover"
+                          fill // Changed from layout="fill"
+                          style={{objectFit: 'cover'}} // Changed from objectFit="cover"
                           data-ai-hint={event.mainImage.dataAiHint}
                           className="group-hover:scale-105 transition-transform"
                         />
