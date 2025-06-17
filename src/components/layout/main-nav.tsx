@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -95,9 +95,9 @@ export default function MainNav() {
         "flex items-center gap-2 rounded-md text-sm font-medium transition-colors",
         isBranding 
           ? "text-xl font-bold text-primary font-headline hover:opacity-90 p-0" 
-          : "px-2 py-1.5 hover:bg-primary/10 hover:text-primary", // Adjusted padding here
+          : "px-2 py-1.5 hover:bg-primary/10 hover:text-primary",
         !isBranding && (pathname === href || (href.includes('#') && pathname + (window.location.hash || '') === href) ) ? "text-primary bg-primary/5" : "text-muted-foreground",
-        isBranding && "p-0" // Ensure branding link itself doesn't get extra padding from the rule above
+        isBranding && "p-0"
       )}
     >
       <Icon className={cn(isBranding ? "h-7 w-7" : "h-5 w-5")} />
@@ -221,6 +221,9 @@ export default function MainNav() {
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-[280px] p-0 flex flex-col">
+                <SheetHeader className="sr-only">
+                  <SheetTitle>Main Navigation Menu</SheetTitle>
+                </SheetHeader>
                 <div className="border-b p-4">
                   <NavLinkItem href="/" label="JUNIOR SCIENTIST" Icon={Atom} isBranding onClick={() => setIsMobileMenuOpen(false)}/>
                 </div>
