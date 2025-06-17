@@ -16,9 +16,10 @@ export interface UserProfileData {
   email: string | null;
   displayName: string | null;
   role: UserRole;
-  photoURL?: string | null; // Store photoURL for consistency if needed
-  academicStandard?: string; // Example: For students
-  assignedEvents?: string[]; // Example: For organizers/representatives
+  photoURL?: string | null; 
+  school?: string; 
+  grade?: string; 
+  registeredEventSlugs?: string[]; 
 }
 
 // This Event interface seems to be for a generic event, not the sub-events.

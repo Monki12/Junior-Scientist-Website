@@ -17,6 +17,9 @@ const mockUserProfiles: Record<UserRole, UserProfileData> = {
     displayName: 'Test Student',
     role: 'student',
     photoURL: 'https://placehold.co/100x100.png?text=TS',
+    school: 'Springfield High',
+    grade: '10th Grade',
+    registeredEventSlugs: ['model-united-nations', 'ex-quiz-it'], 
   },
   organizer: {
     uid: 'mock-organizer-uid',
@@ -46,12 +49,15 @@ const mockUserProfiles: Record<UserRole, UserProfileData> = {
     role: 'admin',
     photoURL: 'https://placehold.co/100x100.png?text=TA',
   },
-  test: {
+  test: { // Generic test user, can act as student for UI
     uid: 'mock-test-uid',
     email: 'generic.test@example.com',
     displayName: 'Generic Test User',
-    role: 'test',
+    role: 'test', // This role will often be treated like 'student' in UI logic
     photoURL: 'https://placehold.co/100x100.png?text=TU',
+    school: 'Testington Academy',
+    grade: '12th Grade',
+    registeredEventSlugs: ['robo-challenge'],
   }
 };
 
@@ -59,10 +65,11 @@ interface AuthContextType {
   authUser: FirebaseUser | null;
   userProfile: UserProfileData | null;
   loading: boolean;
-  signUp: (data: SignUpFormData) => Promise<FirebaseUser | AuthError | { message: string }>; // Adjusted return type for mock
-  logIn: (data: LoginFormData | UserRole) => Promise<FirebaseUser | AuthError | { message: string }>; // Adjusted for mock role login
+  signUp: (data: SignUpFormData) => Promise<FirebaseUser | AuthError | { message: string }>; 
+  logIn: (data: LoginFormData | UserRole) => Promise<FirebaseUser | AuthError | { message: string }>; 
   logOut: () => Promise<void>;
-  setMockUserRole: (role: UserRole | null) => void; // Exposed to allow changing mock user
+  setMockUserRole: (role: UserRole | null) => void; 
+  setUserProfile: React.Dispatch<React.SetStateAction<UserProfileData | null>>; // Added for profile updates
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -70,17 +77,11 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [authUser, setAuthUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfileData | null>(null);
-  const [loading, setLoading] = useState(true); // Start true, then quickly set to false
+  const [loading, setLoading] = useState(true);
 
-  // Initialize with a default mock user or no user
   useEffect(() => {
-    // For this mock setup, we don't listen to onAuthStateChanged
-    // We can set a default mock user or start logged out
-    // To start logged out:
     setAuthUser(null);
     setUserProfile(null);
-    // Or to start as a default 'student':
-    // setMockUserRole('student'); 
     setLoading(false);
   }, []);
 
@@ -88,13 +89,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     if (role && mockUserProfiles[role]) {
       const profile = mockUserProfiles[role];
-      // Create a simplified FirebaseUser-like object
       const mockFbUser: FirebaseUser = {
         uid: profile.uid,
         email: profile.email,
         displayName: profile.displayName,
         photoURL: profile.photoURL,
-        // Add other required FirebaseUser properties as needed, with dummy values
         emailVerified: true,
         isAnonymous: false,
         metadata: {},
@@ -107,7 +106,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         getIdTokenResult: async () => ({ token: 'mock-id-token', claims: {}, expirationTime: '', issuedAtTime: '', signInProvider: null, signInSecondFactor: null}),
         reload: async () => {},
         toJSON: () => ({}),
-      } as FirebaseUser; // Type assertion
+      } as FirebaseUser; 
 
       setAuthUser(mockFbUser);
       setUserProfile(profile);
@@ -119,26 +118,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signUp = async (data: SignUpFormData): Promise<{ message: string }> => {
-    console.warn("Mock Auth: signUp called. In mock mode, new users are not actually created. Defaulting to student or use login page to select role.");
-    // Simulate setting a default user, e.g., student, or do nothing
-    // setMockUserRole('student'); // Optionally auto-login as student on mock signup
+    console.warn("Mock Auth: signUp called. In mock mode, new users are not actually created. Please use mock login.");
     return { message: "Sign up is in mock mode. Please use mock login." };
   };
 
   const logIn = async (data: LoginFormData | UserRole): Promise<{ message: string } | FirebaseUser> => {
     console.warn("Mock Auth: logIn called.");
-    if (typeof data === 'string' && mockUserProfiles[data as UserRole]) { // Login by role
+    let loggedInUser: FirebaseUser | null = null;
+    if (typeof data === 'string' && mockUserProfiles[data as UserRole]) { 
       setMockUserRole(data as UserRole);
-      // Return the mock FirebaseUser object
-      return authUser || { message: "Mock login successful but authUser not set." } as any;
-    } else if (typeof data === 'object' && data.email) { // Login by email (attempt to match)
+      loggedInUser = authUser; // authUser state might not update immediately
+    } else if (typeof data === 'object' && data.email) { 
         const roleToLogin = Object.values(mockUserProfiles).find(p => p.email === data.email)?.role;
         if (roleToLogin) {
             setMockUserRole(roleToLogin);
-            return authUser || { message: "Mock login successful but authUser not set." } as any;
+            loggedInUser = authUser; // authUser state might not update immediately
         }
+    } else {
+      setMockUserRole('student'); 
+      loggedInUser = authUser; // authUser state might not update immediately
     }
-    setMockUserRole('student'); // Default to student if no specific role is matched
+    
+    // To ensure we return the "correct" (latest set) authUser, we can re-fetch from mockUserProfiles
+    if (userProfile) { // If userProfile was set by setMockUserRole
+      const profile = mockUserProfiles[userProfile.role];
+       const mockFbUser: FirebaseUser = {
+        uid: profile.uid, email: profile.email, displayName: profile.displayName, photoURL: profile.photoURL,
+        emailVerified: true, isAnonymous: false, metadata: {}, providerData: [], providerId: 'mock', refreshToken: 'mock-refresh-token', tenantId: null,
+        delete: async () => {}, getIdToken: async () => 'mock-id-token', getIdTokenResult: async () => ({ token: 'mock-id-token', claims: {}, expirationTime: '', issuedAtTime: '', signInProvider: null, signInSecondFactor: null}),
+        reload: async () => {}, toJSON: () => ({}),
+      } as FirebaseUser;
+      return mockFbUser;
+    }
+
     return { message: "Mock login: Defaulted to student or unknown credentials." };
   };
 
@@ -155,7 +167,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     signUp,
     logIn,
     logOut,
-    setMockUserRole, // Expose this for the login page
+    setMockUserRole,
+    setUserProfile, // Expose setUserProfile for profile page updates
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
