@@ -62,7 +62,7 @@ export default function JuniorScientistHomePage() {
       <section className="w-full py-20 md:py-32 text-center bg-background relative overflow-hidden">
         <div className="absolute inset-0 opacity-5 dark:opacity-[0.03]">
            {/* Decorative background, could be an abstract science pattern or subtle gradient lines */}
-           <Image src="https://placehold.co/1920x1080.png" alt="Abstract background" layout="fill" objectFit="cover" data-ai-hint="science pattern dark" />
+           <Image src="https://placehold.co/1920x1080.png" alt="Abstract background" fill style={{ objectFit: 'cover' }} data-ai-hint="science pattern dark" />
         </div>
         <div className="container mx-auto px-4 relative z-10">
           <Atom className="h-16 w-16 md:h-24 md:w-24 text-primary mx-auto mb-6 animate-pulse" />
@@ -156,8 +156,8 @@ export default function JuniorScientistHomePage() {
                     <Image
                       src={event.mainImage.src}
                       alt={event.mainImage.alt}
-                      layout="fill"
-                      objectFit="cover"
+                      fill
+                      style={{ objectFit: 'cover' }}
                       data-ai-hint={event.mainImage.dataAiHint}
                       className="group-hover:scale-105 transition-transform duration-300"
                     />

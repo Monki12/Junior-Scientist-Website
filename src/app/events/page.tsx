@@ -20,8 +20,8 @@ function SubEventCard({ event }: { event: SubEvent }) {
           <Image
             src={event.mainImage.src}
             alt={event.mainImage.alt}
-            layout="fill"
-            objectFit="cover"
+            fill
+            style={{ objectFit: 'cover' }}
             data-ai-hint={event.mainImage.dataAiHint}
             className="group-hover:scale-105 transition-transform duration-300"
           />

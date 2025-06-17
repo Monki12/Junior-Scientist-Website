@@ -133,8 +133,8 @@ export default function SubEventDetailPage() {
             <Image 
               src={event.mainImage.src} 
               alt={event.mainImage.alt} 
-              layout="fill" 
-              objectFit="cover" 
+              fill
+              style={{ objectFit: 'cover' }} 
               priority
               data-ai-hint={event.mainImage.dataAiHint}
             />
@@ -168,8 +168,8 @@ export default function SubEventDetailPage() {
                     <Image 
                       src={img.src} 
                       alt={img.alt} 
-                      layout="fill" 
-                      objectFit="cover"
+                      fill
+                      style={{ objectFit: 'cover' }}
                       data-ai-hint={img.dataAiHint} 
                     />
                   </div>
@@ -261,4 +261,3 @@ export default function SubEventDetailPage() {
     </div>
   );
 }
-

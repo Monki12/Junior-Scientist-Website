@@ -22,8 +22,8 @@ export default function EventCard({ event }: EventCardProps) {
           <Image
             src={event.imageUrl || "https://placehold.co/600x400.png"}
             alt={event.title}
-            layout="fill"
-            objectFit="cover"
+            fill
+            style={{ objectFit: 'cover' }}
             data-ai-hint={event.dataAiHint || event.category || "event generic"}
             className="group-hover:scale-105 transition-transform"
           />
@@ -57,4 +57,3 @@ export default function EventCard({ event }: EventCardProps) {
     </Card>
   );
 }
-
