@@ -1,0 +1,96 @@
+
+import type { SubEvent } from '@/types';
+
+export const subEventsData: SubEvent[] = [
+  {
+    id: '1',
+    slug: 'model-united-nations',
+    title: 'Model United Nations (MUN)',
+    superpowerCategory: 'The Thinker',
+    shortDescription: 'Debate global issues, showcase diplomacy and critical thinking. Perfect for aspiring diplomats!',
+    detailedDescription: 'Dive into the world of international relations with our Model United Nations. Participants will represent different countries, debate pressing global issues, and draft resolutions. This event hones public speaking, negotiation, critical thinking, and leadership skills. An excellent platform for those who dream of shaping global policies.',
+    mainImage: { src: 'https://placehold.co/600x400.png', alt: 'MUN in session', dataAiHint: 'debate conference' },
+    galleryImages: [
+      { src: 'https://placehold.co/400x300.png', alt: 'Students collaborating', dataAiHint: 'team discussion' },
+      { src: 'https://placehold.co/400x300.png', alt: 'Delegate speaking', dataAiHint: 'public speaking' },
+      { src: 'https://placehold.co/400x300.png', alt: 'MUN committee', dataAiHint: 'formal meeting' },
+    ],
+    registrationLink: '/signup?event=mun', // Example specific registration or common
+    deadline: '2024-11-15',
+  },
+  {
+    id: '2',
+    slug: 'ex-quiz-it',
+    title: 'Ex-Quiz-It',
+    superpowerCategory: 'The Brainiac',
+    shortDescription: 'Test your knowledge in this thrilling science and general knowledge quiz.',
+    detailedDescription: 'Ex-Quiz-It is the ultimate battle of wits! Teams will face challenging questions spanning various scientific domains, current affairs, history, and more. Show off your quick thinking, vast knowledge, and teamwork. Are you ready to be quizzed?',
+    mainImage: { src: 'https://placehold.co/600x400.png', alt: 'Quiz competition', dataAiHint: 'quiz show' },
+    galleryImages: [
+      { src: 'https://placehold.co/400x300.png', alt: 'Students with buzzers', dataAiHint: 'quiz buzzers' },
+      { src: 'https://placehold.co/400x300.png', alt: 'Audience watching quiz', dataAiHint: 'event audience' },
+    ],
+    registrationLink: '/signup?event=ex-quiz-it',
+    deadline: '2024-11-18',
+  },
+  {
+    id: '3',
+    slug: 'junior-scientist-olympiad',
+    title: 'Junior Scientist Olympiad',
+    superpowerCategory: 'The Brainiac',
+    shortDescription: 'Challenge yourself with intriguing science and math problems in this Olympiad.',
+    detailedDescription: 'The Junior Scientist Olympiad is designed to test your fundamental understanding of core science and mathematics concepts. Solve complex problems, apply theoretical knowledge to practical scenarios, and prove your mettle against the brightest young minds.',
+    mainImage: { src: 'https://placehold.co/600x400.png', alt: 'Science experiment', dataAiHint: 'science lab' },
+    galleryImages: [
+      { src: 'https://placehold.co/400x300.png', alt: 'Math equations on board', dataAiHint: 'math blackboard' },
+      { src: 'https://placehold.co/400x300.png', alt: 'Student solving problem', dataAiHint: 'student focused' },
+    ],
+    registrationLink: '/signup?event=olympiad',
+    deadline: '2024-11-20',
+  },
+  {
+    id: '4',
+    slug: 'math-a-maze',
+    title: 'Math-A-Maze',
+    superpowerCategory: 'The Strategist',
+    shortDescription: 'Navigate through mathematical puzzles and logical riddles to find your way out.',
+    detailedDescription: 'Engage your logical and analytical skills in Math-A-Maze! Solve a series of interconnected mathematical puzzles and logical riddles to navigate the maze. Speed, accuracy, and strategic thinking are crucial for success.',
+    mainImage: { src: 'https://placehold.co/600x400.png', alt: 'Maze puzzle design', dataAiHint: 'maze game' },
+    galleryImages: [
+      { src: 'https://placehold.co/400x300.png', alt: 'Abstract math concept', dataAiHint: 'math concept' },
+      { src: 'https://placehold.co/400x300.png', alt: 'Students working on puzzle', dataAiHint: 'students puzzle' },
+    ],
+    registrationLink: '/signup?event=math-a-maze',
+    deadline: '2024-11-22',
+  },
+  {
+    id: '5',
+    slug: 'maze-to-mastery',
+    title: 'Maze to Mastery',
+    superpowerCategory: 'The Strategist',
+    shortDescription: 'Solve intricate puzzles and showcase your strategic thinking and problem-solving skills.',
+    detailedDescription: 'Maze to Mastery is a series of challenging puzzles that require sharp strategic thinking, keen pattern recognition, and excellent problem-solving abilities. Navigate complex scenarios to reach the pinnacle of mastery.',
+    mainImage: { src: 'https://placehold.co/600x400.png', alt: 'Strategy board game', dataAiHint: 'strategy game' },
+    galleryImages: [
+      { src: 'https://placehold.co/400x300.png', alt: 'Brain teaser illustration', dataAiHint: 'puzzle mind' },
+      { src: 'https://placehold.co/400x300.png', alt: 'Intricate puzzle design', dataAiHint: 'complex puzzle' },
+    ],
+    registrationLink: '/signup?event=maze-mastery',
+    deadline: '2024-11-25',
+  },
+  {
+    id: '6',
+    slug: 'robo-challenge',
+    title: 'Robo Challenge',
+    superpowerCategory: 'The Innovator',
+    shortDescription: 'Design, build, and compete with your robots in exciting, task-based challenges.',
+    detailedDescription: 'Unleash your inner engineer in the Robo Challenge! Design, build, and program robots to compete in a variety of thrilling tasks and obstacle courses. This event celebrates innovation, technical skill, and teamwork in the field of robotics.',
+    mainImage: { src: 'https://placehold.co/600x400.png', alt: 'Robotics competition arena', dataAiHint: 'student robotics' },
+    galleryImages: [
+      { src: 'https://placehold.co/400x300.png', alt: 'Students building robot', dataAiHint: 'diy robot' },
+      { src: 'https://placehold.co/400x300.png', alt: 'Robot performing task', dataAiHint: 'robot action' },
+    ],
+    registrationLink: '/signup?event=robo-challenge',
+    deadline: '2024-11-28',
+  },
+];

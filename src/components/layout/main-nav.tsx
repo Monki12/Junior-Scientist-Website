@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -16,12 +17,15 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import { Zap, Menu, LogOut, UserCircle, LayoutDashboard, CalendarDays, ScanLine, Bell } from 'lucide-react';
+import { Atom, Menu, LogOut, UserCircle, Home, CalendarDays, Phone, ScanLine, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navLinks = [
+  { href: '/', label: 'Home', icon: Home, authRequired: false },
   { href: '/events', label: 'Events', icon: CalendarDays, authRequired: false },
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, authRequired: true },
+  { href: '/#contact-us', label: 'Contact Us', icon: Phone, authRequired: false },
+  // Keeping dashboard and OCR tool for logged-in users, can be removed if not part of Junior Scientist scope
+  { href: '/dashboard', label: 'Dashboard', icon: UserCircle, authRequired: true },
   { href: '/ocr-tool', label: 'OCR Tool', icon: ScanLine, authRequired: true },
   { href: '/notifications', label: 'Notifications', icon: Bell, authRequired: true },
 ];
@@ -36,12 +40,10 @@ export default function MainNav() {
 
   useEffect(() => setMounted(true), []);
 
-
   const handleLogout = async () => {
     try {
       await logOut();
       router.push('/');
-      // Toast for successful logout is not an error, so omitted based on guidelines.
     } catch (error) {
       toast({
         title: 'Logout Failed',
@@ -54,10 +56,20 @@ export default function MainNav() {
   const NavLinkItem: React.FC<{ href: string; label: string; Icon: React.ElementType; onClick?: () => void }> = ({ href, label, Icon, onClick }) => (
     <Link
       href={href}
-      onClick={onClick}
+      onClick={(e) => {
+        if (href.includes('#')) {
+          e.preventDefault();
+          const targetId = href.split('#')[1];
+          const targetElement = document.getElementById(targetId);
+          if (targetElement) {
+            targetElement.scrollIntoView({ behavior: 'smooth' });
+          }
+        }
+        if (onClick) onClick();
+      }}
       className={cn(
         "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-primary/10 hover:text-primary",
-        pathname === href ? "text-primary bg-primary/5" : "text-muted-foreground"
+        (pathname === href || (href.includes('#') && pathname + (window.location.hash || '') === href) ) ? "text-primary bg-primary/5" : "text-muted-foreground"
       )}
     >
       <Icon className="h-5 w-5" />
@@ -77,8 +89,8 @@ export default function MainNav() {
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between">
           <Link href="/" className="flex items-center gap-2 text-lg font-bold text-primary">
-            <Zap className="h-6 w-6" />
-            <span>EventFlow</span>
+            <Atom className="h-6 w-6" />
+            <span>Junior Scientist</span>
           </Link>
           <div className="h-8 w-20 animate-pulse rounded-md bg-muted"></div>
         </div>
@@ -87,15 +99,14 @@ export default function MainNav() {
   }
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 text-lg font-bold text-primary font-headline">
-          <Zap className="h-6 w-6" />
-          <span>EventFlow</span>
+        <Link href="/" className="flex items-center gap-2 text-xl font-bold text-primary font-headline">
+          <Atom className="h-7 w-7" />
+          <span>JUNIOR SCIENTIST</span>
         </Link>
 
-        {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center space-x-2 lg:space-x-4">
+        <nav className="hidden md:flex items-center space-x-1 lg:space-x-2">
           {navLinks.filter(link => !link.authRequired || (link.authRequired && user)).map(link => (
             <NavLinkItem key={link.href} href={link.href} label={link.label} Icon={link.icon} />
           ))}
@@ -142,7 +153,6 @@ export default function MainNav() {
             </div>
           )}
 
-          {/* Mobile Navigation Trigger */}
           <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
             <SheetTrigger asChild className="md:hidden">
               <Button variant="ghost" size="icon">
@@ -154,8 +164,8 @@ export default function MainNav() {
               <div className="flex h-full flex-col">
                 <div className="border-b p-4">
                   <Link href="/" className="flex items-center gap-2 text-lg font-bold text-primary font-headline" onClick={() => setIsMobileMenuOpen(false)}>
-                    <Zap className="h-6 w-6" />
-                    <span>EventFlow</span>
+                    <Atom className="h-6 w-6" />
+                    <span>JUNIOR SCIENTIST</span>
                   </Link>
                 </div>
                 <nav className="flex-grow space-y-2 p-4">

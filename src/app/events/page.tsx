@@ -1,47 +1,78 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
-import EventCard from '@/components/event-card';
-import type { Event } from '@/types';
+import Link from 'next/link';
+import Image from 'next/image';
+import type { SubEvent } from '@/types';
+import { subEventsData } from '@/data/subEvents';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, ListFilter, Loader2 } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Search, ListFilter, Loader2, CalendarDays, Tag } from 'lucide-react';
 
-// Mock data for events
-const mockEvents: Event[] = [
-  { id: '1', title: 'Tech Conference 2024', description: 'Join us for the latest in tech innovation.', date: '2024-10-15', time: '09:00 AM', location: 'Convention Center', organizerId: 'org1', imageUrl: 'https://placehold.co/600x400.png?a=1', category: 'Technology', dataAiHint: 'tech conference' },
-  { id: '2', title: 'Art Workshop', description: 'Explore your creative side with our hands-on art workshop.', date: '2024-11-05', time: '02:00 PM', location: 'Community Art Studio', organizerId: 'org2', imageUrl: 'https://placehold.co/600x400.png?a=2', category: 'Arts & Culture', dataAiHint: 'art workshop' },
-  { id: '3', title: 'Music Festival', description: 'A weekend of live music from various artists.', date: '2024-09-20', time: '12:00 PM', location: 'City Park', organizerId: 'org3', imageUrl: 'https://placehold.co/600x400.png?a=3', category: 'Music', dataAiHint: 'music festival' },
-  { id: '4', title: 'Startup Pitch Night', description: 'Witness innovative startups pitch their ideas.', date: '2024-10-25', time: '06:00 PM', location: 'Innovation Hub', organizerId: 'org1', imageUrl: 'https://placehold.co/600x400.png?a=4', category: 'Business', dataAiHint: 'startup pitch' },
-  { id: '5', title: 'Food Fair Extravaganza', description: 'Taste delicacies from around the world.', date: '2024-11-12', time: '11:00 AM', location: 'Exhibition Grounds', organizerId: 'org4', imageUrl: 'https://placehold.co/600x400.png?a=5', category: 'Food & Drink', dataAiHint: 'food fair' },
-  { id: '6', title: 'Literary Fest', description: 'Meet authors, attend talks, and discover new books.', date: '2024-12-01', time: '10:00 AM', location: 'Public Library', organizerId: 'org2', imageUrl: 'https://placehold.co/600x400.png?a=6', category: 'Literature', dataAiHint: 'book festival' },
-];
+function SubEventCard({ event }: { event: SubEvent }) {
+  return (
+    <Card className="overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col h-full bg-card/80 backdrop-blur-sm border-border/50 hover:border-primary/50 rounded-xl">
+      <Link href={`/events/${event.slug}`} className="block group">
+        <div className="relative w-full h-56">
+          <Image
+            src={event.mainImage.src}
+            alt={event.mainImage.alt}
+            layout="fill"
+            objectFit="cover"
+            data-ai-hint={event.mainImage.dataAiHint}
+            className="group-hover:scale-105 transition-transform duration-300"
+          />
+        </div>
+        <CardHeader>
+          <CardTitle className="text-2xl font-headline group-hover:text-primary transition-colors">{event.title}</CardTitle>
+          <CardDescription className="line-clamp-3 text-muted-foreground">{event.shortDescription}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm text-muted-foreground flex-grow">
+          <div className="flex items-center gap-2">
+            <Tag className="h-4 w-4 text-primary" />
+            <span>Category: {event.superpowerCategory}</span>
+          </div>
+          {event.deadline && (
+            <div className="flex items-center gap-2">
+              <CalendarDays className="h-4 w-4 text-primary" />
+              <span>Deadline: {new Date(event.deadline).toLocaleDateString()}</span>
+            </div>
+          )}
+        </CardContent>
+      </Link>
+      <CardFooter>
+        <Button asChild className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
+          <Link href={`/events/${event.slug}`}>View Details</Link>
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+}
 
-export default function EventsPage() {
-  const [events, setEvents] = useState<Event[]>([]);
+export default function SubEventsListPage() {
+  const [events, setEvents] = useState<SubEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
 
   useEffect(() => {
-    // Simulate fetching events
-    setTimeout(() => {
-      setEvents(mockEvents);
-      setLoading(false);
-    }, 1000);
+    setEvents(subEventsData);
+    setLoading(false);
   }, []);
 
   const filteredEvents = events
     .filter(event => 
       event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      event.description.toLowerCase().includes(searchTerm.toLowerCase())
+      event.shortDescription.toLowerCase().includes(searchTerm.toLowerCase())
     )
     .filter(event => 
-      categoryFilter === 'all' || (event.category && event.category === categoryFilter)
+      categoryFilter === 'all' || (event.superpowerCategory && event.superpowerCategory === categoryFilter)
     );
   
-  const uniqueCategories = ['all', ...new Set(mockEvents.map(event => event.category).filter(Boolean) as string[])];
-
+  const uniqueCategories = ['all', ...new Set(subEventsData.map(event => event.superpowerCategory).filter(Boolean) as string[])];
 
   if (loading) {
     return (
@@ -55,9 +86,9 @@ export default function EventsPage() {
   return (
     <div className="animate-fade-in-up">
       <header className="mb-12 text-center">
-        <h1 className="text-4xl md:text-5xl font-bold text-primary mb-4">Discover Events</h1>
+        <h1 className="text-4xl md:text-5xl font-bold text-primary mb-4">Junior Scientist Sub-Events</h1>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-          Find exciting events happening near you or online. Explore a variety of categories and book your spot today!
+          Explore the exciting array of sub-events designed to challenge and inspire young scientists. Find your passion and register today!
         </p>
       </header>
 
@@ -66,22 +97,22 @@ export default function EventsPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input 
             type="search"
-            placeholder="Search events..."
-            className="pl-10 w-full"
+            placeholder="Search sub-events..."
+            className="pl-10 w-full bg-card/50 border-border/70"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
         <div className="relative w-full sm:w-auto">
-          <ListFilter className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none" />
+          <ListFilter className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none z-10" />
            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-full sm:w-[200px] pl-10">
-              <SelectValue placeholder="Filter by category" />
+            <SelectTrigger className="w-full sm:w-[220px] pl-10 bg-card/50 border-border/70">
+              <SelectValue placeholder="Filter by superpower" />
             </SelectTrigger>
             <SelectContent>
               {uniqueCategories.map(category => (
                 <SelectItem key={category} value={category}>
-                  {category === 'all' ? 'All Categories' : category}
+                  {category === 'all' ? 'All Superpowers' : category}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -92,15 +123,15 @@ export default function EventsPage() {
       {filteredEvents.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredEvents.map((event) => (
-            <EventCard key={event.id} event={event} />
+            <SubEventCard key={event.id} event={event} />
           ))}
         </div>
       ) : (
         <div className="text-center py-12">
           <Search className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-2xl font-semibold text-foreground mb-2">No Events Found</h3>
+          <h3 className="text-2xl font-semibold text-foreground mb-2">No Sub-Events Found</h3>
           <p className="text-muted-foreground">
-            Try adjusting your search or filter criteria, or check back later for new events.
+            Try adjusting your search or filter criteria.
           </p>
         </div>
       )}
