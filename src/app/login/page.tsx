@@ -1,107 +1,72 @@
+
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useForm, type SubmitHandler } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/use-auth';
-import { useToast } from '@/hooks/use-toast';
-import type { LoginFormData } from '@/types';
-import { Loader2 } from 'lucide-react';
-import type { AuthError } from 'firebase/auth';
+import { Loader2, User, Shield } from 'lucide-react';
+import type { UserRole } from '@/types';
+import Link from 'next/link';
 
-const loginSchema = z.object({
-  email: z.string().email({ message: 'Invalid email address' }),
-  password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
-});
+const mockRolesToTest: UserRole[] = ['student', 'organizer', 'event_representative', 'overall_head', 'admin', 'test'];
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
-  const { logIn } = useAuth();
+  const { setMockUserRole, loading: authLoading } = useAuth(); // Use the new setMockUserRole
   const router = useRouter();
-  const { toast } = useToast();
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
-  });
-
-  const onSubmit: SubmitHandler<LoginFormData> = async (data) => {
+  const handleMockLogin = async (role: UserRole) => {
     setIsLoading(true);
-    const result = await logIn(data);
-    setIsLoading(false);
-
-    if ('code' in result) { // AuthError
-      const firebaseError = result as AuthError;
-      let errorMessage = 'Login failed. Please check your credentials.';
-      if (firebaseError.code === 'auth/user-not-found' || firebaseError.code === 'auth/wrong-password' || firebaseError.code === 'auth/invalid-credential') {
-        errorMessage = 'Invalid email or password.';
-      }
-      toast({
-        title: 'Login Error',
-        description: errorMessage,
-        variant: 'destructive',
-      });
-    } else { // FirebaseUser
-      // Toast for successful login is not an error, so omitted
-      router.push('/dashboard');
-    }
+    // The setMockUserRole function in the context will handle setting authUser and userProfile
+    setMockUserRole(role); 
+    // Simulate a small delay for UX if needed, then navigate
+    // No actual async operation, so loading is mostly for UX feedback here
+    setTimeout(() => {
+      setIsLoading(false);
+      router.push('/dashboard'); 
+    }, 300);
   };
+
+  if (authLoading && !isLoading) { // Show loader if context is loading but page isn't processing a click
+    return (
+      <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center animate-fade-in-up">
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-headline text-primary">Welcome Back!</CardTitle>
-          <CardDescription>Log in to continue to EventFlow.</CardDescription>
+          <CardTitle className="text-3xl font-headline text-primary">Select Mock Role to Login</CardTitle>
+          <CardDescription>Authentication is in MOCK mode. Select a role to continue.</CardDescription>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                {...register('email')}
-                aria-invalid={errors.email ? 'true' : 'false'}
-              />
-              {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                {...register('password')}
-                aria-invalid={errors.password ? 'true' : 'false'}
-              />
-              {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
-            </div>
-            <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isLoading}>
-              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Log In
+        <CardContent className="space-y-4">
+          {mockRolesToTest.map((role) => (
+            <Button
+              key={role}
+              onClick={() => handleMockLogin(role)}
+              className="w-full bg-primary hover:bg-primary/90"
+              disabled={isLoading}
+              variant="outline"
+            >
+              {isLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                role === 'student' || role === 'test' ? <User className="mr-2 h-4 w-4" /> : <Shield className="mr-2 h-4 w-4" />
+              )}
+              Log in as {role.charAt(0).toUpperCase() + role.slice(1).replace('_', ' ')}
             </Button>
-          </form>
+          ))}
         </CardContent>
-        <CardFooter className="flex flex-col items-center space-y-2">
-          <Link href="#" className="text-sm text-primary hover:underline">
-            Forgot password?
-          </Link>
-          <p className="text-sm text-muted-foreground">
-            Don&apos;t have an account?{' '}
-            <Link href="/signup" className="font-semibold text-primary hover:underline">
-              Sign Up
+         <CardFooter className="flex flex-col items-center space-y-2">
+           <p className="text-sm text-muted-foreground">
+            Want to "Sign Up"? (Currently Mocked)
+            <Link href="/signup" className="font-semibold text-primary hover:underline ml-1">
+              Go to Sign Up
             </Link>
           </p>
         </CardFooter>
