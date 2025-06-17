@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -48,18 +49,38 @@ export default function SignUpPage() {
 
     if ('code' in result) { // AuthError
       const firebaseError = result as AuthError;
-      let errorMessage = 'Sign up failed. Please try again.';
-      if (firebaseError.code === 'auth/email-already-in-use') {
-        errorMessage = 'This email is already registered. Please log in or use a different email.';
+      let userFriendlyMessage = firebaseError.message; // Default to Firebase's message
+
+      // Provide more user-friendly messages for common errors
+      switch (firebaseError.code) {
+        case 'auth/email-already-in-use':
+          userFriendlyMessage = 'This email is already registered. Please log in or use a different email.';
+          break;
+        case 'auth/weak-password':
+          userFriendlyMessage = 'The password is too weak. Please choose a stronger password (at least 6 characters).';
+          break;
+        case 'auth/invalid-email':
+          userFriendlyMessage = 'The email address is not valid. Please check the format.';
+          break;
+        case 'auth/operation-not-allowed':
+          userFriendlyMessage = 'Email/password sign-up is not enabled. Please contact support.';
+          break;
+        default:
+          // For less common or unexpected Firebase errors, log the code for debugging.
+          // The default firebaseError.message might be technical.
+          console.error("Firebase SignUp Error Code:", firebaseError.code, "Message:", firebaseError.message);
+          userFriendlyMessage = `Sign up failed: ${firebaseError.message}. Please try again.`;
+          break;
       }
+
       toast({
         title: 'Sign Up Error',
-        description: errorMessage,
+        description: userFriendlyMessage,
         variant: 'destructive',
       });
     } else { // FirebaseUser
-      // Toast for successful signup is not an error, so omitted
-      router.push('/dashboard'); // Or a profile setup page
+      // Toast for successful signup is not an error, so omitted as per guidelines
+      router.push('/dashboard');
     }
   };
 
