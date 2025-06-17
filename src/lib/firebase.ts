@@ -2,11 +2,11 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
-// import { getAnalytics, type Analytics } from 'firebase/analytics'; // Uncomment if you plan to use Firebase Analytics
+// import { getAnalytics, type Analytics } from 'firebase/analytics'; // Analytics not used currently
 
-// **Diagnostic Step: Temporarily hardcoding Firebase config**
-// This is NOT for production. Replace with process.env variables once the issue is resolved.
-const firebaseConfigHardcoded = {
+// ** USING HARDCODED CONFIG FOR DIAGNOSTICS **
+// These values were provided by you.
+const firebaseConfig = {
   apiKey: "AIzaSyAEcbyarXzVnjzhPpIOljAaIrwgw2n14_8",
   authDomain: "jsdb-b9d9a.firebaseapp.com",
   projectId: "jsdb-b9d9a",
@@ -16,58 +16,57 @@ const firebaseConfigHardcoded = {
   measurementId: "G-VCNZ8PZ1CH"
 };
 
-const firebaseConfigEnv = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
-};
-
-// Use hardcoded config for now to isolate the problem
-const firebaseConfig = firebaseConfigHardcoded;
-
-
-// --- ADD THESE CONSOLE.LOGS ---
-console.log("Firebase Config being used in firebase.ts:", firebaseConfig);
-console.log("API Key present in firebase.ts?", !!firebaseConfig.apiKey);
-console.log("Auth Domain present in firebase.ts?", !!firebaseConfig.authDomain);
-console.log("Project ID present in firebase.ts?", !!firebaseConfig.projectId);
-// --------------------------------
+// --- CRITICAL DIAGNOSTIC LOGS ---
+console.log("--- [firebase.ts] Start of Firebase Initialization ---");
+console.log("[firebase.ts] Attempting to load Firebase config. Using HARDCODED values for this test.");
+console.log("[firebase.ts] Config Value - apiKey:", firebaseConfig.apiKey ? `"${firebaseConfig.apiKey}" (Length: ${firebaseConfig.apiKey.length})` : "MISSING or UNDEFINED");
+console.log("[firebase.ts] Config Value - authDomain:", firebaseConfig.authDomain ? `"${firebaseConfig.authDomain}" (Length: ${firebaseConfig.authDomain.length})` : "MISSING or UNDEFINED");
+console.log("[firebase.ts] Config Value - projectId:", firebaseConfig.projectId ? `"${firebaseConfig.projectId}" (Length: ${firebaseConfig.projectId.length})` : "MISSING or UNDEFINED");
+console.log("[firebase.ts] Config Value - storageBucket:", firebaseConfig.storageBucket ? `"${firebaseConfig.storageBucket}" (Length: ${firebaseConfig.storageBucket.length})` : "MISSING or UNDEFINED");
+console.log("[firebase.ts] Config Value - messagingSenderId:", firebaseConfig.messagingSenderId ? `"${firebaseConfig.messagingSenderId}" (Length: ${firebaseConfig.messagingSenderId.length})` : "MISSING or UNDEFINED");
+console.log("[firebase.ts] Config Value - appId:", firebaseConfig.appId ? `"${firebaseConfig.appId}" (Length: ${firebaseConfig.appId.length})` : "MISSING or UNDEFINED");
+console.log("[firebase.ts] Config Value - measurementId:", firebaseConfig.measurementId ? `"${firebaseConfig.measurementId}" (Length: ${firebaseConfig.measurementId.length})` : "NOT SET or UNDEFINED");
 
 let app: FirebaseApp;
-// let analytics: Analytics; // Uncomment if you plan to use Firebase Analytics
 
-if (typeof window !== 'undefined') { // Check if running in the browser
-  if (!getApps().length) {
+// Initialize Firebase app only once
+if (!getApps().length) {
+  console.log("[firebase.ts] No Firebase apps initialized. Initializing new app with HARDCODED config...");
+  try {
     app = initializeApp(firebaseConfig);
-    // if (firebaseConfig.measurementId) { 
-    //   analytics = getAnalytics(app);
-    // }
-  } else {
-    app = getApp();
-    // if (firebaseConfig.measurementId && !getAnalytics(app)) { // Check if analytics already initialized for this app instance
-    //   try {
-    //      analytics = getAnalytics(app);
-    //   } catch (e) {
-    //     // console.warn("Could not initialize analytics for existing app", e)
-    //   }
-    // }
+    console.log("[firebase.ts] Firebase app INITIALIZED successfully.");
+  } catch (e: any) {
+    console.error("[firebase.ts] CRITICAL ERROR during initializeApp:", e.message, e);
+    // If initializeApp itself fails, `auth` and `db` will fail.
+    // Assign a dummy app to prevent immediate crashes downstream, though auth will certainly fail.
+    app = {} as FirebaseApp; // This will cause `getAuth` to fail.
   }
 } else {
-  // This block is for server-side rendering or server components.
-  // For client-side auth, this part is less critical but good for completeness.
-  if (!getApps().length) {
-    app = initializeApp(firebaseConfig);
-  } else {
-    app = getApp();
-  }
+  console.log("[firebase.ts] Firebase app already initialized. Getting existing app...");
+  app = getApp();
+  console.log("[firebase.ts] Existing Firebase app RETRIEVED.");
 }
 
+let auth: Auth;
+let db: Firestore;
 
-const auth: Auth = getAuth(app);
-const db: Firestore = getFirestore(app);
+try {
+  auth = getAuth(app);
+  console.log("[firebase.ts] Firebase Auth service INSTANCE CREATED.");
+} catch (e: any) {
+  console.error("[firebase.ts] CRITICAL ERROR during getAuth(app):", e.message, e);
+  // @ts-ignore Assign dummy to avoid undefined errors, though auth will fail.
+  auth = {} as Auth;
+}
+
+try {
+  db = getFirestore(app);
+  console.log("[firebase.ts] Firestore service INSTANCE CREATED.");
+} catch (e: any) {
+  console.error("[firebase.ts] CRITICAL ERROR during getFirestore(app):", e.message, e);
+  // @ts-ignore Assign dummy to avoid undefined errors.
+  db = {} as Firestore;
+}
+console.log("--- [firebase.ts] End of Firebase Initialization ---");
 
 export { app, auth, db };
