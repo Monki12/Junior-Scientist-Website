@@ -7,7 +7,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/hooks/use-auth';
 import { subEventsData } from '@/data/subEvents';
-import type { UserRole, SubEvent } from '@/types';
+import type { UserRole, SubEvent, UserProfileData } from '@/types'; // UserProfileData might be needed for type hint
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -19,7 +19,6 @@ import {
   FileScan,
   Settings,
   BookUser,
-  Trophy,
   ListChecks,
   CalendarDays,
   UserCircle,
@@ -29,7 +28,8 @@ import {
   Download,
   Info,
   Briefcase,
-  Newspaper
+  Newspaper,
+  Award // Added Trophy icon
 } from 'lucide-react';
 
 // Placeholder stats for organizers
@@ -38,6 +38,10 @@ const organizerStats = [
   { title: 'Active Registrations', value: '345', icon: <Users className="h-6 w-6 text-green-500" />, color: 'text-green-500' },
   { title: 'Pending Tasks', value: '8', icon: <Edit className="h-6 w-6 text-yellow-500" />, color: 'text-yellow-500' },
 ];
+
+interface RegisteredEventDisplay extends SubEvent {
+  teamName?: string;
+}
 
 export default function DashboardPage() {
   const { authUser, userProfile, loading } = useAuth();
@@ -61,9 +65,15 @@ export default function DashboardPage() {
 
   // Student Dashboard
   if (role === 'student' || role === 'test') {
-    const studentRegisteredEvents: SubEvent[] = userProfile.registeredEventSlugs
-      ?.map(slug => subEventsData.find(event => event.slug === slug))
-      .filter(event => event !== undefined) as SubEvent[] || [];
+    const studentRegisteredFullEvents: RegisteredEventDisplay[] = userProfile.registeredEvents
+      ?.map(registeredInfo => {
+        const eventDetail = subEventsData.find(event => event.slug === registeredInfo.eventSlug);
+        if (eventDetail) {
+          return { ...eventDetail, teamName: registeredInfo.teamName };
+        }
+        return null; 
+      })
+      .filter(event => event !== null) as RegisteredEventDisplay[] || [];
 
     return (
       <div className="space-y-8 animate-fade-in-up">
@@ -100,9 +110,9 @@ export default function DashboardPage() {
               <CardDescription>Events you are currently registered for.</CardDescription>
             </CardHeader>
             <CardContent>
-              {studentRegisteredEvents.length > 0 ? (
+              {studentRegisteredFullEvents.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {studentRegisteredEvents.map(event => (
+                  {studentRegisteredFullEvents.map(event => (
                     <Card key={event.id} className="overflow-hidden shadow-md hover:shadow-lg transition-shadow">
                        <Link href={`/events/${event.slug}`} className="block group">
                         <div className="relative w-full h-40">
@@ -117,6 +127,11 @@ export default function DashboardPage() {
                         </div>
                         <CardHeader className="pb-2">
                           <CardTitle className="text-lg group-hover:text-primary">{event.title}</CardTitle>
+                           {event.teamName && (
+                            <p className="text-xs text-accent font-medium flex items-center">
+                              <Users className="mr-1 h-3 w-3"/> Team: {event.teamName}
+                            </p>
+                          )}
                         </CardHeader>
                         <CardContent className="pt-0">
                           <p className="text-sm text-muted-foreground line-clamp-2">{event.shortDescription}</p>
@@ -131,7 +146,7 @@ export default function DashboardPage() {
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   <Info className="h-10 w-10 mx-auto mb-2" />
-                  <p>You haven't registered for any events yet.</p>
+                  <p>You haven&apos;t registered for any events yet.</p>
                   <Button variant="link" asChild className="mt-2 text-primary"><Link href="/events">Explore Events</Link></Button>
                 </div>
               )}
@@ -284,3 +299,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+

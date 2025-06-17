@@ -15,8 +15,9 @@ export const subEventsData: SubEvent[] = [
       { src: 'https://placehold.co/400x300.png', alt: 'Delegate speaking', dataAiHint: 'public speaking' },
       { src: 'https://placehold.co/400x300.png', alt: 'MUN committee', dataAiHint: 'formal meeting' },
     ],
-    registrationLink: '/signup?event=mun', // Example specific registration or common
+    registrationLink: '/signup?event=mun', 
     deadline: '2024-11-15',
+    isTeamEvent: false,
   },
   {
     id: '2',
@@ -32,6 +33,7 @@ export const subEventsData: SubEvent[] = [
     ],
     registrationLink: '/signup?event=ex-quiz-it',
     deadline: '2024-11-18',
+    isTeamEvent: true, // This is a team event
   },
   {
     id: '3',
@@ -77,6 +79,7 @@ export const subEventsData: SubEvent[] = [
     ],
     registrationLink: '/signup?event=maze-mastery',
     deadline: '2024-11-25',
+    isTeamEvent: true, // Example: this could also be a team event
   },
   {
     id: '6',
@@ -92,5 +95,7 @@ export const subEventsData: SubEvent[] = [
     ],
     registrationLink: '/signup?event=robo-challenge',
     deadline: '2024-11-28',
+    isTeamEvent: true, // Example: robotics often team-based
   },
 ];
+

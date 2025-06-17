@@ -19,7 +19,10 @@ export interface UserProfileData {
   photoURL?: string | null; 
   school?: string; 
   grade?: string; 
-  registeredEventSlugs?: string[]; 
+  registeredEvents?: Array<{ // Changed from registeredEventSlugs
+    eventSlug: string;
+    teamName?: string; // Added for team-based events
+  }>; 
 }
 
 // This Event interface seems to be for a generic event, not the sub-events.
@@ -50,6 +53,7 @@ export interface SubEvent {
   galleryImages?: Array<{ src: string; alt: string; dataAiHint: string }>;
   registrationLink: string;
   deadline?: string; 
+  isTeamEvent?: boolean; // Added to mark team-based events
 }
 
 export interface SignUpFormData {
@@ -71,3 +75,4 @@ export interface StudentData {
   contactNumber: string;
   email: string;
 }
+

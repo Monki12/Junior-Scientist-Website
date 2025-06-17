@@ -19,7 +19,10 @@ const mockUserProfiles: Record<UserRole, UserProfileData> = {
     photoURL: 'https://placehold.co/100x100.png?text=TS',
     school: 'Springfield High',
     grade: '10th Grade',
-    registeredEventSlugs: ['model-united-nations', 'ex-quiz-it'], 
+    registeredEvents: [
+      { eventSlug: 'model-united-nations' }, 
+      { eventSlug: 'ex-quiz-it', teamName: 'Quiz Wizards' }
+    ], 
   },
   organizer: {
     uid: 'mock-organizer-uid',
@@ -53,11 +56,11 @@ const mockUserProfiles: Record<UserRole, UserProfileData> = {
     uid: 'mock-test-uid',
     email: 'generic.test@example.com',
     displayName: 'Generic Test User',
-    role: 'test', // This role will often be treated like 'student' in UI logic
+    role: 'test', 
     photoURL: 'https://placehold.co/100x100.png?text=TU',
     school: 'Testington Academy',
     grade: '12th Grade',
-    registeredEventSlugs: ['robo-challenge'],
+    registeredEvents: [{ eventSlug: 'robo-challenge', teamName: 'RoboKnights' }],
   }
 };
 
@@ -69,7 +72,7 @@ interface AuthContextType {
   logIn: (data: LoginFormData | UserRole) => Promise<FirebaseUser | AuthError | { message: string }>; 
   logOut: () => Promise<void>;
   setMockUserRole: (role: UserRole | null) => void; 
-  setUserProfile: React.Dispatch<React.SetStateAction<UserProfileData | null>>; // Added for profile updates
+  setUserProfile: React.Dispatch<React.SetStateAction<UserProfileData | null>>; 
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -127,30 +130,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     let loggedInUser: FirebaseUser | null = null;
     if (typeof data === 'string' && mockUserProfiles[data as UserRole]) { 
       setMockUserRole(data as UserRole);
-      loggedInUser = authUser; // authUser state might not update immediately
+      // Re-fetch from mock to ensure we return the "correct" (latest set) authUser
+      const profile = mockUserProfiles[data as UserRole];
+      loggedInUser = { uid: profile.uid, email: profile.email, displayName: profile.displayName, photoURL: profile.photoURL } as FirebaseUser;
     } else if (typeof data === 'object' && data.email) { 
         const roleToLogin = Object.values(mockUserProfiles).find(p => p.email === data.email)?.role;
         if (roleToLogin) {
             setMockUserRole(roleToLogin);
-            loggedInUser = authUser; // authUser state might not update immediately
+            const profile = mockUserProfiles[roleToLogin];
+            loggedInUser = { uid: profile.uid, email: profile.email, displayName: profile.displayName, photoURL: profile.photoURL } as FirebaseUser;
         }
     } else {
       setMockUserRole('student'); 
-      loggedInUser = authUser; // authUser state might not update immediately
+      const profile = mockUserProfiles['student'];
+      loggedInUser = { uid: profile.uid, email: profile.email, displayName: profile.displayName, photoURL: profile.photoURL } as FirebaseUser;
     }
     
-    // To ensure we return the "correct" (latest set) authUser, we can re-fetch from mockUserProfiles
-    if (userProfile) { // If userProfile was set by setMockUserRole
-      const profile = mockUserProfiles[userProfile.role];
-       const mockFbUser: FirebaseUser = {
-        uid: profile.uid, email: profile.email, displayName: profile.displayName, photoURL: profile.photoURL,
-        emailVerified: true, isAnonymous: false, metadata: {}, providerData: [], providerId: 'mock', refreshToken: 'mock-refresh-token', tenantId: null,
-        delete: async () => {}, getIdToken: async () => 'mock-id-token', getIdTokenResult: async () => ({ token: 'mock-id-token', claims: {}, expirationTime: '', issuedAtTime: '', signInProvider: null, signInSecondFactor: null}),
-        reload: async () => {}, toJSON: () => ({}),
-      } as FirebaseUser;
-      return mockFbUser;
-    }
-
+    if(loggedInUser) return loggedInUser;
     return { message: "Mock login: Defaulted to student or unknown credentials." };
   };
 
@@ -168,8 +164,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     logIn,
     logOut,
     setMockUserRole,
-    setUserProfile, // Expose setUserProfile for profile page updates
+    setUserProfile, 
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
+

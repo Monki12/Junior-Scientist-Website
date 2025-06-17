@@ -9,7 +9,19 @@ import { subEventsData } from '@/data/subEvents';
 import type { SubEvent } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, CalendarDays, ExternalLink, Info, Image as ImageIcon, CheckCircle, Loader2, UserCheck } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { ArrowLeft, CalendarDays, ExternalLink, Info, Image as ImageIcon, CheckCircle, Loader2, UserCheck, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
@@ -24,6 +36,8 @@ export default function SubEventDetailPage() {
 
   const [isRegistered, setIsRegistered] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
+  const [teamName, setTeamName] = useState('');
+  const [isTeamNameDialogOpen, setIsTeamNameDialogOpen] = useState(false);
 
   useEffect(() => {
     if (subEventSlug) {
@@ -38,15 +52,13 @@ export default function SubEventDetailPage() {
 
   useEffect(() => {
     if (event && userProfile && (userProfile.role === 'student' || userProfile.role === 'test')) {
-      setIsRegistered(userProfile.registeredEventSlugs?.includes(event.slug) || false);
+      setIsRegistered(userProfile.registeredEvents?.some(re => re.eventSlug === event.slug) || false);
     }
   }, [userProfile, event]);
 
-  const handleRegister = async () => {
-    if (!userProfile || !event || !setUserProfile) return;
-    
-    // Ensure it's a student or test user trying to register
-    if (userProfile.role !== 'student' && userProfile.role !== 'test') {
+  const openTeamNameDialog = () => {
+    if (!userProfile || !event) return;
+     if (userProfile.role !== 'student' && userProfile.role !== 'test') {
         toast({
             title: "Registration Failed",
             description: "Only students can register for events.",
@@ -54,33 +66,50 @@ export default function SubEventDetailPage() {
         });
         return;
     }
+    setIsTeamNameDialogOpen(true);
+  };
 
+  const handleActualRegister = async (currentTeamName?: string) => {
+    if (!userProfile || !event || !setUserProfile) return;
     setIsRegistering(true);
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
 
     setUserProfile(prevProfile => {
       if (!prevProfile) return null;
-      const newSlugs = Array.from(new Set([...(prevProfile.registeredEventSlugs || []), event.slug]));
-      return { ...prevProfile, registeredEventSlugs: newSlugs };
+      const newRegisteredEvent = { eventSlug: event.slug, teamName: currentTeamName || undefined };
+      const updatedRegisteredEvents = [...(prevProfile.registeredEvents || []), newRegisteredEvent];
+      // Ensure no duplicate event slugs, preferring the latest registration if somehow duplicated (though UI should prevent this)
+      const uniqueRegisteredEvents = Array.from(new Map(updatedRegisteredEvents.map(item => [item.eventSlug, item])).values());
+      return { ...prevProfile, registeredEvents: uniqueRegisteredEvents };
     });
 
-    setIsRegistered(true); // This will be re-confirmed by the useEffect when userProfile updates
+    setIsRegistered(true);
     setIsRegistering(false);
+    setIsTeamNameDialogOpen(false);
+    setTeamName(''); 
     toast({
       title: "Registration Successful!",
-      description: `You have successfully registered for ${event.title}.`,
-      // Not destructive, so will appear as success/info
+      description: `You have successfully registered for ${event.title}${currentTeamName ? ` with team '${currentTeamName}'` : ''}.`,
     });
-     // Optionally redirect to dashboard or show a success message on page
-    // router.push('/dashboard'); 
+  };
+  
+  const handleRegistrationAttempt = () => {
+    if (!event) return;
+    if (event.isTeamEvent) {
+      openTeamNameDialog();
+    } else {
+      handleActualRegister();
+    }
   };
 
 
   if (authLoading || !event) {
     return <div className="flex justify-center items-center min-h-[calc(100vh-10rem)] text-xl text-muted-foreground"><Loader2 className="h-8 w-8 animate-spin mr-2" />Loading event details...</div>;
   }
+
+  const currentRegistrationDetails = userProfile?.registeredEvents?.find(re => re.eventSlug === event.slug);
+
 
   return (
     <div className="max-w-5xl mx-auto py-8 px-4 animate-fade-in-up">
@@ -93,7 +122,10 @@ export default function SubEventDetailPage() {
       <article className="space-y-10">
         <header className="text-center">
           <h1 className="text-4xl md:text-5xl font-bold text-primary mb-3">{event.title}</h1>
-          <Badge variant="secondary" className="text-md bg-primary/10 text-primary">{event.superpowerCategory}</Badge>
+          <div className="space-x-2">
+            <Badge variant="secondary" className="text-md bg-primary/10 text-primary">{event.superpowerCategory}</Badge>
+            {event.isTeamEvent && <Badge variant="outline" className="text-md bg-accent/10 text-accent border-accent"><Users className="mr-1 h-4 w-4"/>Team Event</Badge>}
+          </div>
         </header>
 
         <Card className="shadow-xl overflow-hidden bg-card/80 backdrop-blur-sm">
@@ -170,12 +202,15 @@ export default function SubEventDetailPage() {
                 <div className="text-center py-4">
                   <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-500" />
                   <p className="font-semibold text-foreground">You are already registered for this event.</p>
+                  {currentRegistrationDetails?.teamName && (
+                    <p className="text-sm text-muted-foreground">Team: {currentRegistrationDetails.teamName}</p>
+                  )}
                   <Button variant="link" asChild className="mt-1 text-primary"><Link href="/dashboard">View in Dashboard</Link></Button>
                 </div>
               ) : (
                 <Button 
                   size="lg" 
-                  onClick={handleRegister} 
+                  onClick={handleRegistrationAttempt} 
                   disabled={isRegistering}
                   className="w-full md:w-auto bg-green-500 hover:bg-green-600 text-white text-lg py-3 px-6"
                 >
@@ -193,6 +228,36 @@ export default function SubEventDetailPage() {
           </CardContent>
         </Card>
       </article>
+
+      {event?.isTeamEvent && (
+        <AlertDialog open={isTeamNameDialogOpen} onOpenChange={setIsTeamNameDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Enter Team Name (Optional)</AlertDialogTitle>
+              <AlertDialogDescription>
+                You are registering for &quot;{event.title}&quot;. If you are part of a team, please enter your team name below. Otherwise, you can leave it blank.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="py-4">
+              <Label htmlFor="teamNameInput" className="mb-2 block">Team Name</Label>
+              <Input 
+                id="teamNameInput"
+                value={teamName}
+                onChange={(e) => setTeamName(e.target.value)}
+                placeholder="E.g., The Innovators" 
+                disabled={isRegistering}
+              />
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isRegistering}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => handleActualRegister(teamName)} disabled={isRegistering}>
+                {isRegistering ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Register
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }
