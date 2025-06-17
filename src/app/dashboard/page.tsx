@@ -37,7 +37,8 @@ import {
   TrendingUp,
   Building, // Department Icon
   Activity, // Credibility Score Icon
-  ShieldCheck // Points Icon
+  ShieldCheck, // Points Icon
+  ExternalLink, // Added ExternalLink
 } from 'lucide-react';
 
 interface RegisteredEventDisplay extends SubEvent {
@@ -437,3 +438,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
