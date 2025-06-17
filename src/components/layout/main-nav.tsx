@@ -92,10 +92,12 @@ export default function MainNav() {
         if (!isBranding) setIsMobileMenuOpen(false);
       }}
       className={cn(
-        "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-        isBranding ? "text-xl font-bold text-primary font-headline hover:opacity-90" : "hover:bg-primary/10 hover:text-primary",
+        "flex items-center gap-2 rounded-md text-sm font-medium transition-colors",
+        isBranding 
+          ? "text-xl font-bold text-primary font-headline hover:opacity-90 p-0" 
+          : "px-2 py-1.5 hover:bg-primary/10 hover:text-primary", // Adjusted padding here
         !isBranding && (pathname === href || (href.includes('#') && pathname + (window.location.hash || '') === href) ) ? "text-primary bg-primary/5" : "text-muted-foreground",
-        isBranding && "p-0"
+        isBranding && "p-0" // Ensure branding link itself doesn't get extra padding from the rule above
       )}
     >
       <Icon className={cn(isBranding ? "h-7 w-7" : "h-5 w-5")} />
