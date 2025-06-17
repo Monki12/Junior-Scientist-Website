@@ -1,10 +1,28 @@
 
 import type { User as FirebaseUser } from 'firebase/auth';
 
-export interface UserProfile extends FirebaseUser {
-  role?: string; 
+// Defines the possible roles a user can have in the application
+export type UserRole = 
+  | 'student' 
+  | 'organizer' 
+  | 'event_representative' 
+  | 'overall_head' 
+  | 'admin' 
+  | 'test';
+
+// Interface for custom user profile data stored in Firestore
+export interface UserProfileData {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  role: UserRole;
+  photoURL?: string | null; // Store photoURL for consistency if needed
+  academicStandard?: string; // Example: For students
+  assignedEvents?: string[]; // Example: For organizers/representatives
 }
 
+// This Event interface seems to be for a generic event, not the sub-events.
+// It's kept for now if used elsewhere.
 export interface Event {
   id: string;
   title: string;
@@ -19,6 +37,7 @@ export interface Event {
   dataAiHint?: string;
 }
 
+// Interface for the Junior Scientist Sub-Events
 export interface SubEvent {
   id: string;
   slug: string;
@@ -31,7 +50,6 @@ export interface SubEvent {
   registrationLink: string;
   deadline?: string; 
 }
-
 
 export interface SignUpFormData {
   name?: string; 

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect } from 'react';
@@ -17,16 +18,16 @@ const mockNotifications = [
 
 
 export default function NotificationsPage() {
-  const { user, loading } = useAuth();
+  const { authUser, loading } = useAuth(); // Use authUser for checking login status
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!loading && !authUser) {
       router.push('/login?redirect=/notifications');
     }
-  }, [user, loading, router]);
+  }, [authUser, loading, router]);
 
-  if (loading || !user) {
+  if (loading || !authUser) {
     return (
       <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />

@@ -17,21 +17,43 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import { Atom, Menu, LogOut, UserCircle, Home, CalendarDays, Phone, ScanLine, Bell } from 'lucide-react';
+import { Atom, Menu, LogOut, UserCircle, Home, CalendarDays, Phone, ScanLine, Bell, Briefcase, Settings, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import type { UserRole } from '@/types';
 
-const navLinks = [
-  { href: '/', label: 'Home', icon: Home, authRequired: false },
-  { href: '/events', label: 'Events', icon: CalendarDays, authRequired: false },
-  { href: '/#contact-us', label: 'Contact Us', icon: Phone, authRequired: false },
-  // Keeping dashboard and OCR tool for logged-in users, can be removed if not part of Junior Scientist scope
-  { href: '/dashboard', label: 'Dashboard', icon: UserCircle, authRequired: true },
-  { href: '/ocr-tool', label: 'OCR Tool', icon: ScanLine, authRequired: true },
-  { href: '/notifications', label: 'Notifications', icon: Bell, authRequired: true },
+// Define navigation links based on roles
+const commonLinks = [
+  { href: '/', label: 'Home', icon: Home },
+  { href: '/events', label: 'Events', icon: CalendarDays },
+  { href: '/#contact-us', label: 'Contact Us', icon: Phone },
 ];
 
+const studentLinks = [
+  { href: '/notifications', label: 'Notifications', icon: Bell },
+  { href: '/profile', label: 'My Profile', icon: UserCircle },
+];
+
+const organizerLinks = [
+  { href: '/dashboard', label: 'Organizer Dashboard', icon: BarChart3 },
+  { href: '/organizer/events/manage', label: 'Manage Events', icon: Briefcase}, // Example, new route
+  { href: '/ocr-tool', label: 'OCR Tool', icon: ScanLine },
+  { href: '/notifications', label: 'Notifications', icon: Bell },
+  { href: '/profile', label: 'My Profile', icon: UserCircle },
+];
+
+const overallHeadLinks = [
+  ...organizerLinks, // Inherits organizer links
+  { href: '/admin/tasks', label: 'Task Management', icon: Settings }, // Example, new route
+];
+
+const adminLinks = [
+  ...overallHeadLinks, // Inherits overall head links
+  { href: '/admin/users', label: 'User Management', icon: UserCircle }, // Example, new route
+];
+
+
 export default function MainNav() {
-  const { user, logOut, loading } = useAuth();
+  const { authUser, userProfile, logOut, loading } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
   const pathname = usePathname();
@@ -66,6 +88,7 @@ export default function MainNav() {
           }
         }
         if (onClick) onClick();
+        setIsMobileMenuOpen(false); // Close mobile menu on link click
       }}
       className={cn(
         "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-primary/10 hover:text-primary",
@@ -79,12 +102,44 @@ export default function MainNav() {
 
   const UserAvatar = () => (
     <Avatar className="h-8 w-8">
-      <AvatarImage src={user?.photoURL || undefined} alt={user?.displayName || user?.email || 'User'} />
-      <AvatarFallback>{user?.email?.[0].toUpperCase() || 'U'}</AvatarFallback>
+      <AvatarImage src={authUser?.photoURL || userProfile?.photoURL || undefined} alt={authUser?.displayName || userProfile?.displayName || authUser?.email || 'User'} />
+      <AvatarFallback>{(authUser?.email || userProfile?.email)?.[0].toUpperCase() || 'U'}</AvatarFallback>
     </Avatar>
   );
+  
+  const getNavLinksForRole = (role?: UserRole) => {
+    let specificLinks = [];
+    if (authUser) { // Only show role-specific links if logged in
+      switch (role) {
+        case 'student':
+        case 'test': // Test role can act as student for UI
+          specificLinks = studentLinks;
+          break;
+        case 'organizer':
+          specificLinks = organizerLinks;
+          break;
+        case 'event_representative':
+             specificLinks = organizerLinks; // Assuming representative has similar access to organizer for now
+             break;
+        case 'overall_head':
+          specificLinks = overallHeadLinks;
+          break;
+        case 'admin':
+          specificLinks = adminLinks;
+          break;
+        default: // Fallback for undefined role or unexpected value (could be studentLinks or just profile)
+          specificLinks = studentLinks; 
+      }
+       return [...commonLinks, ...specificLinks];
+    }
+    return commonLinks; // Logged-out users see only common links
+  };
+
+  const currentNavLinks = getNavLinksForRole(userProfile?.role);
+
 
   if (!mounted) {
+    // Simplified skeleton for initial render to avoid layout shifts
     return (
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between">
@@ -92,11 +147,12 @@ export default function MainNav() {
             <Atom className="h-6 w-6" />
             <span>Junior Scientist</span>
           </Link>
-          <div className="h-8 w-20 animate-pulse rounded-md bg-muted"></div>
+          <div className="h-8 w-20 animate-pulse rounded-md bg-muted"></div> {/* Placeholder for auth button/avatar */}
         </div>
       </header>
     );
   }
+
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -107,7 +163,7 @@ export default function MainNav() {
         </Link>
 
         <nav className="hidden md:flex items-center space-x-1 lg:space-x-2">
-          {navLinks.filter(link => !link.authRequired || (link.authRequired && user)).map(link => (
+          {currentNavLinks.map(link => (
             <NavLinkItem key={link.href} href={link.href} label={link.label} Icon={link.icon} />
           ))}
         </nav>
@@ -115,7 +171,7 @@ export default function MainNav() {
         <div className="flex items-center gap-3">
           {loading ? (
              <div className="h-8 w-8 animate-pulse rounded-full bg-muted"></div>
-          ) : user ? (
+          ) : authUser ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
@@ -125,9 +181,9 @@ export default function MainNav() {
               <DropdownMenuContent className="w-56" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{user.displayName || user.email}</p>
+                    <p className="text-sm font-medium leading-none">{userProfile?.displayName || authUser.displayName || authUser.email}</p>
                     <p className="text-xs leading-none text-muted-foreground">
-                      {user.email}
+                      {authUser.email} ({userProfile?.role || '...'})
                     </p>
                   </div>
                 </DropdownMenuLabel>
@@ -168,12 +224,12 @@ export default function MainNav() {
                     <span>JUNIOR SCIENTIST</span>
                   </Link>
                 </div>
-                <nav className="flex-grow space-y-2 p-4">
-                  {navLinks.filter(link => !link.authRequired || (link.authRequired && user)).map(link => (
+                <nav className="flex-grow space-y-1 p-4">
+                  {currentNavLinks.map(link => (
                      <NavLinkItem key={link.href} href={link.href} label={link.label} Icon={link.icon} onClick={() => setIsMobileMenuOpen(false)} />
                   ))}
                 </nav>
-                {!user && !loading && (
+                {!authUser && !loading && (
                   <div className="mt-auto border-t p-4 space-y-2">
                     <Button variant="outline" className="w-full" asChild onClick={() => setIsMobileMenuOpen(false)}>
                       <Link href="/login">Log In</Link>
