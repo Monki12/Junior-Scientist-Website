@@ -17,11 +17,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import { Atom, Menu, LogOut, UserCircle, Home, CalendarDays, Phone, ScanLine, Bell, Briefcase, Settings, BarChart3 } from 'lucide-react';
+import { Atom, Menu, LogOut, UserCircle, Home, CalendarDays, Phone, ScanLine, Bell, Briefcase, Settings, BarChart3, LayoutDashboard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { UserRole } from '@/types';
 
-// Define navigation links based on roles
 const commonLinks = [
   { href: '/', label: 'Home', icon: Home },
   { href: '/events', label: 'Events', icon: CalendarDays },
@@ -29,26 +28,27 @@ const commonLinks = [
 ];
 
 const studentLinks = [
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/notifications', label: 'Notifications', icon: Bell },
   { href: '/profile', label: 'My Profile', icon: UserCircle },
 ];
 
 const organizerLinks = [
   { href: '/dashboard', label: 'Organizer Dashboard', icon: BarChart3 },
-  { href: '/organizer/events/manage', label: 'Manage Events', icon: Briefcase}, // Example, new route
+  { href: '/organizer/events/manage', label: 'Manage Events', icon: Briefcase},
   { href: '/ocr-tool', label: 'OCR Tool', icon: ScanLine },
   { href: '/notifications', label: 'Notifications', icon: Bell },
   { href: '/profile', label: 'My Profile', icon: UserCircle },
 ];
 
 const overallHeadLinks = [
-  ...organizerLinks, // Inherits organizer links
-  { href: '/admin/tasks', label: 'Task Management', icon: Settings }, // Example, new route
+  ...organizerLinks,
+  { href: '/admin/tasks', label: 'Task Management', icon: Settings },
 ];
 
 const adminLinks = [
-  ...overallHeadLinks, // Inherits overall head links
-  { href: '/admin/users', label: 'User Management', icon: UserCircle }, // Example, new route
+  ...overallHeadLinks,
+  { href: '/admin/users', label: 'User Management', icon: UserCircle },
 ];
 
 
@@ -66,6 +66,7 @@ export default function MainNav() {
     try {
       await logOut();
       router.push('/');
+      toast({ title: "Logged Out", description: "You have been successfully logged out." });
     } catch (error) {
       toast({
         title: 'Logout Failed',
@@ -75,7 +76,7 @@ export default function MainNav() {
     }
   };
 
-  const NavLinkItem: React.FC<{ href: string; label: string; Icon: React.ElementType; onClick?: () => void }> = ({ href, label, Icon, onClick }) => (
+  const NavLinkItem: React.FC<{ href: string; label: string; Icon: React.ElementType; onClick?: () => void; isBranding?: boolean; }> = ({ href, label, Icon, onClick, isBranding = false }) => (
     <Link
       href={href}
       onClick={(e) => {
@@ -88,20 +89,22 @@ export default function MainNav() {
           }
         }
         if (onClick) onClick();
-        setIsMobileMenuOpen(false); // Close mobile menu on link click
+        if (!isBranding) setIsMobileMenuOpen(false);
       }}
       className={cn(
-        "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-primary/10 hover:text-primary",
-        (pathname === href || (href.includes('#') && pathname + (window.location.hash || '') === href) ) ? "text-primary bg-primary/5" : "text-muted-foreground"
+        "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+        isBranding ? "text-xl font-bold text-primary font-headline hover:opacity-90" : "hover:bg-primary/10 hover:text-primary",
+        !isBranding && (pathname === href || (href.includes('#') && pathname + (window.location.hash || '') === href) ) ? "text-primary bg-primary/5" : "text-muted-foreground",
+        isBranding && "p-0"
       )}
     >
-      <Icon className="h-5 w-5" />
+      <Icon className={cn(isBranding ? "h-7 w-7" : "h-5 w-5")} />
       {label}
     </Link>
   );
 
   const UserAvatar = () => (
-    <Avatar className="h-8 w-8">
+    <Avatar className="h-8 w-8 border border-transparent group-hover:border-primary/50 transition-colors">
       <AvatarImage src={authUser?.photoURL || userProfile?.photoURL || undefined} alt={authUser?.displayName || userProfile?.displayName || authUser?.email || 'User'} />
       <AvatarFallback>{(authUser?.email || userProfile?.email)?.[0].toUpperCase() || 'U'}</AvatarFallback>
     </Avatar>
@@ -109,58 +112,50 @@ export default function MainNav() {
   
   const getNavLinksForRole = (role?: UserRole) => {
     let specificLinks = [];
-    if (authUser) { // Only show role-specific links if logged in
+    if (authUser) {
       switch (role) {
         case 'student':
-        case 'test': // Test role can act as student for UI
+        case 'test':
           specificLinks = studentLinks;
           break;
         case 'organizer':
+        case 'event_representative':
           specificLinks = organizerLinks;
           break;
-        case 'event_representative':
-             specificLinks = organizerLinks; // Assuming representative has similar access to organizer for now
-             break;
         case 'overall_head':
           specificLinks = overallHeadLinks;
           break;
         case 'admin':
           specificLinks = adminLinks;
           break;
-        default: // Fallback for undefined role or unexpected value (could be studentLinks or just profile)
+        default:
           specificLinks = studentLinks; 
       }
-       return [...commonLinks, ...specificLinks];
+       return [...commonLinks, ...specificLinks.filter(sl => !commonLinks.find(cl => cl.href === sl.href))];
     }
-    return commonLinks; // Logged-out users see only common links
+    return commonLinks;
   };
 
   const currentNavLinks = getNavLinksForRole(userProfile?.role);
 
-
   if (!mounted) {
-    // Simplified skeleton for initial render to avoid layout shifts
     return (
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 text-lg font-bold text-primary">
-            <Atom className="h-6 w-6" />
-            <span>Junior Scientist</span>
-          </Link>
-          <div className="h-8 w-20 animate-pulse rounded-md bg-muted"></div> {/* Placeholder for auth button/avatar */}
+          <div className="flex items-center gap-2 text-lg font-bold text-primary">
+            <Atom className="h-6 w-6 animate-pulse" />
+            <span className="w-32 h-6 bg-muted rounded animate-pulse"></span>
+          </div>
+          <div className="h-8 w-20 animate-pulse rounded-md bg-muted"></div>
         </div>
       </header>
     );
   }
 
-
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 text-xl font-bold text-primary font-headline">
-          <Atom className="h-7 w-7" />
-          <span>JUNIOR SCIENTIST</span>
-        </Link>
+        <NavLinkItem href="/" label="JUNIOR SCIENTIST" Icon={Atom} isBranding />
 
         <nav className="hidden md:flex items-center space-x-1 lg:space-x-2">
           {currentNavLinks.map(link => (
@@ -174,7 +169,7 @@ export default function MainNav() {
           ) : authUser ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                <Button variant="ghost" className="relative h-9 w-9 rounded-full group">
                   <UserAvatar />
                 </Button>
               </DropdownMenuTrigger>
@@ -183,16 +178,23 @@ export default function MainNav() {
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-medium leading-none">{userProfile?.displayName || authUser.displayName || authUser.email}</p>
                     <p className="text-xs leading-none text-muted-foreground">
-                      {authUser.email} ({userProfile?.role || '...'})
+                      {authUser.email} ({userProfile?.role ? userProfile.role.replace('_', ' ') : '...'})
                     </p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                 {(userProfile?.role === 'student' || userProfile?.role === 'test' || userProfile?.role === 'organizer' || userProfile?.role === 'event_representative' || userProfile?.role === 'overall_head' || userProfile?.role === 'admin') && (
+                    <DropdownMenuItem onClick={() => router.push('/dashboard')}>
+                        <LayoutDashboard className="mr-2 h-4 w-4" />
+                        Dashboard
+                    </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={() => router.push('/profile')}>
                   <UserCircle className="mr-2 h-4 w-4" />
                   Profile
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleLogout}>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive-foreground focus:bg-destructive/90">
                   <LogOut className="mr-2 h-4 w-4" />
                   Log out
                 </DropdownMenuItem>
@@ -200,7 +202,7 @@ export default function MainNav() {
             </DropdownMenu>
           ) : (
             <div className="hidden md:flex items-center gap-2">
-              <Button variant="ghost" asChild>
+              <Button variant="outline" asChild>
                 <Link href="/login">Log In</Link>
               </Button>
               <Button asChild className="bg-accent hover:bg-accent/90 text-accent-foreground">
@@ -216,21 +218,17 @@ export default function MainNav() {
                 <span className="sr-only">Toggle menu</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-[280px] p-0">
-              <div className="flex h-full flex-col">
+            <SheetContent side="right" className="w-[280px] p-0 flex flex-col">
                 <div className="border-b p-4">
-                  <Link href="/" className="flex items-center gap-2 text-lg font-bold text-primary font-headline" onClick={() => setIsMobileMenuOpen(false)}>
-                    <Atom className="h-6 w-6" />
-                    <span>JUNIOR SCIENTIST</span>
-                  </Link>
+                  <NavLinkItem href="/" label="JUNIOR SCIENTIST" Icon={Atom} isBranding onClick={() => setIsMobileMenuOpen(false)}/>
                 </div>
-                <nav className="flex-grow space-y-1 p-4">
+                <nav className="flex-grow space-y-1 p-4 overflow-y-auto">
                   {currentNavLinks.map(link => (
                      <NavLinkItem key={link.href} href={link.href} label={link.label} Icon={link.icon} onClick={() => setIsMobileMenuOpen(false)} />
                   ))}
                 </nav>
                 {!authUser && !loading && (
-                  <div className="mt-auto border-t p-4 space-y-2">
+                  <div className="border-t p-4 space-y-2">
                     <Button variant="outline" className="w-full" asChild onClick={() => setIsMobileMenuOpen(false)}>
                       <Link href="/login">Log In</Link>
                     </Button>
@@ -239,7 +237,14 @@ export default function MainNav() {
                     </Button>
                   </div>
                 )}
-              </div>
+                 {authUser && !loading && (
+                  <div className="border-t p-4 space-y-2">
+                    <Button variant="destructive" className="w-full" onClick={() => {handleLogout(); setIsMobileMenuOpen(false);}}>
+                      <LogOut className="mr-2 h-4 w-4" />
+                      Log out
+                    </Button>
+                  </div>
+                 )}
             </SheetContent>
           </Sheet>
         </div>

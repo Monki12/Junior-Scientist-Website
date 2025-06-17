@@ -1,31 +1,48 @@
 
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { BellRing, Loader2, Info, CheckCircle, AlertTriangle } from 'lucide-react';
 
-// Mock notifications
-const mockNotifications = [
+// Mock notifications data
+const initialMockNotifications = [
   { id: '1', type: 'info', title: 'Welcome to EventFlow!', message: 'Explore events and manage your activities seamlessly.', date: '2024-07-28', read: false },
   { id: '2', type: 'success', title: 'Profile Updated', message: 'Your profile information has been successfully updated.', date: '2024-07-27', read: true },
   { id: '3', type: 'warning', title: 'Upcoming Event Reminder', message: 'Tech Conference 2024 is starting in 3 days.', date: '2024-07-26', read: false },
   { id: '4', type: 'info', title: 'New Event Posted', message: 'Check out the new "Art Workshop" event in your area.', date: '2024-07-25', read: true },
 ];
 
+interface NotificationItem {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  date: string;
+  read: boolean;
+}
 
 export default function NotificationsPage() {
-  const { authUser, loading } = useAuth(); // Use authUser for checking login status
+  const { authUser, loading } = useAuth();
   const router = useRouter();
+  const [notifications, setNotifications] = useState<NotificationItem[]>(initialMockNotifications);
 
   useEffect(() => {
     if (!loading && !authUser) {
       router.push('/login?redirect=/notifications');
     }
   }, [authUser, loading, router]);
+
+  const toggleReadStatus = (notificationId: string) => {
+    setNotifications(prevNotifications =>
+      prevNotifications.map(notif =>
+        notif.id === notificationId ? { ...notif, read: !notif.read } : notif
+      )
+    );
+  };
 
   if (loading || !authUser) {
     return (
@@ -51,10 +68,10 @@ export default function NotificationsPage() {
         <p className="text-muted-foreground mt-1">Stay updated with the latest alerts and announcements.</p>
       </header>
 
-      {mockNotifications.length > 0 ? (
+      {notifications.length > 0 ? (
         <div className="space-y-4">
-          {mockNotifications.map(notif => (
-            <Card key={notif.id} className={`shadow-lg hover:shadow-xl transition-shadow ${!notif.read ? 'bg-primary/5 border-primary/20' : ''}`}>
+          {notifications.map(notif => (
+            <Card key={notif.id} className={`shadow-lg hover:shadow-xl transition-shadow ${!notif.read ? 'bg-primary/5 border-primary/20' : 'bg-card'}`}>
               <CardContent className="p-4 flex items-start gap-4">
                 <div className="pt-1">
                   {getIconForType(notif.type)}
@@ -62,12 +79,12 @@ export default function NotificationsPage() {
                 <div className="flex-grow">
                   <div className="flex justify-between items-start">
                     <h3 className={`font-semibold ${!notif.read ? 'text-primary' : 'text-foreground'}`}>{notif.title}</h3>
-                    {!notif.read && <span className="inline-block h-2 w-2 rounded-full bg-accent"></span>}
+                    {!notif.read && <span className="inline-block h-2 w-2 rounded-full bg-accent animate-pulse"></span>}
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">{notif.message}</p>
                   <p className="text-xs text-muted-foreground/70 mt-2">{new Date(notif.date).toLocaleDateString()}</p>
                 </div>
-                <Button variant="ghost" size="sm" className="text-xs text-muted-foreground hover:text-primary">
+                <Button variant="ghost" size="sm" className="text-xs text-muted-foreground hover:text-primary" onClick={() => toggleReadStatus(notif.id)}>
                   Mark as {notif.read ? 'unread' : 'read'}
                 </Button>
               </CardContent>
@@ -85,7 +102,7 @@ export default function NotificationsPage() {
       )}
       
        <div className="text-center mt-8">
-        <Button variant="outline">Load More Notifications</Button>
+        <Button variant="outline" disabled>Load More Notifications (mock)</Button>
       </div>
     </div>
   );
