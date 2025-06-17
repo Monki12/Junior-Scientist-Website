@@ -33,22 +33,12 @@ const studentLinks = [
   { href: '/profile', label: 'My Profile', icon: UserCircle },
 ];
 
-const organizerLinks = [
-  { href: '/dashboard', label: 'Organizer Dashboard', icon: BarChart3 },
-  { href: '/organizer/events/manage', label: 'Manage Events', icon: Briefcase},
+const baseOrganizerLinks = [
+  { href: '/dashboard', label: 'My Dashboard', icon: LayoutDashboard },
+  // Manage Events link will be conditional based on role and assigned event for event_representative
   { href: '/ocr-tool', label: 'OCR Tool', icon: ScanLine },
   { href: '/notifications', label: 'Notifications', icon: Bell },
   { href: '/profile', label: 'My Profile', icon: UserCircle },
-];
-
-const overallHeadLinks = [
-  ...organizerLinks,
-  { href: '/admin/tasks', label: 'Task Management', icon: Settings },
-];
-
-const adminLinks = [
-  ...overallHeadLinks,
-  { href: '/admin/users', label: 'User Management', icon: UserCircle },
 ];
 
 
@@ -89,15 +79,15 @@ export default function MainNav() {
           }
         }
         if (onClick) onClick();
-        if (!isBranding) setIsMobileMenuOpen(false);
+        if (!isBranding) setIsMobileMenuOpen(false); // Close mobile menu on item click unless it's the brand logo
       }}
       className={cn(
         "flex items-center gap-2 rounded-md text-sm font-medium transition-colors",
         isBranding 
-          ? "text-xl font-bold text-primary font-headline hover:opacity-90 p-0" 
-          : "px-2 py-1.5 hover:bg-primary/10 hover:text-primary",
+          ? "text-xl font-bold text-primary font-headline hover:opacity-90 p-0" // Branding has no padding from NavLinkItem
+          : "px-2 py-1.5 hover:bg-primary/10 hover:text-primary", // Adjusted padding
         !isBranding && (pathname === href || (href.includes('#') && pathname + (window.location.hash || '') === href) ) ? "text-primary bg-primary/5" : "text-muted-foreground",
-        isBranding && "p-0"
+        isBranding && "p-0" // Ensure branding item does not get padding
       )}
     >
       <Icon className={cn(isBranding ? "h-7 w-7" : "h-5 w-5")} />
@@ -108,37 +98,60 @@ export default function MainNav() {
   const UserAvatar = () => (
     <Avatar className="h-8 w-8 border border-transparent group-hover:border-primary/50 transition-colors">
       <AvatarImage src={authUser?.photoURL || userProfile?.photoURL || undefined} alt={authUser?.displayName || userProfile?.displayName || authUser?.email || 'User'} />
-      <AvatarFallback>{(authUser?.email || userProfile?.email)?.[0].toUpperCase() || 'U'}</AvatarFallback>
+      <AvatarFallback>{(userProfile?.displayName || authUser?.displayName || userProfile?.email || authUser?.email)?.[0].toUpperCase() || 'U'}</AvatarFallback>
     </Avatar>
   );
   
-  const getNavLinksForRole = (role?: UserRole) => {
-    let specificLinks = [];
-    if (authUser) {
-      switch (role) {
+  const getNavLinksForRole = (profile?: UserProfileData | null) => {
+    let specificLinks: Array<{ href: string; label: string; icon: React.ElementType; }> = [];
+    if (authUser && profile) {
+      switch (profile.role) {
         case 'student':
         case 'test':
           specificLinks = studentLinks;
           break;
-        case 'organizer':
         case 'event_representative':
-          specificLinks = organizerLinks;
+          specificLinks = [...baseOrganizerLinks];
+          if (profile.assignedEventSlug) {
+            specificLinks.splice(1, 0, { href: `/organizer/events/manage/${profile.assignedEventSlug}`, label: 'Manage My Event', icon: Briefcase });
+            specificLinks.splice(2, 0, { href: `/organizer/event-tasks`, label: 'Event Tasks', icon: Settings });
+
+          }
+          break;
+        case 'organizer':
+          specificLinks = [...baseOrganizerLinks];
+          // Organizers might get a link to a page showing all events they contribute to later
           break;
         case 'overall_head':
-          specificLinks = overallHeadLinks;
+          specificLinks = [
+            { href: '/dashboard', label: 'OH Dashboard', icon: LayoutDashboard },
+            { href: '/admin/tasks', label: 'Global Tasks', icon: Settings },
+            { href: '/organizer/events/manage', label: 'Manage All Events', icon: Briefcase },
+            { href: '/ocr-tool', label: 'OCR Tool', icon: ScanLine },
+            { href: '/notifications', label: 'Notifications', icon: Bell },
+            { href: '/profile', label: 'My Profile', icon: UserCircle },
+          ];
           break;
         case 'admin':
-          specificLinks = adminLinks;
+          specificLinks = [
+            { href: '/dashboard', label: 'Admin Dashboard', icon: LayoutDashboard },
+            { href: '/admin/tasks', label: 'Global Tasks', icon: Settings },
+            { href: '/organizer/events/manage', label: 'Manage All Events', icon: Briefcase },
+            { href: '/admin/users', label: 'Manage Users', icon: UserCircle }, // Placeholder
+            { href: '/ocr-tool', label: 'OCR Tool', icon: ScanLine },
+            { href: '/notifications', label: 'Notifications', icon: Bell },
+            { href: '/profile', label: 'My Profile', icon: UserCircle },
+          ];
           break;
         default:
-          specificLinks = studentLinks; 
+          specificLinks = studentLinks; // Fallback, should ideally not happen
       }
        return [...commonLinks, ...specificLinks.filter(sl => !commonLinks.find(cl => cl.href === sl.href))];
     }
     return commonLinks;
   };
 
-  const currentNavLinks = getNavLinksForRole(userProfile?.role);
+  const currentNavLinks = getNavLinksForRole(userProfile);
 
   if (!mounted) {
     return (
@@ -180,17 +193,15 @@ export default function MainNav() {
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-medium leading-none">{userProfile?.displayName || authUser.displayName || authUser.email}</p>
                     <p className="text-xs leading-none text-muted-foreground">
-                      {authUser.email} ({userProfile?.role ? userProfile.role.replace('_', ' ') : '...'})
+                      {authUser.email} {userProfile?.role ? `(${userProfile.role.replace('_', ' ')})` : ''}
                     </p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                 {(userProfile?.role === 'student' || userProfile?.role === 'test' || userProfile?.role === 'organizer' || userProfile?.role === 'event_representative' || userProfile?.role === 'overall_head' || userProfile?.role === 'admin') && (
-                    <DropdownMenuItem onClick={() => router.push('/dashboard')}>
-                        <LayoutDashboard className="mr-2 h-4 w-4" />
-                        Dashboard
-                    </DropdownMenuItem>
-                )}
+                <DropdownMenuItem onClick={() => router.push('/dashboard')}>
+                    <LayoutDashboard className="mr-2 h-4 w-4" />
+                    Dashboard
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => router.push('/profile')}>
                   <UserCircle className="mr-2 h-4 w-4" />
                   Profile
@@ -221,12 +232,10 @@ export default function MainNav() {
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-[280px] p-0 flex flex-col">
-                <SheetHeader className="sr-only">
-                  <SheetTitle>Main Navigation Menu</SheetTitle>
-                </SheetHeader>
-                <div className="border-b p-4">
+                <SheetHeader className="border-b p-4">
+                  <SheetTitle className="sr-only">Main Navigation Menu</SheetTitle>
                   <NavLinkItem href="/" label="JUNIOR SCIENTIST" Icon={Atom} isBranding onClick={() => setIsMobileMenuOpen(false)}/>
-                </div>
+                </SheetHeader>
                 <nav className="flex-grow space-y-1 p-4 overflow-y-auto">
                   {currentNavLinks.map(link => (
                      <NavLinkItem key={link.href} href={link.href} label={link.label} Icon={link.icon} onClick={() => setIsMobileMenuOpen(false)} />
@@ -257,3 +266,4 @@ export default function MainNav() {
     </header>
   );
 }
+
