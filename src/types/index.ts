@@ -125,4 +125,3 @@ export interface CustomColumnDefinition {
   defaultValue?: any;
   description?: string;
 }
-

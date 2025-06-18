@@ -32,12 +32,12 @@ import { ArrowLeft, Loader2, Users, Search, ShieldAlert, Filter, PlusCircle, Bar
 
 // Enhanced mock data
 const initialMockEventParticipants: EventParticipant[] = [
-  { id: 'stud1', name: 'Alice Smith', email: 'alice.smith@example.com', schoolName: 'Springfield High', registrationDate: new Date('2024-07-01T10:00:00Z').toISOString(), paymentStatus: 'paid', customData: { levels: { '1': { present: true, venue: 'Auditorium A', qualified: 'auto'}, '2': { present: true, qualified: 'yes' } } } },
-  { id: 'stud2', name: 'Bob Johnson', email: 'bob.johnson@example.com', schoolName: 'Northwood Academy', registrationDate: new Date('2024-07-02T11:30:00Z').toISOString(), paymentStatus: 'pending', customData: { levels: { '1': { present: true, venue: 'Hall B', qualified: 'auto'}, '2': { present: false, qualified: 'no' } } } },
-  { id: 'stud3', name: 'Charlie Brown', email: 'charlie.brown@example.com', schoolName: 'Springfield High', registrationDate: new Date('2024-07-03T09:15:00Z').toISOString(), paymentStatus: 'paid', customData: { levels: { '1': { present: false, venue: 'Room C1', qualified: 'auto'}, '2': { present: false, qualified: 'auto' } } } },
-  { id: 'stud4', name: 'Diana Prince', email: 'diana.prince@example.com', schoolName: 'Riverside Prep', registrationDate: new Date('2024-07-04T14:00:00Z').toISOString(), paymentStatus: 'waived', customData: { levels: { '1': { present: true, venue: 'Auditorium A', qualified: 'auto'}, '2': { present: true, qualified: 'auto' } } } },
-  { id: 'stud5', name: 'Edward Nigma', email: 'edward.nigma@example.com', schoolName: 'Northwood Academy', registrationDate: new Date('2024-07-05T16:45:00Z').toISOString(), paymentStatus: 'failed', customData: { levels: { '1': { present: true, venue: 'Hall B', qualified: 'auto'}, '2': { present: true, qualified: 'yes' } } } },
-  { id: 'stud6', name: 'Fiona Gallagher', email: 'fiona.gallagher@example.com', schoolName: 'Springfield High', registrationDate: new Date('2024-07-06T08:00:00Z').toISOString(), paymentStatus: 'paid', customData: { levels: { '1': { present: true, venue: 'Room C1', qualified: 'auto'}, '2': { present: false, qualified: 'no' } } } },
+  { id: 'stud1', name: 'Alice Smith', email: 'alice.smith@example.com', contactNumber: '555-1234', schoolName: 'Springfield High', registrationDate: new Date('2024-07-01T10:00:00Z').toISOString(), paymentStatus: 'paid', customData: { notes: 'Interested in volunteering too.'} },
+  { id: 'stud2', name: 'Bob Johnson', email: 'bob.johnson@example.com', contactNumber: '555-5678', schoolName: 'Northwood Academy', registrationDate: new Date('2024-07-02T11:30:00Z').toISOString(), paymentStatus: 'pending', customData: {} },
+  { id: 'stud3', name: 'Charlie Brown', email: 'charlie.brown@example.com', contactNumber: '555-9012', schoolName: 'Springfield High', registrationDate: new Date('2024-07-03T09:15:00Z').toISOString(), paymentStatus: 'paid', customData: {} },
+  { id: 'stud4', name: 'Diana Prince', email: 'diana.prince@example.com', contactNumber: '555-3456', schoolName: 'Riverside Prep', registrationDate: new Date('2024-07-04T14:00:00Z').toISOString(), paymentStatus: 'waived', customData: { notes: 'VIP Guest.'} },
+  { id: 'stud5', name: 'Edward Nigma', email: 'edward.nigma@example.com', contactNumber: '555-7890', schoolName: 'Northwood Academy', registrationDate: new Date('2024-07-05T16:45:00Z').toISOString(), paymentStatus: 'failed', customData: {} },
+  { id: 'stud6', name: 'Fiona Gallagher', email: 'fiona.gallagher@example.com', contactNumber: '555-2345', schoolName: 'Springfield High', registrationDate: new Date('2024-07-06T08:00:00Z').toISOString(), paymentStatus: 'paid', customData: {} },
 ];
 
 interface ActiveDynamicFilter {
@@ -116,12 +116,9 @@ export default function ManageParticipantsPage() {
     const standardCols = [
       { id: 'name', name: 'Name', isCustom: false },
       { id: 'email', name: 'Email', isCustom: false },
-      // { id: 'contactNumber', name: 'Contact Number', isCustom: false }, // Removed from direct filter options for brevity
+      { id: 'contactNumber', name: 'Contact Number', isCustom: false },
       { id: 'schoolName', name: 'School Name', isCustom: false },
       { id: 'paymentStatus', name: 'Payment Status', isCustom: false },
-      { id: 'levels.1.present', name: 'Lvl 1 Present', isCustom: false }, // Example for level filtering
-      { id: 'levels.1.venue', name: 'Lvl 1 Venue', isCustom: false },
-      { id: 'levels.2.qualified', name: 'Lvl 2 Qualify Status', isCustom: false },
     ];
     const customCols = customColumnDefinitions.map(col => ({ id: col.id, name: col.name, isCustom: true }));
     return [...standardCols, ...customCols];
@@ -133,7 +130,8 @@ export default function ManageParticipantsPage() {
       const matchesSearch = searchTermLower === '' ||
         participant.name.toLowerCase().includes(searchTermLower) ||
         participant.email.toLowerCase().includes(searchTermLower) ||
-        (participant.schoolName && participant.schoolName.toLowerCase().includes(searchTermLower));
+        (participant.schoolName && participant.schoolName.toLowerCase().includes(searchTermLower)) ||
+        (participant.contactNumber && participant.contactNumber.toLowerCase().includes(searchTermLower));
       
       const matchesSchool = schoolFilter === 'all' || participant.schoolName === schoolFilter;
       const matchesPaymentStatus = paymentStatusFilter === 'all' || participant.paymentStatus === paymentStatusFilter;
@@ -145,17 +143,10 @@ export default function ManageParticipantsPage() {
           if (filter.isCustom) {
             participantValue = participant.customData?.[filter.columnId];
           } else {
-            // Handle nested standard properties like levels
-            if (filter.columnId.startsWith('levels.')) {
-                const parts = filter.columnId.split('.'); // e.g., ['levels', '1', 'present']
-                participantValue = participant.customData?.[parts[0]]?.[parts[1]]?.[parts[2]];
-            } else {
-                participantValue = (participant as any)[filter.columnId];
-            }
+            participantValue = (participant as any)[filter.columnId];
           }
 
           if (participantValue === undefined || participantValue === null) {
-            // If filter value is for 'empty' or 'not set', this logic might need adjustment
             return filter.value.toLowerCase() === 'false' && typeof participantValue === 'boolean' ? true : false;
           }
           
@@ -241,31 +232,6 @@ export default function ManageParticipantsPage() {
       )
     );
   };
-  
-  const handleLevelQualificationChange = (participantId: string, level: string, qualification: 'yes' | 'no' | 'auto') => {
-    setParticipants(prev =>
-      prev.map(p => {
-        if (p.id === participantId) {
-          const updatedLevels = {
-            ...(p.customData?.levels || {}),
-            [level]: {
-              ...(p.customData?.levels?.[level] || { present: false, qualified: 'auto' }), // Ensure level object exists
-              qualified: qualification,
-            },
-          };
-          return {
-            ...p,
-            customData: {
-              ...p.customData,
-              levels: updatedLevels,
-            },
-          };
-        }
-        return p;
-      })
-    );
-  };
-
 
   const renderCustomCell = (participant: EventParticipant, column: CustomColumnDefinition) => {
     const value = participant.customData?.[column.id] ?? column.defaultValue ?? getInitialValueForDataType(column.dataType);
@@ -300,22 +266,6 @@ export default function ManageParticipantsPage() {
             return <Checkbox checked={!!value} onCheckedChange={(checked) => handleCustomDataChange(participant.id, column.id, !!checked)} aria-label={`Toggle ${column.name} for ${participant.name}`}/>;
         default:
             return <span onClick={() => column.dataType !== 'checkbox' && setEditingCell({ participantId: participant.id, columnId: column.id })} className="cursor-pointer hover:bg-muted/50 p-1 rounded min-h-[2rem] block">{String(value)}</span>;
-    }
-  };
-  
-  const getQualificationRowClass = (status?: 'yes' | 'no' | 'auto') => {
-    switch (status) {
-      case 'yes': return 'bg-green-500/10 hover:bg-green-500/20';
-      case 'no': return 'bg-red-500/10 hover:bg-red-500/20';
-      default: return '';
-    }
-  };
-
-  const getQualificationIcon = (status?: 'yes' | 'no' | 'auto') => {
-    switch (status) {
-      case 'yes': return <Check className="h-4 w-4 text-green-600" />;
-      case 'no': return <X className="h-4 w-4 text-red-600" />;
-      default: return <HelpCircle className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
@@ -553,7 +503,7 @@ export default function ManageParticipantsPage() {
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle>Participant List ({filteredParticipants.length} found)</CardTitle>
-          <CardDescription>Total Participants: {participants.length}. Click cells in custom columns or Lvl 2 Qualify to edit.</CardDescription>
+          <CardDescription>Total Participants: {participants.length}. Click cells in custom columns to edit.</CardDescription>
         </CardHeader>
         <CardContent>
           {filteredParticipants.length > 0 ? (
@@ -563,12 +513,10 @@ export default function ManageParticipantsPage() {
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
+                    <TableHead>Contact</TableHead>
                     <TableHead>School</TableHead>
                     <TableHead>Registered On</TableHead>
                     <TableHead>Payment</TableHead>
-                    <TableHead>Lvl 1 Present</TableHead>
-                    <TableHead>Lvl 1 Venue</TableHead>
-                    <TableHead>Lvl 2 Qualify Status</TableHead>
                     {customColumnDefinitions.map(col => (
                       <TableHead key={col.id}>{col.name}</TableHead>
                     ))}
@@ -631,13 +579,11 @@ export default function ManageParticipantsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredParticipants.map((participant) => {
-                    const level1Data = participant.customData?.levels?.['1'] || { present: false, venue: '', qualified: 'auto' };
-                    const level2Data = participant.customData?.levels?.['2'] || { present: false, venue: '', qualified: 'auto' };
-                    return (
-                      <TableRow key={participant.id} className={getQualificationRowClass(level2Data.qualified)}>
+                  {filteredParticipants.map((participant) => (
+                      <TableRow key={participant.id}>
                         <TableCell className="font-medium">{participant.name}</TableCell>
                         <TableCell>{participant.email}</TableCell>
+                        <TableCell>{participant.contactNumber || 'N/A'}</TableCell>
                         <TableCell>{participant.schoolName || 'N/A'}</TableCell>
                         <TableCell>{new Date(participant.registrationDate).toLocaleDateString()}</TableCell>
                         <TableCell>
@@ -649,26 +595,6 @@ export default function ManageParticipantsPage() {
                             {participant.paymentStatus}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-center">
-                            <Checkbox checked={level1Data.present} disabled aria-label={`Level 1 Present for ${participant.name}`}/>
-                        </TableCell>
-                        <TableCell>{level1Data.venue || 'N/A'}</TableCell>
-                        <TableCell className="flex items-center gap-1">
-                           {getQualificationIcon(level2Data.qualified)}
-                           <Select
-                              value={level2Data.qualified}
-                              onValueChange={(value: 'yes' | 'no' | 'auto') => handleLevelQualificationChange(participant.id, '2', value)}
-                            >
-                              <SelectTrigger className="h-8 text-xs w-[150px]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="auto">Auto (Based on Lvl 1)</SelectItem>
-                                <SelectItem value="yes">Yes (Qualify)</SelectItem>
-                                <SelectItem value="no">No (Disqualify)</SelectItem>
-                              </SelectContent>
-                            </Select>
-                        </TableCell>
                         {customColumnDefinitions.map(col => (
                           <TableCell key={col.id}>
                             {renderCustomCell(participant, col)}
@@ -676,8 +602,7 @@ export default function ManageParticipantsPage() {
                         ))}
                         <TableCell></TableCell>
                       </TableRow>
-                    );
-                  })}
+                    ))}
                 </TableBody>
               </Table>
             </div>
