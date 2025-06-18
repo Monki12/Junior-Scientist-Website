@@ -3,7 +3,6 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter, notFound } from 'next/navigation';
-import Link from 'next/link';
 import { useAuth } from '@/hooks/use-auth';
 import { subEventsData } from '@/data/subEvents';
 import type { SubEvent, EventParticipant } from '@/types';
@@ -14,16 +13,17 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Loader2, Users, Search, ShieldAlert, Filter } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useToast } from '@/hooks/use-toast';
+import { ArrowLeft, Loader2, Users, Search, ShieldAlert, Filter, MessageSquare, CheckSquare } from 'lucide-react';
 
-// Mock data for participants - in a real app, this would come from a backend
-const mockEventParticipants: EventParticipant[] = [
-  { id: 'stud1', name: 'Alice Smith', email: 'alice.smith@example.com', contactNumber: '555-0101', schoolName: 'Springfield High', registrationDate: new Date('2024-07-01T10:00:00Z').toISOString(), paymentStatus: 'paid' },
-  { id: 'stud2', name: 'Bob Johnson', email: 'bob.johnson@example.com', contactNumber: '555-0102', schoolName: 'Northwood Academy', registrationDate: new Date('2024-07-02T11:30:00Z').toISOString(), paymentStatus: 'pending' },
-  { id: 'stud3', name: 'Charlie Brown', email: 'charlie.brown@example.com', contactNumber: '555-0103', schoolName: 'Springfield High', registrationDate: new Date('2024-07-03T09:15:00Z').toISOString(), paymentStatus: 'paid' },
-  { id: 'stud4', name: 'Diana Prince', email: 'diana.prince@example.com', contactNumber: '555-0104', schoolName: 'Riverside Prep', registrationDate: new Date('2024-07-04T14:00:00Z').toISOString(), paymentStatus: 'waived' },
-  { id: 'stud5', name: 'Edward Nigma', email: 'edward.nigma@example.com', contactNumber: '555-0105', schoolName: 'Northwood Academy', registrationDate: new Date('2024-07-05T16:45:00Z').toISOString(), paymentStatus: 'failed' },
-  { id: 'stud6', name: 'Fiona Gallagher', email: 'fiona.gallagher@example.com', contactNumber: '555-0106', schoolName: 'Springfield High', registrationDate: new Date('2024-07-06T08:00:00Z').toISOString(), paymentStatus: 'paid' },
+const initialMockEventParticipants: EventParticipant[] = [
+  { id: 'stud1', name: 'Alice Smith', email: 'alice.smith@example.com', contactNumber: '555-0101', schoolName: 'Springfield High', registrationDate: new Date('2024-07-01T10:00:00Z').toISOString(), paymentStatus: 'paid', notes: 'Interested in volunteering.', followUpCompleted: false },
+  { id: 'stud2', name: 'Bob Johnson', email: 'bob.johnson@example.com', contactNumber: '555-0102', schoolName: 'Northwood Academy', registrationDate: new Date('2024-07-02T11:30:00Z').toISOString(), paymentStatus: 'pending', followUpCompleted: true },
+  { id: 'stud3', name: 'Charlie Brown', email: 'charlie.brown@example.com', contactNumber: '555-0103', schoolName: 'Springfield High', registrationDate: new Date('2024-07-03T09:15:00Z').toISOString(), paymentStatus: 'paid', notes: 'Needs special assistance for mobility.', followUpCompleted: false },
+  { id: 'stud4', name: 'Diana Prince', email: 'diana.prince@example.com', contactNumber: '555-0104', schoolName: 'Riverside Prep', registrationDate: new Date('2024-07-04T14:00:00Z').toISOString(), paymentStatus: 'waived', followUpCompleted: false },
+  { id: 'stud5', name: 'Edward Nigma', email: 'edward.nigma@example.com', contactNumber: '555-0105', schoolName: 'Northwood Academy', registrationDate: new Date('2024-07-05T16:45:00Z').toISOString(), paymentStatus: 'failed', notes: 'Payment issue, follow up.', followUpCompleted: true },
+  { id: 'stud6', name: 'Fiona Gallagher', email: 'fiona.gallagher@example.com', contactNumber: '555-0106', schoolName: 'Springfield High', registrationDate: new Date('2024-07-06T08:00:00Z').toISOString(), paymentStatus: 'paid', followUpCompleted: false },
 ];
 
 
@@ -31,11 +31,13 @@ export default function ManageParticipantsPage() {
   const router = useRouter();
   const params = useParams();
   const eventSlug = params.eventSlug as string;
+  const { toast } = useToast();
 
   const { userProfile, loading: authLoading } = useAuth();
   const [event, setEvent] = useState<SubEvent | null>(null);
   const [loadingEvent, setLoadingEvent] = useState(true);
-
+  
+  const [participants, setParticipants] = useState<EventParticipant[]>(initialMockEventParticipants);
   const [searchTerm, setSearchTerm] = useState('');
   const [schoolFilter, setSchoolFilter] = useState('all');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('all');
@@ -66,14 +68,14 @@ export default function ManageParticipantsPage() {
   }, [userProfile, authLoading, router, eventSlug]);
 
   const uniqueSchoolNames = useMemo(() => {
-    const schools = new Set(mockEventParticipants.map(p => p.schoolName).filter(Boolean) as string[]);
+    const schools = new Set(participants.map(p => p.schoolName).filter(Boolean) as string[]);
     return ['all', ...Array.from(schools)];
-  }, []);
+  }, [participants]);
 
   const paymentStatuses: Array<EventParticipant['paymentStatus'] | 'all'> = ['all', 'paid', 'pending', 'waived', 'failed'];
 
   const filteredParticipants = useMemo(() => {
-    return mockEventParticipants.filter(participant => {
+    return participants.filter(participant => {
       const searchTermLower = searchTerm.toLowerCase();
       const matchesSearch = searchTermLower === '' ||
         participant.name.toLowerCase().includes(searchTermLower) ||
@@ -85,7 +87,36 @@ export default function ManageParticipantsPage() {
 
       return matchesSearch && matchesSchool && matchesPaymentStatus;
     });
-  }, [searchTerm, schoolFilter, paymentStatusFilter]);
+  }, [participants, searchTerm, schoolFilter, paymentStatusFilter]);
+
+  const handleFollowUpToggle = (participantId: string) => {
+    setParticipants(prevParticipants =>
+      prevParticipants.map(p =>
+        p.id === participantId ? { ...p, followUpCompleted: !p.followUpCompleted } : p
+      )
+    );
+    toast({
+        title: "Follow-up Updated",
+        description: `Follow-up status for participant ${participantId} changed. (Mock update)`,
+    });
+  };
+
+  const handleNotesAction = (participant: EventParticipant) => {
+    // In a real app, this would open a modal to add/edit notes.
+    // For now, we'll just display existing notes or a prompt using a toast.
+    if (participant.notes) {
+      toast({
+        title: `Notes for ${participant.name}`,
+        description: participant.notes,
+      });
+    } else {
+      toast({
+        title: `Notes for ${participant.name}`,
+        description: "No notes yet. Click to add (feature coming soon).",
+      });
+    }
+    // Mock: console.log("Would open notes modal for:", participant.id, "Current notes:", participant.notes);
+  };
 
 
   if (authLoading || loadingEvent || !userProfile || !event) {
@@ -183,7 +214,7 @@ export default function ManageParticipantsPage() {
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle>Participant List ({filteredParticipants.length} found)</CardTitle>
-          <CardDescription>Total Participants: {mockEventParticipants.length}</CardDescription>
+          <CardDescription>Total Participants: {participants.length}</CardDescription>
         </CardHeader>
         <CardContent>
           {filteredParticipants.length > 0 ? (
@@ -197,6 +228,7 @@ export default function ManageParticipantsPage() {
                     <TableHead>School</TableHead>
                     <TableHead>Registered On</TableHead>
                     <TableHead>Payment</TableHead>
+                    <TableHead className="text-center">Follow-up</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -212,14 +244,26 @@ export default function ManageParticipantsPage() {
                         <Badge variant={
                           participant.paymentStatus === 'paid' ? 'default' :
                           participant.paymentStatus === 'pending' ? 'secondary' :
-                          'outline' // 'waived' or 'failed'
+                          'outline' 
                         } className="capitalize">
                           {participant.paymentStatus}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" disabled>View</Button> 
-                        {/* Placeholder for future actions like edit, view profile, add note */}
+                      <TableCell className="text-center">
+                        <Checkbox
+                          id={`followup-${participant.id}`}
+                          checked={participant.followUpCompleted}
+                          onCheckedChange={() => handleFollowUpToggle(participant.id)}
+                          aria-label={`Mark follow-up for ${participant.name} as ${participant.followUpCompleted ? 'incomplete' : 'complete'}`}
+                        />
+                      </TableCell>
+                      <TableCell className="text-right space-x-1">
+                        <Button variant="ghost" size="icon" onClick={() => handleNotesAction(participant)} title="View/Add Notes">
+                           <MessageSquare className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" disabled title="View Details">
+                           <Users className="h-4 w-4" />
+                        </Button> 
                       </TableCell>
                     </TableRow>
                   ))}

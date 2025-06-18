@@ -31,8 +31,8 @@ export interface RegisteredEventInfo {
   teamMembers?: { id: string, name: string, role?: string }[]; 
   admitCardStatus?: 'published' | 'pending' | 'unavailable';
   eventDate?: string; 
-  registrationDate?: string; // Added for student's own registration view
-  paymentStatus?: 'paid' | 'pending' | 'waived' | 'failed'; // Added for student's own registration view
+  registrationDate?: string; 
+  paymentStatus?: 'paid' | 'pending' | 'waived' | 'failed'; 
 }
 
 export interface UserProfileData {
@@ -102,14 +102,15 @@ export interface StudentData {
   email: string;
 }
 
-// New interface for participant data viewable by Event Reps
 export interface EventParticipant {
-  id: string; // Student's UID
+  id: string; 
   name: string;
   email: string;
   contactNumber?: string;
   schoolName?: string;
-  registrationDate: string; // ISO Date string
+  registrationDate: string; 
   paymentStatus: 'paid' | 'pending' | 'waived' | 'failed';
-  // Later: customColumns, notes etc.
+  notes?: string; 
+  followUpCompleted?: boolean; 
 }
+
