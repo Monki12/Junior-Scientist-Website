@@ -348,9 +348,9 @@ export default function DashboardPage() {
                     </Button>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm">
-                    <p>Due Today: <Badge variant={tasksDueToday > 0 ? "default" : "outline"}>{tasksDueToday}</Badge></p>
-                    <p>Overdue: <Badge variant={overdueTasks > 0 ? "destructive" : "outline"} className={overdueTasks > 0 ? "" : "text-muted-foreground"}>{overdueTasks}</Badge></p>
-                    <p>This Week: <Badge variant={tasksThisWeek > 0 ? "secondary" : "outline"}>{tasksThisWeek}</Badge></p>
+                    <span>Due Today: <Badge variant={tasksDueToday > 0 ? "default" : "outline"}>{tasksDueToday}</Badge></span>
+                    <span>Overdue: <Badge variant={overdueTasks > 0 ? "destructive" : "outline"} className={overdueTasks > 0 ? "" : "text-muted-foreground"}>{overdueTasks}</Badge></span>
+                    <span>This Week: <Badge variant={tasksThisWeek > 0 ? "secondary" : "outline"}>{tasksThisWeek}</Badge></span>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -579,9 +579,9 @@ export default function DashboardPage() {
                 </Button>
               </div>
               <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm border-t pt-3">
-                <p>Due Today: <Badge variant={tasksDueToday > 0 ? "default" : "outline"} className="bg-blue-500/10 text-blue-700 border-blue-500/30">{tasksDueToday}</Badge></p>
-                <p>Overdue: <Badge variant={overdueTasks > 0 ? "destructive" : "outline"} className={overdueTasks > 0 ? "" : "text-muted-foreground"}>{overdueTasks}</Badge></p>
-                <p>This Week: <Badge variant={tasksThisWeek > 0 ? "secondary" : "outline"} className="bg-purple-500/10 text-purple-700 border-purple-500/30">{tasksThisWeek}</Badge></p>
+                <span>Due Today: <Badge variant={tasksDueToday > 0 ? "default" : "outline"} className="bg-blue-500/10 text-blue-700 border-blue-500/30">{tasksDueToday}</Badge></span>
+                <span>Overdue: <Badge variant={overdueTasks > 0 ? "destructive" : "outline"} className={overdueTasks > 0 ? "" : "text-muted-foreground"}>{overdueTasks}</Badge></span>
+                <span>This Week: <Badge variant={tasksThisWeek > 0 ? "secondary" : "outline"} className="bg-purple-500/10 text-purple-700 border-purple-500/30">{tasksThisWeek}</Badge></span>
               </div>
             </CardHeader>
             <CardContent>
