@@ -3,7 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card'; // Added CardFooter
-import { Atom, CheckCircle, Users, Cpu, Bot, Puzzle, Award, Brain, MessageSquare, TrendingUp, ShieldCheck, BookOpen, Users2, Phone, Mail, Instagram, Facebook, Twitter, ArrowDown, Sparkles, Zap, Trophy } from 'lucide-react'; // Added more icons
+import { Atom, CheckCircle, Users, Cpu, Bot, Puzzle, Award, Brain, MessageSquare, TrendingUp, ShieldCheck, BookOpen, Users2, Phone, Mail, Instagram, Facebook, Twitter, ArrowDown, Sparkles, Zap, Trophy, Info } from 'lucide-react'; // Added Info
 import { subEventsData } from '@/data/subEvents';
 
 const superpowerCategories = [
@@ -57,6 +57,8 @@ const perks = [
 
 // Homepage uses the new EventFlow theme
 export default function EventFlowHomePage() {
+  const featuredEvents = subEventsData.filter(event => event.isFeatured).slice(0, 3);
+
   return (
     <div className="flex flex-col items-center text-foreground animate-fade-in-up space-y-16 md:space-y-24"> {/* Added space between sections */}
       {/* Hero Section */}
@@ -67,7 +69,7 @@ export default function EventFlowHomePage() {
         <div className="container mx-auto px-4 relative z-10">
           <Atom className="h-16 w-16 md:h-20 md:w-20 text-primary mx-auto mb-6 animate-bounce" /> {/* Changed animation */}
           <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-4 text-primary uppercase" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-            EventFlow
+            Junior Scientist
           </h1>
           <p className="text-xl md:text-2xl text-foreground/80 mb-6 max-w-3xl mx-auto">
             Your Gateway to Exciting Student Events
@@ -156,30 +158,37 @@ export default function EventFlowHomePage() {
           <p className="text-lg text-muted-foreground mb-12 max-w-2xl mx-auto">
             Explore a variety of challenges designed to spark curiosity and innovation.
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {subEventsData.slice(0, 3).map((event) => ( // Show first 3 events
-              <Link href={`/events/${event.slug}`} key={event.id} className="block group">
-                <Card className="overflow-hidden shadow-soft hover:shadow-md-soft transition-shadow duration-300 h-full bg-card border border-border/30 hover:border-primary/50 rounded-xl">
-                  <div className="relative w-full h-48">
-                    <Image
-                      src={event.mainImage.src}
-                      alt={event.mainImage.alt}
-                      fill
-                      style={{ objectFit: 'cover' }}
-                      data-ai-hint={event.mainImage.dataAiHint}
-                      className="group-hover:scale-105 transition-transform duration-300"
-                    />
-                  </div>
-                  <CardHeader className="p-4">
-                    <CardTitle className="text-lg group-hover:text-primary transition-colors">{event.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-4 pt-0">
-                    <p className="text-sm text-muted-foreground line-clamp-2">{event.shortDescription}</p>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
-          </div>
+          {featuredEvents.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {featuredEvents.map((event) => (
+                <Link href={`/events/${event.slug}`} key={event.id} className="block group">
+                  <Card className="overflow-hidden shadow-soft hover:shadow-md-soft transition-shadow duration-300 h-full bg-card border border-border/30 hover:border-primary/50 rounded-xl">
+                    <div className="relative w-full h-48">
+                      <Image
+                        src={event.mainImage.src}
+                        alt={event.mainImage.alt}
+                        fill
+                        style={{ objectFit: 'cover' }}
+                        data-ai-hint={event.mainImage.dataAiHint}
+                        className="group-hover:scale-105 transition-transform duration-300"
+                      />
+                    </div>
+                    <CardHeader className="p-4">
+                      <CardTitle className="text-lg group-hover:text-primary transition-colors">{event.title}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 pt-0">
+                      <p className="text-sm text-muted-foreground line-clamp-2">{event.shortDescription}</p>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-10 text-muted-foreground">
+              <Info className="h-12 w-12 mx-auto mb-3 text-primary/30" />
+              <p className="text-lg">No featured events at the moment. Check back soon!</p>
+            </div>
+          )}
            <Button asChild className="mt-12 bg-accent hover:bg-accent/80 text-accent-foreground px-8 py-3 text-md rounded-lg shadow-soft">
               <Link href="/events">View All Events</Link>
             </Button>

@@ -24,6 +24,7 @@ export const subEventsData: SubEvent[] = [
     organizers: ['Test Organizer Alice', 'David (Organizer)'],
     event_representatives: ['Test Event Rep Bob'],
     registeredParticipantCount: 120,
+    isFeatured: true,
   },
   {
     id: '2',
@@ -46,6 +47,7 @@ export const subEventsData: SubEvent[] = [
     organizers: ['Test Organizer Alice'],
     event_representatives: ['Test Event Rep Bob'],
     registeredParticipantCount: 75,
+    isFeatured: true,
   },
   {
     id: '3',
@@ -67,6 +69,7 @@ export const subEventsData: SubEvent[] = [
     organizers: ['Test Organizer Alice'],
     event_representatives: ['Another Event Rep'],
     registeredParticipantCount: 250,
+    isFeatured: true,
   },
   {
     id: '4',
@@ -88,6 +91,7 @@ export const subEventsData: SubEvent[] = [
     organizers: ['David (Organizer)'],
     event_representatives: ['Test Event Rep Bob'],
     registeredParticipantCount: 90,
+    isFeatured: false,
   },
   {
     id: '5',
@@ -132,6 +136,7 @@ export const subEventsData: SubEvent[] = [
     organizers: ['David (Organizer)'],
     event_representatives: ['Test Event Rep Bob'],
     registeredParticipantCount: 45,
+    isFeatured: true, // Made this featured for example
   },
   {
     id: '7',
@@ -155,7 +160,7 @@ export const subEventsData: SubEvent[] = [
     id: '8',
     slug: 'art-exhibition',
     title: 'Student Art Exhibition',
-    superpowerCategory: 'The Thinker', // Can be debated, more artistic
+    superpowerCategory: 'The Thinker', 
     shortDescription: 'Showcase your artistic talents in various mediums.',
     detailedDescription: 'A platform for young artists to display their creativity. Submit your paintings, sculptures, digital art, and more. Categories for different age groups and themes will be available. Judged by local artists.',
     mainImage: { src: 'https://placehold.co/600x400.png', alt: 'Art gallery display', dataAiHint: 'art gallery exhibition' },
@@ -168,5 +173,41 @@ export const subEventsData: SubEvent[] = [
     event_representatives: ['Test Event Rep Bob'],
     registeredParticipantCount: 80,
   },
+  {
+    id: '9',
+    slug: 'debate-championship',
+    title: 'Inter-School Debate Championship',
+    superpowerCategory: 'The Thinker',
+    shortDescription: 'Articulate your arguments and engage in riveting debates on contemporary issues.',
+    detailedDescription: 'The Inter-School Debate Championship provides a platform for students to engage in structured argumentation, express their views thoughtfully, and develop critical thinking skills. Teams will debate on a range of current topics.',
+    mainImage: { src: 'https://placehold.co/600x400.png', alt: 'Students debating on stage', dataAiHint: 'debate stage' },
+    registrationLink: '/signup?event=debate-championship',
+    deadline: '2024-10-25',
+    eventDate: '2024-11-15',
+    isTeamEvent: true,
+    status: 'Planning' as EventStatus,
+    venue: 'Conference Hall B',
+    organizers: ['Test Organizer Alice', 'Overall Head Carol'],
+    event_representatives: ['Test Event Rep Bob'],
+    registeredParticipantCount: 50,
+  },
+  {
+    id: '10',
+    slug: 'young-innovators-fair',
+    title: 'Young Innovators Science Fair',
+    superpowerCategory: 'The Innovator',
+    shortDescription: 'Present your innovative science projects and models to a panel of experts.',
+    detailedDescription: 'The Young Innovators Science Fair encourages students to explore scientific concepts and develop innovative solutions to real-world problems. Participants can showcase their projects, models, and research findings.',
+    mainImage: { src: 'https://placehold.co/600x400.png', alt: 'Science fair project display', dataAiHint: 'science project' },
+    registrationLink: '/signup?event=innovators-fair',
+    deadline: '2024-11-05',
+    eventDate: '2024-11-25',
+    isTeamEvent: false,
+    status: 'Active' as EventStatus,
+    venue: 'Exhibition Center Gamma',
+    organizers: ['David (Organizer)', 'Overall Head Carol'],
+    event_representatives: ['Another Event Rep'],
+    registeredParticipantCount: 100,
+    isFeatured: false, // Example of not featured
+  },
 ];
-
