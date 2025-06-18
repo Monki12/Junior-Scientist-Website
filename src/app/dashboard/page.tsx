@@ -49,7 +49,7 @@ const getStatusBadgeVariant = (status: Task['status']): { variant: "default" | "
 export default function DashboardPage() {
   const { authUser, userProfile, setUserProfile, loading } = useAuth();
   const router = useRouter();
-  const [localUserProfileTasks, setLocalUserProfileTasks] = useState<Task[]>(userProfile?.tasks || []);
+  const [localUserProfileTasks, setLocalUserProfileTasks] = useState<Task[]>([]);
 
   useEffect(() => {
     if (!loading && !authUser) {
@@ -57,6 +57,8 @@ export default function DashboardPage() {
     }
     if (userProfile?.tasks) {
       setLocalUserProfileTasks(userProfile.tasks);
+    } else {
+      setLocalUserProfileTasks([]); // Ensure it's an empty array if no tasks
     }
   }, [authUser, userProfile, loading, router]);
 
@@ -71,7 +73,6 @@ export default function DashboardPage() {
     );
     setLocalUserProfileTasks(updatedTasks);
 
-    // Also update the main userProfile context
     setUserProfile(prevProfile => {
       if (!prevProfile) return null;
       return { ...prevProfile, tasks: updatedTasks };
@@ -90,7 +91,7 @@ export default function DashboardPage() {
   const role: UserRole = userProfile.role;
 
   // Student Dashboard
-  if (role === 'student' || (role === 'test' && !userProfile.tasks?.length)) { // Test user with NO tasks sees student dash
+  if (role === 'student' || (role === 'test' && (!userProfile.tasks || userProfile.tasks.filter(task => task.assignedTo?.includes(userProfile.displayName || '____NO_NAME____')).length === 0))) { // Test user with NO assigned tasks sees student dash
     const studentRegisteredFullEvents: RegisteredEventDisplay[] = userProfile.registeredEvents
       ?.map(registeredInfo => {
         const eventDetail = subEventsData.find(event => event.slug === registeredInfo.eventSlug);
@@ -247,13 +248,15 @@ export default function DashboardPage() {
     );
   }
   
-  // For organizer, event_representative, overall_head, admin, or test user with tasks
-  // My Tasks Section
-  const tasks = localUserProfileTasks || [];
+  // Filter tasks assigned to the current user for the "My Tasks" section
+  const myTasks = userProfile.displayName
+    ? localUserProfileTasks.filter(task => task.assignedTo?.includes(userProfile.displayName!))
+    : [];
+
   const today = startOfDay(new Date());
-  const tasksDueToday = tasks.filter(task => task.dueDate && isValid(parseISO(task.dueDate)) && isToday(parseISO(task.dueDate)) && task.status !== 'Completed').length;
-  const overdueTasks = tasks.filter(task => task.dueDate && isValid(parseISO(task.dueDate)) && isPast(parseISO(task.dueDate)) && !isToday(parseISO(task.dueDate)) && task.status !== 'Completed').length;
-  const tasksThisWeek = tasks.filter(task => task.dueDate && isValid(parseISO(task.dueDate)) && isThisWeek(parseISO(task.dueDate), { weekStartsOn: 1 }) && task.status !== 'Completed').length;
+  const tasksDueToday = myTasks.filter(task => task.dueDate && isValid(parseISO(task.dueDate)) && isToday(parseISO(task.dueDate)) && task.status !== 'Completed').length;
+  const overdueTasks = myTasks.filter(task => task.dueDate && isValid(parseISO(task.dueDate)) && isPast(parseISO(task.dueDate)) && !isToday(parseISO(task.dueDate)) && task.status !== 'Completed').length;
+  const tasksThisWeek = myTasks.filter(task => task.dueDate && isValid(parseISO(task.dueDate)) && isThisWeek(parseISO(task.dueDate), { weekStartsOn: 1 }) && task.status !== 'Completed').length;
 
 
   if (role === 'event_representative') {
@@ -305,7 +308,7 @@ export default function DashboardPage() {
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mb-4">
                                 <p className="flex items-center"><UsersRound className="mr-1.5 h-4 w-4 text-accent" /> Registered: <span className="font-semibold ml-1">57</span></p>
-                                <p className="flex items-center"><ListChecks className="mr-1.5 h-4 w-4 text-accent" /> Pending Tasks: <span className="font-semibold ml-1">{tasks.filter(t => t.status !== 'Completed').length}</span></p>
+                                <p className="flex items-center"><ListChecks className="mr-1.5 h-4 w-4 text-accent" /> Pending Tasks: <span className="font-semibold ml-1">{myTasks.filter(t => t.status !== 'Completed').length}</span></p>
                                 <div className="flex items-center col-span-full text-sm"><Info className="mr-1.5 h-4 w-4 text-accent" /> Status: <Badge variant="secondary" className="ml-1">Planning</Badge></div>
                             </div>
                             <div className="flex flex-wrap gap-2 mt-4">
@@ -334,7 +337,7 @@ export default function DashboardPage() {
 
         <Separator />
         
-        {tasks.length > 0 && (
+        {myTasks.length > 0 && (
              <section id="my-tasks">
               <Card className="shadow-md-soft rounded-xl">
                 <CardHeader>
@@ -354,7 +357,7 @@ export default function DashboardPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {tasks.length > 0 ? (
+                  {myTasks.length > 0 ? (
                     <div className="overflow-x-auto rounded-md border">
                       <Table>
                         <TableHeader>
@@ -367,7 +370,7 @@ export default function DashboardPage() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {tasks.slice(0, 5).map((task) => ( // Show max 5 tasks in this condensed view
+                          {myTasks.slice(0, 5).map((task) => ( 
                             <TableRow key={task.id} className={`hover:bg-muted/50 transition-colors duration-150 ${task.status === 'Completed' ? 'opacity-60' : ''}`}>
                               <TableCell>
                                 <Checkbox
@@ -412,7 +415,7 @@ export default function DashboardPage() {
              <Card className="shadow-soft rounded-xl">
                 <CardContent className="py-6 text-muted-foreground">
                     <BarChartHorizontalBig className="h-10 w-10 mx-auto mb-3 text-primary/30" />
-                    <p className="text-center">Key metrics and statistics (e.g., total registrations, task completion rate, upcoming critical deadlines) will be displayed here soon.</p>
+                    <p className="text-center">Key metrics and statistics (e.g., total registrations, task completion rate, upcoming critical deadlines) related to your assigned event will be displayed here soon.</p>
                 </CardContent>
             </Card>
         </section>
@@ -536,14 +539,14 @@ export default function DashboardPage() {
                 </CardContent>
             </Card>
         )}
-         {(tasks.length > 0) && (
+         {(myTasks.length > 0 || role === 'event_representative') && ( // Show pending tasks if user has tasks or is ER (ER might have 0 but section is relevant)
             <Card className="shadow-soft rounded-xl">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium text-muted-foreground">Pending Tasks</CardTitle>
                     <ClipboardList className="h-5 w-5 text-blue-500" />
                 </CardHeader>
                 <CardContent>
-                    <div className="text-2xl font-bold text-blue-600">{tasks.filter(t => t.status === 'pending' || t.status === 'in-progress' || t.status === 'Not Started').length}</div>
+                    <div className="text-2xl font-bold text-blue-600">{myTasks.filter(t => t.status === 'Pending Review' || t.status === 'In Progress' || t.status === 'Not Started').length}</div>
                 </CardContent>
             </Card>
         )}
@@ -565,7 +568,7 @@ export default function DashboardPage() {
       )}
 
 
-      {(tasks.length > 0) && (
+      {(myTasks.length > 0 || role === 'event_representative') && ( // Show "My Tasks" if user has tasks or is ER
         <section id="my-tasks">
           <Card className="shadow-md-soft rounded-xl">
             <CardHeader>
@@ -579,13 +582,13 @@ export default function DashboardPage() {
                 </Button>
               </div>
               <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm border-t pt-3">
-                <span>Due Today: <Badge variant={tasksDueToday > 0 ? "default" : "outline"} className="bg-blue-500/10 text-blue-700 border-blue-500/30">{tasksDueToday}</Badge></span>
+                <span>Due Today: <Badge variant={tasksDueToday > 0 ? "default" : "outline"} className={`${tasksDueToday > 0 ? 'bg-blue-500/10 text-blue-700 border-blue-500/30' : ''}` }>{tasksDueToday}</Badge></span>
                 <span>Overdue: <Badge variant={overdueTasks > 0 ? "destructive" : "outline"} className={overdueTasks > 0 ? "" : "text-muted-foreground"}>{overdueTasks}</Badge></span>
-                <span>This Week: <Badge variant={tasksThisWeek > 0 ? "secondary" : "outline"} className="bg-purple-500/10 text-purple-700 border-purple-500/30">{tasksThisWeek}</Badge></span>
+                <span>This Week: <Badge variant={tasksThisWeek > 0 ? "secondary" : "outline"} className={`${tasksThisWeek > 0 ? 'bg-purple-500/10 text-purple-700 border-purple-500/30': ''}`}>{tasksThisWeek}</Badge></span>
               </div>
             </CardHeader>
             <CardContent>
-              {tasks.length > 0 ? (
+              {myTasks.length > 0 ? (
                  <div className="overflow-x-auto rounded-md border">
                     <Table>
                         <TableHeader>
@@ -598,7 +601,7 @@ export default function DashboardPage() {
                         </TableRow>
                         </TableHeader>
                         <TableBody>
-                        {tasks.slice(0, 7).map((task) => ( // Show max 7 tasks in this condensed view
+                        {myTasks.slice(0, 7).map((task) => ( // Show max 7 tasks in this condensed view
                             <TableRow 
                                 key={task.id} 
                                 className={`hover:bg-muted/50 transition-colors duration-150 ${task.status === 'Completed' ? 'opacity-60' : ''}`}
