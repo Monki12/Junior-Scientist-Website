@@ -110,7 +110,21 @@ export interface EventParticipant {
   schoolName?: string;
   registrationDate: string; 
   paymentStatus: 'paid' | 'pending' | 'waived' | 'failed';
-  notes?: string; 
-  followUpCompleted?: boolean; 
+  // notes?: string; // Removed as per redesign
+  // followUpCompleted?: boolean; // Removed as per redesign
+  // Custom column data will be handled differently later
 }
+
+// Represents the definition of a custom column
+export interface CustomColumnDefinition {
+  id: string; // Unique ID for the column
+  name: string; // Display name of the column header
+  dataType: 'text' | 'number' | 'checkbox' | 'dropdown' | 'date';
+  options?: string[]; // For dropdown type
+  defaultValue?: any;
+  description?: string;
+}
+// Represents the custom data stored for a participant, keyed by columnId
+export type ParticipantCustomData = Record<string, any>;
+
 

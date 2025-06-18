@@ -13,17 +13,18 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
+// import { Checkbox } from '@/components/ui/checkbox'; // Checkbox removed as "Follow-up" column is removed
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Loader2, Users, Search, ShieldAlert, Filter, MessageSquare, CheckSquare } from 'lucide-react';
+import { ArrowLeft, Loader2, Users, Search, ShieldAlert, Filter, PlusCircle, BarChart2, PieChart, Users2 } from 'lucide-react';
 
+// Enhanced mock data
 const initialMockEventParticipants: EventParticipant[] = [
-  { id: 'stud1', name: 'Alice Smith', email: 'alice.smith@example.com', contactNumber: '555-0101', schoolName: 'Springfield High', registrationDate: new Date('2024-07-01T10:00:00Z').toISOString(), paymentStatus: 'paid', notes: 'Interested in volunteering.', followUpCompleted: false },
-  { id: 'stud2', name: 'Bob Johnson', email: 'bob.johnson@example.com', contactNumber: '555-0102', schoolName: 'Northwood Academy', registrationDate: new Date('2024-07-02T11:30:00Z').toISOString(), paymentStatus: 'pending', followUpCompleted: true },
-  { id: 'stud3', name: 'Charlie Brown', email: 'charlie.brown@example.com', contactNumber: '555-0103', schoolName: 'Springfield High', registrationDate: new Date('2024-07-03T09:15:00Z').toISOString(), paymentStatus: 'paid', notes: 'Needs special assistance for mobility.', followUpCompleted: false },
-  { id: 'stud4', name: 'Diana Prince', email: 'diana.prince@example.com', contactNumber: '555-0104', schoolName: 'Riverside Prep', registrationDate: new Date('2024-07-04T14:00:00Z').toISOString(), paymentStatus: 'waived', followUpCompleted: false },
-  { id: 'stud5', name: 'Edward Nigma', email: 'edward.nigma@example.com', contactNumber: '555-0105', schoolName: 'Northwood Academy', registrationDate: new Date('2024-07-05T16:45:00Z').toISOString(), paymentStatus: 'failed', notes: 'Payment issue, follow up.', followUpCompleted: true },
-  { id: 'stud6', name: 'Fiona Gallagher', email: 'fiona.gallagher@example.com', contactNumber: '555-0106', schoolName: 'Springfield High', registrationDate: new Date('2024-07-06T08:00:00Z').toISOString(), paymentStatus: 'paid', followUpCompleted: false },
+  { id: 'stud1', name: 'Alice Smith', email: 'alice.smith@example.com', contactNumber: '555-0101', schoolName: 'Springfield High', registrationDate: new Date('2024-07-01T10:00:00Z').toISOString(), paymentStatus: 'paid' },
+  { id: 'stud2', name: 'Bob Johnson', email: 'bob.johnson@example.com', contactNumber: '555-0102', schoolName: 'Northwood Academy', registrationDate: new Date('2024-07-02T11:30:00Z').toISOString(), paymentStatus: 'pending' },
+  { id: 'stud3', name: 'Charlie Brown', email: 'charlie.brown@example.com', contactNumber: '555-0103', schoolName: 'Springfield High', registrationDate: new Date('2024-07-03T09:15:00Z').toISOString(), paymentStatus: 'paid' },
+  { id: 'stud4', name: 'Diana Prince', email: 'diana.prince@example.com', contactNumber: '555-0104', schoolName: 'Riverside Prep', registrationDate: new Date('2024-07-04T14:00:00Z').toISOString(), paymentStatus: 'waived' },
+  { id: 'stud5', name: 'Edward Nigma', email: 'edward.nigma@example.com', contactNumber: '555-0105', schoolName: 'Northwood Academy', registrationDate: new Date('2024-07-05T16:45:00Z').toISOString(), paymentStatus: 'failed' },
+  { id: 'stud6', name: 'Fiona Gallagher', email: 'fiona.gallagher@example.com', contactNumber: '555-0106', schoolName: 'Springfield High', registrationDate: new Date('2024-07-06T08:00:00Z').toISOString(), paymentStatus: 'paid' },
 ];
 
 
@@ -89,34 +90,30 @@ export default function ManageParticipantsPage() {
     });
   }, [participants, searchTerm, schoolFilter, paymentStatusFilter]);
 
-  const handleFollowUpToggle = (participantId: string) => {
-    setParticipants(prevParticipants =>
-      prevParticipants.map(p =>
-        p.id === participantId ? { ...p, followUpCompleted: !p.followUpCompleted } : p
-      )
-    );
+  const handleAddCustomColumn = () => {
     toast({
-        title: "Follow-up Updated",
-        description: `Follow-up status for participant ${participantId} changed. (Mock update)`,
+      title: "Feature Coming Soon",
+      description: "Ability to add custom columns will be available in a future update.",
     });
   };
+  
+  const schoolBreakdown = useMemo(() => {
+    const breakdown: Record<string, number> = {};
+    filteredParticipants.forEach(p => {
+      if (p.schoolName) {
+        breakdown[p.schoolName] = (breakdown[p.schoolName] || 0) + 1;
+      }
+    });
+    return breakdown;
+  }, [filteredParticipants]);
 
-  const handleNotesAction = (participant: EventParticipant) => {
-    // In a real app, this would open a modal to add/edit notes.
-    // For now, we'll just display existing notes or a prompt using a toast.
-    if (participant.notes) {
-      toast({
-        title: `Notes for ${participant.name}`,
-        description: participant.notes,
-      });
-    } else {
-      toast({
-        title: `Notes for ${participant.name}`,
-        description: "No notes yet. Click to add (feature coming soon).",
-      });
-    }
-    // Mock: console.log("Would open notes modal for:", participant.id, "Current notes:", participant.notes);
-  };
+  const paymentStatusBreakdown = useMemo(() => {
+    const breakdown: Record<string, number> = {};
+    filteredParticipants.forEach(p => {
+      breakdown[p.paymentStatus] = (breakdown[p.paymentStatus] || 0) + 1;
+    });
+    return breakdown;
+  }, [filteredParticipants]);
 
 
   if (authLoading || loadingEvent || !userProfile || !event) {
@@ -144,7 +141,7 @@ export default function ManageParticipantsPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto py-8 px-4 animate-fade-in-up space-y-6">
+    <div className="max-w-full mx-auto py-8 px-4 animate-fade-in-up space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <Button variant="outline" size="sm" onClick={() => router.back()} className="mb-2 sm:mb-0">
@@ -159,6 +156,55 @@ export default function ManageParticipantsPage() {
           Export Data (CSV)
         </Button>
       </div>
+
+      {/* Visualization Statistics Section */}
+      <Card className="shadow-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><BarChart2 className="h-6 w-6 text-primary" />Statistics Overview</CardTitle>
+          <CardDescription>Quick insights into your participant data. Updates with filters.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="bg-secondary/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1"><Users2 className="h-4 w-4"/>Total Participants</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-primary">{filteredParticipants.length}</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-secondary/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1"><PieChart className="h-4 w-4"/>By School (Mock)</CardTitle>
+            </CardHeader>
+            <CardContent className="text-xs">
+              {Object.entries(schoolBreakdown).map(([school, count]) => (
+                <p key={school}>{school}: {count}</p>
+              ))}
+              {Object.keys(schoolBreakdown).length === 0 && <p className="text-muted-foreground">No school data in current view.</p>}
+            </CardContent>
+          </Card>
+          <Card className="bg-secondary/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1"><PieChart className="h-4 w-4"/>Payment Status (Mock)</CardTitle>
+            </CardHeader>
+            <CardContent className="text-xs">
+               {Object.entries(paymentStatusBreakdown).map(([status, count]) => (
+                <p key={status} className="capitalize">{status}: {count}</p>
+              ))}
+              {Object.keys(paymentStatusBreakdown).length === 0 && <p className="text-muted-foreground">No payment data.</p>}
+            </CardContent>
+          </Card>
+           <Card className="bg-secondary/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Custom Column Stats</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground">Visualizations for custom columns will appear here once created.</p>
+            </CardContent>
+          </Card>
+        </CardContent>
+      </Card>
+
 
       <Card className="shadow-lg">
         <CardHeader>
@@ -228,8 +274,12 @@ export default function ManageParticipantsPage() {
                     <TableHead>School</TableHead>
                     <TableHead>Registered On</TableHead>
                     <TableHead>Payment</TableHead>
-                    <TableHead className="text-center">Follow-up</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    {/* Removed Follow-up and Actions columns */}
+                    <TableHead className="text-right">
+                       <Button variant="outline" size="sm" onClick={handleAddCustomColumn}>
+                         <PlusCircle className="mr-2 h-4 w-4" /> Add Column
+                       </Button>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -249,22 +299,8 @@ export default function ManageParticipantsPage() {
                           {participant.paymentStatus}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-center">
-                        <Checkbox
-                          id={`followup-${participant.id}`}
-                          checked={participant.followUpCompleted}
-                          onCheckedChange={() => handleFollowUpToggle(participant.id)}
-                          aria-label={`Mark follow-up for ${participant.name} as ${participant.followUpCompleted ? 'incomplete' : 'complete'}`}
-                        />
-                      </TableCell>
-                      <TableCell className="text-right space-x-1">
-                        <Button variant="ghost" size="icon" onClick={() => handleNotesAction(participant)} title="View/Add Notes">
-                           <MessageSquare className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" disabled title="View Details">
-                           <Users className="h-4 w-4" />
-                        </Button> 
-                      </TableCell>
+                       {/* Empty cell for where "Add Column" button is in header */}
+                       <TableCell></TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
