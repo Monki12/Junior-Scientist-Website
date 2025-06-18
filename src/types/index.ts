@@ -9,20 +9,26 @@ export type UserRole =
   | 'admin' 
   | 'test';
 
+export type TaskPriority = 'High' | 'Medium' | 'Low';
+export type TaskStatus = 'Not Started' | 'In Progress' | 'Pending Review' | 'Completed';
+
 export interface Task {
   id: string;
   title: string;
   description: string;
-  assignedToName?: string;
-  assignedToUid?: string;  
+  assignedTo?: string[]; // Array of user names or IDs
   assignedByName?: string;
   assignedByUid?: string;  
   eventSlug?: string;      
-  deadline?: string;       
+  dueDate?: string; // ISO string date
+  priority: TaskPriority;
+  status: TaskStatus;
   points?: number;
-  status: 'pending' | 'in-progress' | 'completed' | 'overdue';
-  createdAt: string;        
-  updatedAt: string;        
+  attachments?: { name: string, url: string }[]; // Array of attachment objects
+  subtasks?: { text: string, completed: boolean }[];
+  createdBy?: string; // User ID or name
+  createdAt: string; // ISO string date       
+  updatedAt: string; // ISO string date
 }
 
 export interface RegisteredEventInfo {
@@ -102,8 +108,17 @@ export interface StudentData {
   email: string;
 }
 
-// Represents the custom data stored for a participant, keyed by columnId
+export interface CustomColumnDefinition {
+  id: string; 
+  name: string; 
+  dataType: 'text' | 'number' | 'checkbox' | 'dropdown' | 'date';
+  options?: string[]; 
+  defaultValue?: any;
+  description?: string;
+}
+
 export type ParticipantCustomData = Record<string, any>;
+
 
 export interface EventParticipant {
   id: string; 
@@ -113,15 +128,5 @@ export interface EventParticipant {
   schoolName?: string;
   registrationDate: string; 
   paymentStatus: 'paid' | 'pending' | 'waived' | 'failed';
-  customData?: ParticipantCustomData; 
-}
-
-// Represents the definition of a custom column
-export interface CustomColumnDefinition {
-  id: string; // Unique ID for the column
-  name: string; // Display name of the column header
-  dataType: 'text' | 'number' | 'checkbox' | 'dropdown' | 'date';
-  options?: string[]; // For dropdown type, comma-separated string initially, then parsed to array
-  defaultValue?: any;
-  description?: string;
+  customData?: ParticipantCustomData;
 }
