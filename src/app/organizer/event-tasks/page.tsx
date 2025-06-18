@@ -5,7 +5,7 @@ import { useEffect, useState, useMemo, useCallback, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { subEventsData } from '@/data/subEvents';
-import type { Task, TaskPriority, TaskStatus, SubEvent, UserProfileData, CustomTaskColumnDefinition, ActiveTaskFilter } from '@/types';
+import type { Task, TaskPriority, TaskStatus, CustomTaskColumnDefinition, ActiveTaskFilter, UserProfileData } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -17,22 +17,29 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO, isValid, isPast, parse } from 'date-fns';
 import {
-  ListChecks, ShieldAlert, Loader2, Search, Filter, PlusCircle, Edit2, Trash2, CalendarIcon, ArrowUpDown, Tag, XIcon
+  ListChecks, ShieldAlert, Loader2, Search, Filter, PlusCircle, Edit2, Trash2, CalendarIcon, ArrowUpDown, Tag, XIcon, ChevronDown
 } from 'lucide-react';
 
-// Mock users for assignment (in a real app, this would come from user data)
-const mockAssignableUsers = ['Alice (Organizer)', 'Bob (Event Rep)', 'Carol (Overall Head)', 'Self'];
+// Mock users for assignment (in a real app, this would come from user data based on event context)
+const mockAssignableUsersForEvent = [
+  'Alice (Organizer)', 
+  'Bob (Event Rep for this Event)', 
+  'Carol (Overall Head)', 
+  'David (Organizer)',
+  'Self (Current User)' // Special keyword
+];
 
 const initialMockTasks: Task[] = [
   { id: 'task-1', title: 'Prepare Quiz Questions Set A', description: 'Create 50 multiple choice questions for round 1.', assignedTo: ['Alice (Organizer)'], dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(), priority: 'High', status: 'In Progress', eventSlug: 'ex-quiz-it', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), createdBy: 'Event Rep Bob', customTaskData: { notes: 'Focus on STEM', difficulty: 5 } },
-  { id: 'task-2', title: 'Book Auditorium', description: 'Finalize booking for the main hall for Dec 5th.', assignedTo: ['Self'], dueDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), priority: 'High', status: 'Pending Review', eventSlug: 'ex-quiz-it', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), createdBy: 'Event Rep Bob' },
+  { id: 'task-2', title: 'Book Auditorium', description: 'Finalize booking for the main hall for Dec 5th.', assignedTo: ['Self (Current User)'], dueDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), priority: 'High', status: 'Pending Review', eventSlug: 'ex-quiz-it', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), createdBy: 'Event Rep Bob' },
   { id: 'task-3', title: 'Design Participation Certificates', description: 'Create a template for certificates.', assignedTo: ['Carol (Overall Head)'], dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), priority: 'Medium', status: 'Not Started', eventSlug: 'ex-quiz-it', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), createdBy: 'Event Rep Bob' },
-  { id: 'task-4', title: 'Arrange Volunteer Refreshments', description: 'Coordinate with catering for volunteer snacks and drinks.', assignedTo: ['Bob (Event Rep)'], dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(), priority: 'Low', status: 'Completed', eventSlug: 'ex-quiz-it', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), createdBy: 'Admin' },
+  { id: 'task-4', title: 'Arrange Volunteer Refreshments', description: 'Coordinate with catering for volunteer snacks and drinks.', assignedTo: ['Bob (Event Rep for this Event)'], dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(), priority: 'Low', status: 'Completed', eventSlug: 'ex-quiz-it', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), createdBy: 'Admin' },
 ];
 
 const defaultTaskFormState = {
@@ -115,9 +122,11 @@ export default function EventTasksPage() {
       } else if (userProfile.role === 'event_representative' && userProfile.assignedEventSlug) {
         const assignedEvent = subEventsData.find(e => e.slug === userProfile.assignedEventSlug);
         setEventTitle(assignedEvent ? `Tasks for "${assignedEvent.title}"` : 'My Event Tasks');
-        setTasks(prevTasks => prevTasks.map(t => ({...t, eventSlug: userProfile.assignedEventSlug })));
+        // Filter tasks for the specific event if ER, or use all mock tasks for OH/Admin for broader testing
+        setTasks(initialMockTasks.filter(t => t.eventSlug === userProfile.assignedEventSlug));
       } else if (userProfile.role === 'overall_head' || userProfile.role === 'admin') {
         setEventTitle('All Event Tasks Overview');
+        setTasks(initialMockTasks); // Admins/OH see all mock tasks
       }
     } else if (!authLoading && !userProfile) {
       router.push('/login?redirect=/organizer/event-tasks');
@@ -130,21 +139,29 @@ export default function EventTasksPage() {
       return;
     }
 
-    if (editingTaskId) { // Update existing task
+    let finalAssignedTo = currentTaskForm.assignedTo;
+    if (currentTaskForm.assignedTo.includes('Self (Current User)') && userProfile?.displayName) {
+      finalAssignedTo = finalAssignedTo.map(u => u === 'Self (Current User)' ? userProfile.displayName! : u);
+    }
+    
+    const taskDataToSave = {
+      ...currentTaskForm,
+      assignedTo: finalAssignedTo,
+      dueDate: currentTaskForm.dueDate!.toISOString(),
+    };
+
+
+    if (editingTaskId) { 
       setTasks(prev => prev.map(task => task.id === editingTaskId ? {
         ...task,
-        ...currentTaskForm,
-        assignedTo: currentTaskForm.assignedTo,
-        dueDate: currentTaskForm.dueDate!.toISOString(),
+        ...taskDataToSave,
         updatedAt: new Date().toISOString(),
       } : task));
       toast({ title: "Task Updated", description: `Task "${currentTaskForm.title}" has been updated.` });
-    } else { // Add new task
+    } else { 
       const newTask: Task = {
         id: `task-${Date.now()}`,
-        ...currentTaskForm,
-        assignedTo: currentTaskForm.assignedTo,
-        dueDate: currentTaskForm.dueDate!.toISOString(),
+        ...taskDataToSave,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         createdBy: userProfile?.displayName || 'Current User',
@@ -164,9 +181,14 @@ export default function EventTasksPage() {
 
   const openEditTaskDialog = (task: Task) => {
     setEditingTaskId(task.id);
+    let assignedToForForm = task.assignedTo || [];
+    if (userProfile?.displayName && assignedToForForm.includes(userProfile.displayName)) {
+      assignedToForForm = assignedToForForm.map(u => u === userProfile.displayName ? 'Self (Current User)' : u);
+    }
+
     setCurrentTaskForm({
       ...task,
-      assignedTo: task.assignedTo || [],
+      assignedTo: assignedToForForm,
       dueDate: task.dueDate ? parseISO(task.dueDate) : undefined,
     });
     setIsTaskFormDialogOpen(true);
@@ -295,10 +317,10 @@ export default function EventTasksPage() {
   };
   
   const getStatusBadgeVariant = (status: TaskStatus) => {
-    if (status === 'Completed') return 'default';
-    if (status === 'In Progress') return 'secondary';
+    if (status === 'Completed') return 'default'; // Using 'default' for a potentially more prominent look
+    if (status === 'In Progress') return 'secondary'; // Standard secondary
     if (status === 'Pending Review') return 'outline'; // Consider a yellowish variant if theme supports
-    return 'outline';
+    return 'outline'; // 'Not Started' and other fallbacks
   };
 
   const handleAddDynamicFilter = () => {
@@ -388,8 +410,11 @@ export default function EventTasksPage() {
         case 'number':
           return <Input type="number" value={Number(value)} onChange={(e) => handleCustomTaskDataChange(task.id, column.id, parseFloat(e.target.value) || 0)} onBlur={() => setEditingCustomCell(null)} autoFocus className="h-8 text-xs"/>;
         case 'date':
+          // Using a simple text input for date for inline editing; a popover calendar might be too complex here.
           return <Input type="date" value={String(value)} onChange={(e) => handleCustomTaskDataChange(task.id, column.id, e.target.value)} onBlur={() => setEditingCustomCell(null)} autoFocus className="h-8 text-xs"/>;
         case 'checkbox':
+           // Checkbox updates directly, no separate "editing" state needed, it's handled by renderCustomTaskCell's default case.
+           // This case might not be hit if !isEditing for checkbox.
            return <Checkbox checked={!!value} onCheckedChange={(checked) => handleCustomTaskDataChange(task.id, column.id, !!checked)} />;
         case 'dropdown':
           return (
@@ -401,14 +426,16 @@ export default function EventTasksPage() {
             </Select>
           );
         default:
-          return String(value);
+          return String(value); // Fallback
       }
     }
 
+    // Non-editing display
     switch (column.dataType) {
         case 'checkbox':
             return <Checkbox checked={!!value} onCheckedChange={(checked) => handleCustomTaskDataChange(task.id, column.id, !!checked)} aria-label={`Toggle ${column.name} for ${task.title}`}/>;
         default:
+            // Make cell clickable to enter edit mode for non-checkbox types
             return <span onClick={() => column.dataType !== 'checkbox' && setEditingCustomCell({ taskId: task.id, columnId: column.id })} className="cursor-pointer hover:bg-muted/50 p-1 rounded min-h-[2rem] block">{String(value)}</span>;
     }
   };
@@ -465,12 +492,34 @@ export default function EventTasksPage() {
                 </div>
                  <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="taskAssignedTo" className="text-right">Assigned To</Label>
-                  <Input 
-                    id="taskAssignedTo" 
-                    value={currentTaskForm.assignedTo.join(', ')} 
-                    onChange={e => setCurrentTaskForm(f => ({ ...f, assignedTo: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))} 
-                    className="col-span-3" placeholder="Comma-separated names (mock)" 
-                   />
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" className="col-span-3 justify-between">
+                            {currentTaskForm.assignedTo.length > 0 ? currentTaskForm.assignedTo.join(', ') : "Select Assignees"}
+                            <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">
+                            <DropdownMenuLabel>Assignable Users</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            {mockAssignableUsersForEvent.map(user => (
+                            <DropdownMenuCheckboxItem
+                                key={user}
+                                checked={currentTaskForm.assignedTo.includes(user)}
+                                onCheckedChange={(checked) => {
+                                setCurrentTaskForm(f => {
+                                    const newAssignedTo = checked 
+                                    ? [...f.assignedTo, user] 
+                                    : f.assignedTo.filter(u => u !== user);
+                                    return { ...f, assignedTo: newAssignedTo };
+                                });
+                                }}
+                            >
+                                {user}
+                            </DropdownMenuCheckboxItem>
+                            ))}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="taskDueDate" className="text-right">Due Date</Label>
@@ -509,11 +558,6 @@ export default function EventTasksPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                {/* Points input (optional based on your blueprint) */}
-                {/* <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="taskPoints" className="text-right">Points</Label>
-                  <Input id="taskPoints" type="number" value={currentTaskForm.points || ''} onChange={e => setCurrentTaskForm(f => ({ ...f, points: parseInt(e.target.value) || 0 }))} className="col-span-3" />
-                </div> */}
               </div>
               <DialogFooter>
                 <DialogClose asChild><Button variant="outline" onClick={() => { setIsTaskFormDialogOpen(false); setEditingTaskId(null); }}>Cancel</Button></DialogClose>
@@ -556,7 +600,7 @@ export default function EventTasksPage() {
             </div>
              <Popover open={isAddFilterPopoverOpen} onOpenChange={setIsAddFilterPopoverOpen}>
                 <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full md:w-auto mt-auto"> {/* Ensure button aligns with others */}
+                    <Button variant="outline" className="w-full md:w-auto mt-auto">
                         <Tag className="mr-2 h-4 w-4" /> Add Dynamic Filter
                     </Button>
                 </PopoverTrigger>
@@ -687,7 +731,7 @@ export default function EventTasksPage() {
                               </div>
                             </div>
                             <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogCancel onClick={() => setIsAddCustomTaskColumnDialogOpen(false)}>Cancel</AlertDialogCancel>
                               <AlertDialogAction type="submit">Save Column</AlertDialogAction>
                             </AlertDialogFooter>
                           </form>
@@ -754,8 +798,8 @@ export default function EventTasksPage() {
             </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setTaskToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteTask} className={buttonVariants({ variant: "destructive" })}>
+            <AlertDialogCancel onClick={() => {setTaskToDelete(null); setIsDeleteConfirmDialogOpen(false);}}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteTask} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                 Confirm Delete
             </AlertDialogAction>
             </AlertDialogFooter>
@@ -764,6 +808,3 @@ export default function EventTasksPage() {
     </div>
   );
 }
-
-// Helper function for buttonVariants, replace with actual import if it exists
-const buttonVariants = (opts: any) => "";
