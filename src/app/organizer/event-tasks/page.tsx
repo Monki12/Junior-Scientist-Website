@@ -127,7 +127,7 @@ const BasicTimelineView = ({ tasks }: { tasks: Task[] }) => {
             }
 
             let durationDays = Math.max(1, differenceInDays(taskDueDate, taskStartDate));
-            if(taskStartDate > taskDueDate) durationDays = 0; // Handle cases where start is after due
+            if(taskStartDate > taskDueDate) durationDays = 0; 
 
             let durationPercent = 0;
             if (totalTimelineDays > 0) {
@@ -219,8 +219,6 @@ export default function EventTasksPage() {
       } else if (userProfile.role === 'event_representative' && userProfile.assignedEventSlug) {
         const assignedEvent = subEventsData.find(e => e.slug === userProfile.assignedEventSlug);
         setEventTitle(assignedEvent ? `Tasks for "${assignedEvent.title}"` : 'My Event Tasks');
-        // Mock: Filter tasks by assigned event if needed for specific user views, or show all for admin/overall head
-        // For now, using initialMockTasks which may not be event-specific
       } else if (userProfile.role === 'overall_head' || userProfile.role === 'admin') {
         setEventTitle('All Event Tasks Overview');
       }
@@ -818,25 +816,25 @@ export default function EventTasksPage() {
             <div className="overflow-x-auto rounded-md border">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-muted/50">
+                  <TableRow className="bg-muted/50 hover:bg-muted/60">
                     <TableHead className="w-[50px]"></TableHead>
-                    <TableHead className="cursor-pointer hover:bg-muted/80 group" onClick={() => requestSort('title')}>
+                    <TableHead className="cursor-pointer hover:bg-muted group" onClick={() => requestSort('title')}>
                         <div className="flex items-center gap-1">
                             Task Title {getSortIndicator('title')}
                         </div>
                     </TableHead>
                     <TableHead>Assigned To</TableHead>
-                    <TableHead className="cursor-pointer hover:bg-muted/80 group" onClick={() => requestSort('dueDate')}>
+                    <TableHead className="cursor-pointer hover:bg-muted group" onClick={() => requestSort('dueDate')}>
                          <div className="flex items-center gap-1">
                             Due Date {getSortIndicator('dueDate')}
                         </div>
                     </TableHead>
-                    <TableHead className="cursor-pointer hover:bg-muted/80 group" onClick={() => requestSort('priority')}>
+                    <TableHead className="cursor-pointer hover:bg-muted group" onClick={() => requestSort('priority')}>
                         <div className="flex items-center gap-1">
                             Priority {getSortIndicator('priority')}
                         </div>
                     </TableHead>
-                     <TableHead className="cursor-pointer hover:bg-muted/80 group" onClick={() => requestSort('status')}>
+                     <TableHead className="cursor-pointer hover:bg-muted group" onClick={() => requestSort('status')}>
                         <div className="flex items-center gap-1">
                             Status {getSortIndicator('status')}
                         </div>
@@ -851,14 +849,14 @@ export default function EventTasksPage() {
                              <PlusCircle className="mr-2 h-4 w-4" /> Add Column
                            </Button>
                           </AlertDialogTrigger>
-                          <DialogContent>
+                          <AlertDialogContent>
                           <form onSubmit={handleAddCustomTaskColumnSubmit}>
-                            <DialogHeader>
-                              <DialogTitle>Add New Custom Task Column</DialogTitle>
-                              <DialogDescription>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Add New Custom Task Column</AlertDialogTitle>
+                              <AlertDialogDescription>
                                 Define a new column to track additional task information.
-                              </DialogDescription>
-                            </DialogHeader>
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
                             <div className="space-y-4 py-4">
                               <div>
                                 <Label htmlFor="newCustomTaskColName">Column Name</Label>
@@ -888,12 +886,12 @@ export default function EventTasksPage() {
                                 <Input id="newCustomTaskColDefaultValue" value={newCustomTaskColumnForm.defaultValue} onChange={e => setNewCustomTaskColumnForm({...newCustomTaskColumnForm, defaultValue: e.target.value})} />
                               </div>
                             </div>
-                            <DialogFooter>
-                              <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel asChild><Button variant="outline">Cancel</Button></AlertDialogCancel>
                               <Button type="submit">Save Column</Button>
-                            </DialogFooter>
+                            </AlertDialogFooter>
                           </form>
-                          </DialogContent>
+                          </AlertDialogContent>
                        </AlertDialog>
                     </TableHead>
                   </TableRow>
@@ -902,7 +900,7 @@ export default function EventTasksPage() {
                   {filteredAndSortedTasks.map((task) => (
                     <TableRow 
                         key={task.id} 
-                        className={`hover:bg-muted/30 transition-colors duration-150 ${task.status === 'Completed' ? 'opacity-60 bg-green-500/5' : ''} ${taskToDelete?.id === task.id ? 'bg-destructive/10' : ''}`}
+                        className={`hover:bg-muted/50 transition-colors duration-150 ${task.status === 'Completed' ? 'opacity-60 bg-green-500/5' : ''} ${taskToDelete?.id === task.id ? 'bg-destructive/10' : ''}`}
                     >
                       <TableCell>
                         <Checkbox
@@ -981,4 +979,3 @@ export default function EventTasksPage() {
     </div>
   );
 }
-
