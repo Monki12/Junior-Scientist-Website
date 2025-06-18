@@ -6,24 +6,49 @@ import { createContext, useState, useEffect, ReactNode } from 'react';
 import type { SignUpFormData, LoginFormData, UserProfileData, UserRole, Task, RegisteredEventInfo } from '@/types';
 // subEventsData can be imported if needed for event titles etc., but dashboard will fetch from its own data source for now.
 
-const mockTasksBase: Omit<Task, 'id' | 'assignedToUid' | 'assignedToName'>[] = [
-  { title: 'Prepare presentation slides', description: 'Draft slides for the opening ceremony.', status: 'pending', deadline: '2024-08-15', points: 20, createdAt: '2024-07-20', updatedAt: '2024-07-20', assignedByName: 'Admin User' },
-  { title: 'Coordinate with vendors', description: 'Finalize contracts with catering and AV.', status: 'in-progress', deadline: '2024-08-10', points: 30, createdAt: '2024-07-15', updatedAt: '2024-07-18', assignedByName: 'Overall Head' },
-  { title: 'Update social media', description: 'Post daily updates about event registrations.', status: 'completed', deadline: '2024-07-25', points: 10, createdAt: '2024-07-01', updatedAt: '2024-07-25', assignedByName: 'Event Rep' },
+// More diversified mock tasks
+const mockTasksData: Omit<Task, 'id' | 'assignedTo' | 'createdBy' | 'createdAt' | 'updatedAt' | 'customTaskData' >[] = [
+  { title: 'Prepare MUN Delegate Handbook', description: 'Draft handbook including rules of procedure and country profiles.', status: 'Not Started', dueDate: '2024-10-15T00:00:00Z', points: 25, priority: 'High', eventSlug: 'model-united-nations', assignedByName: 'Overall Head Carol' },
+  { title: 'Finalize Quiz Questions - Round 1', description: 'Create 50 MCQs for science round.', status: 'In Progress', dueDate: '2024-11-01T00:00:00Z', points: 30, priority: 'High', eventSlug: 'ex-quiz-it', assignedByName: 'Event Rep Bob' },
+  { title: 'Book Auditorium for MUN', description: 'Confirm booking for main hall for Dec 1st.', status: 'Pending Review', dueDate: '2024-09-30T00:00:00Z', points: 15, priority: 'Medium', eventSlug: 'model-united-nations', assignedByName: 'Organizer Alice' },
+  { title: 'Design RoboChallenge Arena Layout', description: 'Draft the arena specifications and obstacle placements.', status: 'Not Started', dueDate: '2024-10-20T00:00:00Z', points: 20, priority: 'High', eventSlug: 'robo-challenge', assignedByName: 'Organizer Alice' },
+  { title: 'Procure Robotics Kits', description: 'Order 20 standard robotics kits for participants.', status: 'Completed', dueDate: '2024-09-15T00:00:00Z', points: 10, priority: 'Medium', eventSlug: 'robo-challenge', assignedByName: 'Organizer Alice' },
+  { title: 'Update EventFlow Website Content', description: 'Add details for newly approved sub-events.', status: 'In Progress', dueDate: '2024-08-25T00:00:00Z', points: 15, priority: 'Low', eventSlug: 'global', assignedByName: 'Admin Dave' },
+  { title: 'Coordinate Volunteer Training Session', description: 'Schedule and organize a training session for all event volunteers.', status: 'Not Started', dueDate: '2024-11-10T00:00:00Z', points: 20, priority: 'Medium', eventSlug: 'global', assignedByName: 'Overall Head Carol' },
+  { title: 'Test Registration Payment Gateway', description: 'Perform end-to-end test of the payment flow.', status: 'Pending Review', dueDate: '2024-08-30T00:00:00Z', points: 10, priority: 'High', eventSlug: 'global', assignedByName: 'Admin Dave' },
+  { title: 'Prepare Olympiad Question Paper Set A', description: 'Create 30 physics problems for Junior Scientist Olympiad.', status: 'In Progress', dueDate: '2024-11-05T00:00:00Z', points: 25, priority: 'High', eventSlug: 'junior-scientist-olympiad', assignedByName: 'Organizer Alice'},
+  { title: 'Setup Math-A-Maze Puzzles Online', description: 'Deploy digital version of puzzles for practice.', status: 'Not Started', dueDate: '2024-11-10T00:00:00Z', points: 15, priority: 'Medium', eventSlug: 'math-a-maze', assignedByName: 'Organizer Alice'},
 ];
 
+// Helper to create full Task objects
+const createTaskObject = (
+    baseTask: Omit<Task, 'id' | 'assignedTo' | 'createdBy' | 'createdAt' | 'updatedAt' | 'customTaskData'>,
+    id: string,
+    assignedTo: string[],
+    createdBy: string
+): Task => ({
+    ...baseTask,
+    id,
+    assignedTo,
+    createdBy,
+    createdAt: new Date(Date.now() - Math.random() * 10 * 24 * 60 * 60 * 1000).toISOString(), // Random creation time in last 10 days
+    updatedAt: new Date().toISOString(),
+    customTaskData: baseTask.title.includes("Quiz") ? { notes: 'Focus on STEM', difficulty: 5 } : {}
+});
+
+
 const mockStudentRegisteredEvents: RegisteredEventInfo[] = [
-  { 
-    eventSlug: 'model-united-nations', 
-    eventDate: '2024-12-01', 
-    admitCardStatus: 'pending' 
-  }, 
-  { 
-    eventSlug: 'ex-quiz-it', 
-    teamName: 'Quiz Wizards', 
-    eventDate: '2024-12-05', 
+  {
+    eventSlug: 'model-united-nations',
+    eventDate: '2024-12-01',
+    admitCardStatus: 'pending'
+  },
+  {
+    eventSlug: 'ex-quiz-it',
+    teamName: 'Quiz Wizards',
+    eventDate: '2024-12-05',
     admitCardStatus: 'published',
-    teamMembers: [{id: 'mem1', name: 'Jane Doe'}, {id: 'mem2', name: 'John Smith'}] 
+    teamMembers: [{id: 'mem1', name: 'Jane Doe'}, {id: 'mem2', name: 'John Smith'}]
   },
   {
     eventSlug: 'robo-challenge',
@@ -36,7 +61,7 @@ const mockStudentRegisteredEvents: RegisteredEventInfo[] = [
 
 const mockUserProfiles: Record<UserRole, UserProfileData> = {
   student: {
-    uid: 'mock-student-uid-12345', // More unique looking ID
+    uid: 'mock-student-uid-12345',
     email: 'student.test@example.com',
     displayName: 'Alex Johnson',
     role: 'student',
@@ -44,7 +69,7 @@ const mockUserProfiles: Record<UserRole, UserProfileData> = {
     school: 'Springfield High International',
     grade: '10th Grade - Section A',
     phoneNumbers: ['+1-555-0101', '+1-555-0102'],
-    registeredEvents: mockStudentRegisteredEvents, 
+    registeredEvents: mockStudentRegisteredEvents,
   },
   organizer: {
     uid: 'mock-organizer-uid',
@@ -53,10 +78,13 @@ const mockUserProfiles: Record<UserRole, UserProfileData> = {
     role: 'organizer',
     photoURL: 'https://placehold.co/100x100.png?text=TOA',
     department: 'Logistics',
-    assignedEventSlugs: ['model-united-nations', 'robo-challenge'],
+    assignedEventSlugs: ['model-united-nations', 'robo-challenge', 'junior-scientist-olympiad', 'math-a-maze'],
     tasks: [
-        { id: 'task1', ...mockTasksBase[0], assignedToUid: 'mock-organizer-uid', assignedToName: 'Test Organizer Alice', eventSlug: 'model-united-nations' },
-        { id: 'task2', ...mockTasksBase[1], assignedToUid: 'mock-organizer-uid', assignedToName: 'Test Organizer Alice', eventSlug: 'robo-challenge', status: 'pending' },
+        createTaskObject(mockTasksData[0], 'task-org-1', ['Test Organizer Alice'], 'Overall Head Carol'), // MUN Handbook
+        createTaskObject(mockTasksData[3], 'task-org-2', ['Test Organizer Alice'], 'Event Rep Bob'), // RoboChallenge Arena
+        createTaskObject(mockTasksData[4], 'task-org-3', ['Test Organizer Alice', 'David (Organizer)'], 'Test Organizer Alice'), // Procure Kits
+        createTaskObject(mockTasksData[8], 'task-org-4', ['Test Organizer Alice'], 'Overall Head Carol'), // Olympiad questions
+        createTaskObject(mockTasksData[9], 'task-org-5', ['Test Organizer Alice'], 'Event Rep Bob'), // Math-A-Maze puzzles
     ],
     points: 150,
     credibilityScore: 75,
@@ -70,7 +98,8 @@ const mockUserProfiles: Record<UserRole, UserProfileData> = {
     department: 'Event Management',
     assignedEventSlug: 'ex-quiz-it',
     tasks: [
-        { id: 'task3', ...mockTasksBase[2], assignedToUid: 'mock-representative-uid', assignedToName: 'Test Event Rep Bob', status: 'in-progress', eventSlug: 'ex-quiz-it', title: 'Finalize Quiz Questions' },
+        createTaskObject(mockTasksData[1], 'task-er-1', ['Test Event Rep Bob', 'Self (Current User)'], 'Overall Head Carol'), // Finalize Quiz Questions
+        { ...createTaskObject(mockTasksData[2], 'task-er-2', ['Test Organizer Alice'], 'Test Event Rep Bob'), title: 'Follow up on Auditorium Booking for Ex-Quiz-It', eventSlug: 'ex-quiz-it', priority: 'Medium' }
     ],
     points: 200,
     credibilityScore: 80,
@@ -83,7 +112,8 @@ const mockUserProfiles: Record<UserRole, UserProfileData> = {
     photoURL: 'https://placehold.co/100x100.png?text=OHC',
     department: 'Coordination',
     tasks: [
-         { id: 'task4', title: 'Oversee budget allocation', description: 'Review and approve budget requests from all event reps.', status: 'pending', deadline: '2024-08-05', points: 50, createdAt: '2024-07-20', updatedAt: '2024-07-20', assignedToUid: 'mock-overall-head-uid', assignedToName: 'Test Overall Head Carol', assignedByName: 'Admin User' }
+         createTaskObject(mockTasksData[6], 'task-oh-1', ['Test Overall Head Carol', 'Self (Current User)'], 'Admin Dave'), // Volunteer Training
+         { ...createTaskObject(mockTasksData[0], 'task-oh-2', ['Test Organizer Alice'], 'Test Overall Head Carol'), id: 'task-oh-mun-oversee', title: 'Oversee MUN Handbook Creation' }
     ],
     points: 300,
     credibilityScore: 85,
@@ -96,16 +126,17 @@ const mockUserProfiles: Record<UserRole, UserProfileData> = {
     photoURL: 'https://placehold.co/100x100.png?text=TAD',
     department: 'Administration',
     tasks: [
-        { id: 'task5', title: 'System Maintenance Check', description: 'Ensure all platform services are operational.', status: 'completed', deadline: '2024-07-30', points: 25, createdAt: '2024-07-20', updatedAt: '2024-07-28', assignedToUid: 'mock-admin-uid', assignedToName: 'Test Admin Dave', assignedByName: 'System' }
+        createTaskObject(mockTasksData[5], 'task-adm-1', ['Test Admin Dave'], 'System'), // Website Content
+        createTaskObject(mockTasksData[7], 'task-adm-2', ['Test Admin Dave', 'Self (Current User)'], 'System') // Payment Gateway Test
     ],
     points: 500,
     credibilityScore: 95,
   },
-  test: { 
+  test: {
     uid: 'mock-test-uid-67890',
     email: 'generic.test@example.com',
     displayName: 'Sam Williams (Test)',
-    role: 'test', 
+    role: 'test',
     photoURL: 'https://placehold.co/120x120.png?text=SW',
     school: 'Testington Academy Global',
     grade: '12th Grade - Section B',
@@ -116,7 +147,7 @@ const mockUserProfiles: Record<UserRole, UserProfileData> = {
     ],
     department: 'QA',
     tasks: [
-        { id: 'task6', title: 'Test student dashboard', description: 'Verify all student dashboard features.', status: 'pending', deadline: '2024-08-01', points: 10, createdAt: '2024-07-25', updatedAt: '2024-07-25', assignedToUid: 'mock-test-uid-67890', assignedToName: 'Sam Williams (Test)', assignedByName: 'Overall Head' }
+        { ...createTaskObject(mockTasksData[1], 'task-test-1', ['Sam Williams (Test)'], 'Overall Head Carol'), title: 'Verify Quiz Task Functionality', eventSlug: 'ex-quiz-it', priority: 'Low' }
     ],
     points: 50,
     credibilityScore: 60,
@@ -127,11 +158,11 @@ interface AuthContextType {
   authUser: FirebaseUser | null;
   userProfile: UserProfileData | null;
   loading: boolean;
-  signUp: (data: SignUpFormData) => Promise<FirebaseUser | AuthError | { message: string }>; 
-  logIn: (data: LoginFormData | UserRole) => Promise<FirebaseUser | AuthError | { message: string }>; 
+  signUp: (data: SignUpFormData) => Promise<FirebaseUser | AuthError | { message: string }>;
+  logIn: (data: LoginFormData | UserRole) => Promise<FirebaseUser | AuthError | { message: string }>;
   logOut: () => Promise<void>;
-  setMockUserRole: (role: UserRole | null) => void; 
-  setUserProfile: React.Dispatch<React.SetStateAction<UserProfileData | null>>; 
+  setMockUserRole: (role: UserRole | null) => void;
+  setUserProfile: React.Dispatch<React.SetStateAction<UserProfileData | null>>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -142,13 +173,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Attempt to retrieve stored role, or default to null
     const storedRole = typeof window !== "undefined" ? localStorage.getItem('mockUserRole') as UserRole | null : null;
-    if (storedRole) {
+    if (storedRole && mockUserProfiles[storedRole]) { // Ensure stored role is valid
       setMockUserRole(storedRole);
     } else {
+      // If no valid stored role, or on initial load without a role, clear auth state.
+      // This prevents defaulting to a student or any other role if localStorage is empty or invalid.
       setAuthUser(null);
       setUserProfile(null);
+       if (typeof window !== "undefined") {
+          localStorage.removeItem('mockUserRole'); // Clean up invalid stored role
+       }
     }
     setLoading(false);
   }, []);
@@ -174,7 +209,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         getIdTokenResult: async () => ({ token: 'mock-id-token', claims: {}, expirationTime: '', issuedAtTime: '', signInProvider: null, signInSecondFactor: null}),
         reload: async () => {},
         toJSON: () => ({}),
-      } as FirebaseUser; 
+      } as FirebaseUser;
 
       setAuthUser(mockFbUser);
       setUserProfile(profile);
@@ -201,35 +236,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     let loggedInUser: FirebaseUser | null = null;
     let roleToSet: UserRole | null = null;
 
-    if (typeof data === 'string' && mockUserProfiles[data as UserRole]) { 
+    if (typeof data === 'string' && mockUserProfiles[data as UserRole]) {
       roleToSet = data as UserRole;
-    } else if (typeof data === 'object' && data.email) { 
+    } else if (typeof data === 'object' && data.email) {
         const foundRole = Object.values(mockUserProfiles).find(p => p.email === data.email)?.role;
         if (foundRole) {
             roleToSet = foundRole;
         }
     }
-    
+
     if (roleToSet) {
       setMockUserRole(roleToSet);
       const profile = mockUserProfiles[roleToSet];
-      loggedInUser = { uid: profile.uid, email: profile.email, displayName: profile.displayName, photoURL: profile.photoURL } as FirebaseUser;
+      loggedInUser = { uid: profile.uid, email: profile.email, displayName: profile.displayName, photoURL: profile.photoURL } as FirebaseUser; // Simplified mock FirebaseUser
     } else {
-      // Default to student if no match or invalid input, or handle error
-      setMockUserRole('student'); 
-      const profile = mockUserProfiles['student'];
-      loggedInUser = { uid: profile.uid, email: profile.email, displayName: profile.displayName, photoURL: profile.photoURL } as FirebaseUser;
+      // If no specific role found or invalid input, perhaps clear auth or default carefully
+      // For now, let's clear it to avoid assuming a default role on failed "login by email"
+      setMockUserRole(null);
+      return { message: "Mock login: Unknown credentials or role. Please select a role directly." };
     }
-    
+
     if(loggedInUser) return loggedInUser;
-    return { message: "Mock login: Defaulted to student or unknown credentials." };
+    // This path should ideally not be reached if roleToSet leads to a valid profile.
+    return { message: "Mock login: Failed to establish user session." };
   };
 
   const logOut = async () => {
     console.warn("Mock Auth: logOut called.");
     setMockUserRole(null);
   };
-  
+
 
   const value = {
     authUser,
@@ -239,7 +275,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     logIn,
     logOut,
     setMockUserRole,
-    setUserProfile, 
+    setUserProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -28,20 +28,11 @@ import {
 } from 'lucide-react';
 
 const mockAssignableUsersForEvent = [
-  'Alice (Organizer)', 
-  'Bob (Event Rep for this Event)', 
-  'Carol (Overall Head)', 
+  'Alice (Organizer)',
+  'Bob (Event Rep for this Event)',
+  'Carol (Overall Head)',
   'David (Organizer)',
-  'Self (Current User)' 
-];
-
-const initialMockTasks: Task[] = [
-  { id: 'task-1', title: 'Prepare Quiz Questions Set A', description: 'Create 50 multiple choice questions for round 1.', assignedTo: ['Alice (Organizer)'], dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(), priority: 'High', status: 'In Progress', eventSlug: 'ex-quiz-it', createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), updatedAt: new Date().toISOString(), createdBy: 'Event Rep Bob', customTaskData: { notes: 'Focus on STEM', difficulty: 5 } },
-  { id: 'task-2', title: 'Book Auditorium', description: 'Finalize booking for the main hall for Dec 5th.', assignedTo: ['Self (Current User)'], dueDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), priority: 'High', status: 'Pending Review', eventSlug: 'ex-quiz-it', createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), updatedAt: new Date().toISOString(), createdBy: 'Event Rep Bob' },
-  { id: 'task-3', title: 'Design Participation Certificates', description: 'Create a template for certificates.', assignedTo: ['Carol (Overall Head)'], dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), priority: 'Medium', status: 'Not Started', eventSlug: 'ex-quiz-it', createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), updatedAt: new Date().toISOString(), createdBy: 'Event Rep Bob' },
-  { id: 'task-4', title: 'Arrange Volunteer Refreshments', description: 'Coordinate with catering for volunteer snacks and drinks.', assignedTo: ['Bob (Event Rep for this Event)'], dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(), priority: 'Low', status: 'Completed', eventSlug: 'ex-quiz-it', createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), updatedAt: new Date().toISOString(), createdBy: 'Admin' },
-  { id: 'task-5', title: 'Setup Online Registration Form', description: 'Deploy and test the online registration portal for the event.', assignedTo: ['David (Organizer)', 'Self (Current User)'], dueDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(), priority: 'High', status: 'Not Started', eventSlug: 'ex-quiz-it', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), createdBy: 'Event Rep Bob' },
-  { id: 'task-6', title: 'Finalize Judge Panel', description: 'Confirm availability of all judges for the main event days.', assignedTo: ['Carol (Overall Head)'], dueDate: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).toISOString(), priority: 'Medium', status: 'In Progress', eventSlug: 'ex-quiz-it', createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(), updatedAt: new Date().toISOString(), createdBy: 'Event Rep Bob' },
+  'Self (Current User)'
 ];
 
 const defaultTaskFormState = {
@@ -72,8 +63,8 @@ type TaskViewMode = 'list' | 'timeline';
 
 const getPriorityBadgeVariant = (priority: TaskPriority) => {
   if (priority === 'High') return 'destructive';
-  if (priority === 'Medium') return 'secondary'; 
-  return 'outline'; 
+  if (priority === 'Medium') return 'secondary';
+  return 'outline';
 };
 
 const getStatusBadgeVariant = (status: TaskStatus): { variant: "default" | "secondary" | "outline" | "destructive", colorClass: string } => {
@@ -120,20 +111,20 @@ const BasicTimelineView = ({ tasks }: { tasks: Task[] }) => {
           {tasks.map((task, index) => {
             const taskStartDate = task.createdAt && isValid(parseISO(task.createdAt)) ? parseISO(task.createdAt) : overallStartDate;
             const taskDueDate = task.dueDate && isValid(parseISO(task.dueDate)) ? parseISO(task.dueDate) : overallEndDate;
-            
+
             let startOffsetPercent = 0;
             if (totalTimelineDays > 0) {
               startOffsetPercent = (differenceInDays(taskStartDate, overallStartDate) / totalTimelineDays) * 100;
             }
 
             let durationDays = Math.max(1, differenceInDays(taskDueDate, taskStartDate));
-            if(taskStartDate > taskDueDate) durationDays = 0; 
+            if(taskStartDate > taskDueDate) durationDays = 0;
 
             let durationPercent = 0;
             if (totalTimelineDays > 0) {
                  durationPercent = (durationDays / totalTimelineDays) * 100;
             }
-            
+
             const { colorClass } = getStatusBadgeVariant(task.status);
 
             return (
@@ -143,8 +134,8 @@ const BasicTimelineView = ({ tasks }: { tasks: Task[] }) => {
                 style={{
                   top: `${index * 40 + 30}px`,
                   left: `${Math.max(0, Math.min(100, startOffsetPercent))}%`,
-                  width: `${Math.max(2, Math.min(100 - startOffsetPercent, durationPercent))}%`, 
-                  minWidth: '50px', 
+                  width: `${Math.max(2, Math.min(100 - startOffsetPercent, durationPercent))}%`,
+                  minWidth: '50px',
                 }}
                 title={`${task.title} (Status: ${task.status})`}
               >
@@ -162,9 +153,9 @@ const BasicTimelineView = ({ tasks }: { tasks: Task[] }) => {
 export default function EventTasksPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { userProfile, loading: authLoading } = useAuth();
+  const { userProfile, setUserProfile, loading: authLoading } = useAuth();
 
-  const [tasks, setTasks] = useState<Task[]>(initialMockTasks);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [eventTitle, setEventTitle] = useState<string>('Event Tasks');
   const [isClient, setIsClient] = useState(false);
   const [currentView, setCurrentView] = useState<TaskViewMode>('list');
@@ -172,8 +163,9 @@ export default function EventTasksPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<TaskStatus | 'All'>('All');
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'All'>('All');
-  const [assignedToFilter, setAssignedToFilter] = useState('');
-  
+  const [assignedToFilterText, setAssignedToFilterText] = useState('');
+
+
   const [activeDynamicFilters, setActiveDynamicFilters] = useState<ActiveTaskFilter[]>([]);
   const [isAddFilterPopoverOpen, setIsAddFilterPopoverOpen] = useState(false);
   const [newFilterColumn, setNewFilterColumn] = useState<{ id: string, name: string, isCustom?: boolean } | null>(null);
@@ -192,7 +184,7 @@ export default function EventTasksPage() {
     customTaskData?: Record<string, any>;
   }>(defaultTaskFormState);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
-  
+
   const [isDeleteConfirmDialogOpen, setIsDeleteConfirmDialogOpen] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
 
@@ -212,16 +204,23 @@ export default function EventTasksPage() {
   useEffect(() => {
     setIsClient(true);
     if (!authLoading && userProfile) {
-      const canAccess = userProfile.role === 'event_representative' || userProfile.role === 'overall_head' || userProfile.role === 'admin';
+      const canAccess = userProfile.role === 'event_representative' || userProfile.role === 'overall_head' || userProfile.role === 'admin' || userProfile.role === 'organizer' || userProfile.role === 'test';
       if (!canAccess) {
         toast({ title: "Access Denied", description: "You don't have permission to view this page.", variant: "destructive" });
         router.push('/dashboard');
       } else if (userProfile.role === 'event_representative' && userProfile.assignedEventSlug) {
         const assignedEvent = subEventsData.find(e => e.slug === userProfile.assignedEventSlug);
         setEventTitle(assignedEvent ? `Tasks for "${assignedEvent.title}"` : 'My Event Tasks');
+        // For ER, tasks are already filtered by their profile for their assigned event.
+        // No further pre-filtering needed here for ER.
       } else if (userProfile.role === 'overall_head' || userProfile.role === 'admin') {
         setEventTitle('All Event Tasks Overview');
+      } else if (userProfile.role === 'organizer') {
+        setEventTitle('My Organized Event Tasks');
+      } else if (userProfile.role === 'test') {
+        setEventTitle('Test User Tasks');
       }
+      setTasks(userProfile.tasks || []); // Initialize tasks from context
     } else if (!authLoading && !userProfile) {
       router.push('/login?redirect=/organizer/event-tasks');
     }
@@ -237,8 +236,8 @@ export default function EventTasksPage() {
     if (currentTaskForm.assignedTo.includes('Self (Current User)') && userProfile?.displayName) {
       finalAssignedTo = finalAssignedTo.map(u => u === 'Self (Current User)' ? userProfile.displayName! : u).filter((value, index, self) => self.indexOf(value) === index);
     }
-    
-    const taskDataToSave = {
+
+    const taskDataToSave: Omit<Task, 'id' | 'createdBy' | 'createdAt' | 'eventSlug'> = {
       title: currentTaskForm.title,
       description: currentTaskForm.description,
       assignedTo: finalAssignedTo,
@@ -250,23 +249,31 @@ export default function EventTasksPage() {
       updatedAt: new Date().toISOString(),
     };
 
-    if (editingTaskId) { 
-      setTasks(prev => prev.map(task => task.id === editingTaskId ? {
-        ...task,
-        ...taskDataToSave,
-      } : task));
+    if (editingTaskId) {
+        const updatedTask = {
+            ...tasks.find(t => t.id === editingTaskId)!,
+            ...taskDataToSave,
+         };
+      setUserProfile(prev => {
+        if (!prev) return null;
+        return { ...prev, tasks: prev.tasks?.map(task => task.id === editingTaskId ? updatedTask : task) || [updatedTask] };
+      });
       toast({ title: "Task Updated", description: `Task "${currentTaskForm.title}" has been updated.` });
-    } else { 
+    } else {
       const newTask: Task = {
         id: `task-${Date.now()}`,
         ...taskDataToSave,
         createdBy: userProfile?.displayName || 'Current User',
         createdAt: new Date().toISOString(),
-        eventSlug: (userProfile?.role === 'event_representative' && userProfile.assignedEventSlug) ? userProfile.assignedEventSlug : 'general',
+        eventSlug: (userProfile?.role === 'event_representative' && userProfile.assignedEventSlug) ? userProfile.assignedEventSlug : 'general', // Or derive eventSlug differently
       };
-      setTasks(prev => [newTask, ...prev]);
+      setUserProfile(prev => {
+        if (!prev) return null;
+        return { ...prev, tasks: [...(prev.tasks || []), newTask] };
+      });
       toast({ title: "Task Created", description: `Task "${newTask.title}" has been added.` });
     }
+    // setTasks will update via useEffect when userProfile.tasks changes
     setCurrentTaskForm(defaultTaskFormState);
     setEditingTaskId(null);
     setIsTaskFormDialogOpen(false);
@@ -292,29 +299,41 @@ export default function EventTasksPage() {
     });
     setIsTaskFormDialogOpen(true);
   };
-  
+
   const openDeleteConfirmDialog = (task: Task) => {
     setTaskToDelete(task);
     setIsDeleteConfirmDialogOpen(true);
   };
 
   const handleDeleteTask = () => {
-    if (taskToDelete) {
-      setTasks(prev => prev.filter(task => task.id !== taskToDelete.id));
+    if (taskToDelete && userProfile && setUserProfile) {
+        setUserProfile(prev => {
+            if (!prev) return null;
+            return { ...prev, tasks: prev.tasks?.filter(task => task.id !== taskToDelete.id) || [] };
+        });
       toast({ title: "Task Deleted", description: `Task "${taskToDelete.title}" has been deleted.` });
-      setTaskToDelete(null);
+      setTaskToDelete(null); // Clear after setting context to avoid race condition with highlight
       setIsDeleteConfirmDialogOpen(false);
     }
   };
 
   const toggleTaskStatus = (taskId: string, currentStatus: TaskStatus) => {
-    setTasks(prevTasks => prevTasks.map(task =>
-      task.id === taskId
-        ? { ...task, status: currentStatus === 'Completed' ? 'In Progress' : 'Completed', updatedAt: new Date().toISOString() }
-        : task
-    ));
+     if (userProfile && setUserProfile) {
+        const newStatus = currentStatus === 'Completed' ? 'In Progress' : 'Completed';
+        setUserProfile(prev => {
+            if (!prev) return null;
+            return {
+                ...prev,
+                tasks: prev.tasks?.map(task =>
+                    task.id === taskId
+                    ? { ...task, status: newStatus, updatedAt: new Date().toISOString() }
+                    : task
+                ) || []
+            };
+        });
+    }
   };
-  
+
   const requestSort = (key: SortableTaskFields) => {
     let direction: SortDirection = 'asc';
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -328,22 +347,22 @@ export default function EventTasksPage() {
 
 
   const filteredAndSortedTasks = useMemo(() => {
-    let sortableTasks = [...tasks];
-    
+    let sortableTasks = [...tasks]; // Use the local tasks state which is synced from context
+
     sortableTasks = sortableTasks.filter(task => {
       const searchTermLower = searchTerm.toLowerCase();
-      const assignedToFilterLower = assignedToFilter.toLowerCase();
+      const assignedToFilterLower = assignedToFilterText.toLowerCase();
 
       const matchesSearch = searchTermLower === '' ||
         task.title.toLowerCase().includes(searchTermLower) ||
         (task.description && task.description.toLowerCase().includes(searchTermLower));
-      
-      const matchesAssignedTo = assignedToFilterLower === '' || 
+
+      const matchesAssignedTo = assignedToFilterLower === '' ||
         (task.assignedTo && task.assignedTo.some(assignee => assignee.toLowerCase().includes(assignedToFilterLower)));
 
       const matchesStatus = statusFilter === 'All' || task.status === statusFilter;
       const matchesPriority = priorityFilter === 'All' || task.priority === priorityFilter;
-      
+
       let matchesDynamic = true;
       if (activeDynamicFilters.length > 0) {
         matchesDynamic = activeDynamicFilters.every(filter => {
@@ -358,7 +377,7 @@ export default function EventTasksPage() {
             if (typeof taskValue === 'boolean' && filter.value.toLowerCase() === 'false') return true;
             return false;
           }
-          
+
           const valueStr = String(taskValue).toLowerCase();
           const filterValueStr = filter.value.toLowerCase();
 
@@ -371,7 +390,7 @@ export default function EventTasksPage() {
           return valueStr.includes(filterValueStr);
         });
       }
-      
+
       return matchesSearch && matchesAssignedTo && matchesStatus && matchesPriority && matchesDynamic;
     });
 
@@ -396,7 +415,7 @@ export default function EventTasksPage() {
           valA = dateA;
           valB = dateB;
         }
-        
+
         if (valA === undefined || valA === null) valA = '' as any;
         if (valB === undefined || valB === null) valB = '' as any;
 
@@ -412,8 +431,8 @@ export default function EventTasksPage() {
       });
     }
     return sortableTasks;
-  }, [tasks, searchTerm, statusFilter, priorityFilter, assignedToFilter, activeDynamicFilters, sortConfig]);
-  
+  }, [tasks, searchTerm, statusFilter, priorityFilter, assignedToFilterText, activeDynamicFilters, sortConfig]);
+
 
   const handleAddDynamicFilter = () => {
     if (newFilterColumn && newFilterValue.trim() !== '') {
@@ -436,7 +455,7 @@ export default function EventTasksPage() {
   const removeDynamicFilter = (filterId: string) => {
     setActiveDynamicFilters(prev => prev.filter(f => f.id !== filterId));
   };
-  
+
   const availableTaskFilterColumns = useMemo(() => {
     const customCols = customTaskColumnDefinitions.map(col => ({ id: col.id, name: col.name, isCustom: true }));
     return [...standardTaskFilterColumns, ...customCols];
@@ -466,31 +485,40 @@ export default function EventTasksPage() {
     };
     setCustomTaskColumnDefinitions(prev => [...prev, newDefinition]);
 
-    setTasks(prevTasks => 
-      prevTasks.map(p => ({
-        ...p,
-        customTaskData: {
-          ...(p.customTaskData || {}),
-          [newColumnId]: newCustomTaskColumnForm.defaultValue || getInitialValueForTaskDataType(newCustomTaskColumnForm.dataType)
-        }
-      }))
-    );
+     if (setUserProfile) {
+        setUserProfile(prevProfile => {
+            if (!prevProfile) return null;
+            const updatedTasks = (prevProfile.tasks || []).map(task => ({
+                ...task,
+                customTaskData: {
+                    ...(task.customTaskData || {}),
+                    [newColumnId]: newCustomTaskColumnForm.defaultValue || getInitialValueForTaskDataType(newCustomTaskColumnForm.dataType)
+                }
+            }));
+            return { ...prevProfile, tasks: updatedTasks };
+        });
+    }
+
 
     setNewCustomTaskColumnForm({ name: '', dataType: 'text', options: '', defaultValue: ''});
     setIsAddCustomTaskColumnDialogOpen(false);
     toast({ title: "Success", description: `Custom task column "${newDefinition.name}" added.` });
   };
-  
+
   const handleCustomTaskDataChange = (taskId: string, columnId: string, value: any) => {
-    setTasks(prev => 
-      prev.map(p => 
-        p.id === taskId 
-        ? { ...p, customTaskData: { ...(p.customTaskData || {}), [columnId]: value }, updatedAt: new Date().toISOString() }
-        : p
-      )
-    );
+    if (setUserProfile) {
+        setUserProfile(prevProfile => {
+            if (!prevProfile) return null;
+            const updatedTasks = (prevProfile.tasks || []).map(task =>
+                task.id === taskId
+                ? { ...task, customTaskData: { ...(task.customTaskData || {}), [columnId]: value }, updatedAt: new Date().toISOString() }
+                : task
+            );
+            return { ...prevProfile, tasks: updatedTasks };
+        });
+    }
   };
-  
+
   const renderCustomTaskCell = (task: Task, column: CustomTaskColumnDefinition) => {
     const value = task.customTaskData?.[column.id] ?? column.defaultValue ?? getInitialValueForTaskDataType(column.dataType);
     const isEditing = editingCustomCell?.taskId === task.id && editingCustomCell?.columnId === column.id;
@@ -515,7 +543,7 @@ export default function EventTasksPage() {
             </Select>
           );
         default:
-          return String(value); 
+          return String(value);
       }
     }
 
@@ -537,8 +565,8 @@ export default function EventTasksPage() {
       </div>
     );
   }
-  
-  const canAccessPage = userProfile.role === 'event_representative' || userProfile.role === 'overall_head' || userProfile.role === 'admin';
+
+  const canAccessPage = userProfile.role === 'event_representative' || userProfile.role === 'overall_head' || userProfile.role === 'admin' || userProfile.role === 'organizer' || userProfile.role === 'test';
   if (!canAccessPage) {
      return (
       <div className="flex flex-col min-h-[calc(100vh-10rem)] items-center justify-center text-center p-4">
@@ -561,7 +589,7 @@ export default function EventTasksPage() {
     searchTerm && { label: 'Search', value: searchTerm },
     statusFilter !== 'All' && { label: 'Status', value: statusFilter },
     priorityFilter !== 'All' && { label: 'Priority', value: priorityFilter },
-    assignedToFilter && { label: 'Assigned To', value: assignedToFilter },
+    assignedToFilterText && { label: 'Assigned To', value: assignedToFilterText },
   ].filter(Boolean);
 
   const allActiveFiltersForDisplay = [
@@ -586,15 +614,15 @@ export default function EventTasksPage() {
                   <LayoutDashboard className="mr-2 h-4 w-4" /> Go to Dashboard
                 </Link>
             </Button>
-            <Button 
-                variant={currentView === 'list' ? 'secondary' : 'outline'} 
+            <Button
+                variant={currentView === 'list' ? 'secondary' : 'outline'}
                 onClick={() => setCurrentView('list')}
                 className="shadow-sm hover:shadow-md-soft transition-shadow"
             >
                 <Rows className="mr-2 h-4 w-4"/> List View
             </Button>
-            <Button 
-                variant={currentView === 'timeline' ? 'secondary' : 'outline'} 
+            <Button
+                variant={currentView === 'timeline' ? 'secondary' : 'outline'}
                 onClick={() => setCurrentView('timeline')}
                 className="shadow-sm hover:shadow-md-soft transition-shadow"
             >
@@ -646,10 +674,10 @@ export default function EventTasksPage() {
                                     checked={currentTaskForm.assignedTo.includes(user)}
                                     onCheckedChange={(checked) => {
                                     setCurrentTaskForm(f => {
-                                        const newAssignedTo = checked 
-                                        ? [...f.assignedTo, user] 
+                                        const newAssignedTo = checked
+                                        ? [...f.assignedTo, user]
                                         : f.assignedTo.filter(u => u !== user);
-                                        return { ...f, assignedTo: newAssignedTo.filter((v, i, a) => a.indexOf(v) === i) }; 
+                                        return { ...f, assignedTo: newAssignedTo.filter((v, i, a) => a.indexOf(v) === i) };
                                     });
                                     }}
                                 >
@@ -718,7 +746,7 @@ export default function EventTasksPage() {
             </div>
              <div>
                 <Label htmlFor="assignedTo-filter">Filter Assigned To</Label>
-                <Input id="assignedTo-filter" placeholder="Assignee name..." value={assignedToFilter} onChange={e => setAssignedToFilter(e.target.value)} />
+                <Input id="assignedTo-filter" placeholder="Assignee name..." value={assignedToFilterText} onChange={e => setAssignedToFilterText(e.target.value)} />
             </div>
             <div>
                 <Label htmlFor="status-filter">Filter Status</Label>
@@ -898,8 +926,8 @@ export default function EventTasksPage() {
                 </TableHeader>
                 <TableBody>
                   {filteredAndSortedTasks.map((task) => (
-                    <TableRow 
-                        key={task.id} 
+                    <TableRow
+                        key={task.id}
                         className={`hover:bg-muted/50 transition-colors duration-150 ${task.status === 'Completed' ? 'opacity-60 bg-green-500/5' : ''} ${taskToDelete?.id === task.id ? 'bg-destructive/10' : ''}`}
                     >
                       <TableCell>
@@ -930,7 +958,7 @@ export default function EventTasksPage() {
                           <Edit2 className="h-4 w-4" />
                            <span className="sr-only">Edit Task</span>
                         </Button>
-                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/80 hover:bg-destructive/10 h-8 w-8" onClick={() => openDeleteConfirmDialog(task)}>
+                         <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/80 hover:bg-destructive/10 h-8 w-8" onClick={() => openDeleteConfirmDialog(task)}>
                             <Trash2 className="h-4 w-4" />
                             <span className="sr-only">Delete Task</span>
                         </Button>
@@ -954,8 +982,8 @@ export default function EventTasksPage() {
 
       <AlertDialog open={isDeleteConfirmDialogOpen} onOpenChange={(isOpen) => {
           setIsDeleteConfirmDialogOpen(isOpen);
-          if (!isOpen && taskToDelete) { 
-            setTimeout(() => setTaskToDelete(null), 150); 
+          if (!isOpen && taskToDelete) {
+            setTimeout(() => setTaskToDelete(null), 150);
           } else if (!isOpen) {
             setTaskToDelete(null);
           }
