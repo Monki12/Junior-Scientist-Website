@@ -18,7 +18,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -86,13 +86,11 @@ const getStatusBadgeVariant = (status: TaskStatus): { variant: "default" | "seco
 };
 
 
-// Basic Timeline View Component (Placeholder)
 const BasicTimelineView = ({ tasks }: { tasks: Task[] }) => {
   if (tasks.length === 0) {
     return <div className="text-center py-10 text-muted-foreground">No tasks to display in timeline view.</div>;
   }
 
-  // Determine a rough overall start and end date for the timeline display
   const allDates = tasks.flatMap(task => [
     task.createdAt && isValid(parseISO(task.createdAt)) ? parseISO(task.createdAt) : new Date(),
     task.dueDate && isValid(parseISO(task.dueDate)) ? parseISO(task.dueDate) : addDays(new Date(), 1)
@@ -111,7 +109,6 @@ const BasicTimelineView = ({ tasks }: { tasks: Task[] }) => {
       </CardHeader>
       <CardContent className="space-y-3 overflow-x-auto p-4">
         <div className="relative min-w-[800px]" style={{ height: `${tasks.length * 40 + 50}px` }}>
-          {/* Mock time scale */}
           <div className="flex justify-between text-xs text-muted-foreground border-b pb-1 mb-2">
             <span>{format(overallStartDate, 'MMM dd, yyyy')}</span>
             <span>Timeline Span: ~{totalTimelineDays} days</span>
@@ -180,6 +177,7 @@ export default function EventTasksPage() {
     priority: TaskPriority;
     status: TaskStatus;
     points?: number;
+    customTaskData?: Record<string, any>;
   }>(defaultTaskFormState);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   
@@ -231,9 +229,14 @@ export default function EventTasksPage() {
     }
     
     const taskDataToSave = {
-      ...currentTaskForm,
+      title: currentTaskForm.title,
+      description: currentTaskForm.description,
       assignedTo: finalAssignedTo,
       dueDate: currentTaskForm.dueDate!.toISOString(),
+      priority: currentTaskForm.priority,
+      status: currentTaskForm.status,
+      points: currentTaskForm.points || 0,
+      customTaskData: currentTaskForm.customTaskData || {},
       updatedAt: new Date().toISOString(),
     };
 
@@ -241,7 +244,6 @@ export default function EventTasksPage() {
       setTasks(prev => prev.map(task => task.id === editingTaskId ? {
         ...task,
         ...taskDataToSave,
-        customTaskData: tasks.find(t => t.id === editingTaskId)?.customTaskData || {},
       } : task));
       toast({ title: "Task Updated", description: `Task "${currentTaskForm.title}" has been updated.` });
     } else { 
@@ -251,10 +253,6 @@ export default function EventTasksPage() {
         createdBy: userProfile?.displayName || 'Current User',
         createdAt: new Date().toISOString(),
         eventSlug: (userProfile?.role === 'event_representative' && userProfile.assignedEventSlug) ? userProfile.assignedEventSlug : 'general',
-        customTaskData: customTaskColumnDefinitions.reduce((acc, colDef) => {
-          acc[colDef.id] = colDef.defaultValue || getInitialValueForTaskDataType(colDef.dataType);
-          return acc;
-        }, {} as Record<string, any>),
       };
       setTasks(prev => [newTask, ...prev]);
       toast({ title: "Task Created", description: `Task "${newTask.title}" has been added.` });
@@ -280,6 +278,7 @@ export default function EventTasksPage() {
       priority: task.priority,
       status: task.status,
       points: task.points || 0,
+      customTaskData: task.customTaskData || {},
     });
     setIsTaskFormDialogOpen(true);
   };
@@ -346,7 +345,9 @@ export default function EventTasksPage() {
           }
 
           if (taskValue === undefined || taskValue === null) {
-            return filter.value.toLowerCase() === 'false' && typeof taskValue === 'boolean' ? true : false;
+             // Handle cases where value might be legitimately null or undefined, e.g. for booleans
+            if (typeof taskValue === 'boolean' && filter.value.toLowerCase() === 'false') return true;
+            return false;
           }
           
           const valueStr = String(taskValue).toLowerCase();
@@ -513,7 +514,7 @@ export default function EventTasksPage() {
         case 'checkbox':
             return <Checkbox checked={!!value} onCheckedChange={(checked) => handleCustomTaskDataChange(task.id, column.id, !!checked)} aria-label={`Toggle ${column.name} for ${task.title}`}/>;
         case 'date':
-            return <span onClick={() => setEditingCustomCell({ taskId: task.id, columnId: column.id })} className="cursor-pointer hover:bg-muted/50 p-1 rounded min-h-[2rem] block">{value ? format(parseISO(String(value)), 'MMM dd, yyyy') : 'N/A'}</span>;
+            return <span onClick={() => setEditingCustomCell({ taskId: task.id, columnId: column.id })} className="cursor-pointer hover:bg-muted/50 p-1 rounded min-h-[2rem] block">{value && isValid(parseISO(String(value))) ? format(parseISO(String(value)), 'MMM dd, yyyy') : 'N/A'}</span>;
         default:
             return <span onClick={() => column.dataType !== 'checkbox' && setEditingCustomCell({ taskId: task.id, columnId: column.id })} className="cursor-pointer hover:bg-muted/50 p-1 rounded min-h-[2rem] block">{String(value)}</span>;
     }
@@ -543,7 +544,7 @@ export default function EventTasksPage() {
     if (sortConfig.key === columnKey) {
       return sortConfig.direction === 'asc' ? '↑' : '↓';
     }
-    return <ArrowUpDown className="h-3 w-3 opacity-30 group-hover:opacity-70" />;
+    return <ArrowUpDown className="h-3 w-3 opacity-30 group-hover:opacity-70 inline-block ml-1" />;
   };
 
   const activeStaticFiltersForDisplay = [
@@ -554,7 +555,7 @@ export default function EventTasksPage() {
   ].filter(Boolean);
 
   const allActiveFiltersForDisplay = [
-    ...activeStaticFiltersForDisplay.map(f => ({ ...f, isDynamic: false, id: f.label.toLowerCase()})),
+    ...activeStaticFiltersForDisplay.map(f => ({ ...f, isDynamic: false, id: f!.label.toLowerCase()})),
     ...activeDynamicFilters.map(df => ({ label: df.columnName, value: df.value, id: df.id, isDynamic: true }))
   ];
 
@@ -570,7 +571,7 @@ export default function EventTasksPage() {
             <CardDescription>Manage, assign, and track tasks for your event(s).</CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-             <Button variant="outline" asChild>
+            <Button variant="outline" asChild>
                 <Link href="/dashboard">
                   <LayoutDashboard className="mr-2 h-4 w-4" /> Go to Dashboard
                 </Link>
@@ -578,14 +579,14 @@ export default function EventTasksPage() {
             <Button 
                 variant={currentView === 'list' ? 'secondary' : 'outline'} 
                 onClick={() => setCurrentView('list')}
-                className="shadow-sm hover:shadow-md transition-shadow"
+                className="shadow-sm hover:shadow-md-soft transition-shadow"
             >
                 <Rows className="mr-2 h-4 w-4"/> List View
             </Button>
             <Button 
                 variant={currentView === 'timeline' ? 'secondary' : 'outline'} 
                 onClick={() => setCurrentView('timeline')}
-                className="shadow-sm hover:shadow-md transition-shadow"
+                className="shadow-sm hover:shadow-md-soft transition-shadow"
             >
                 <GanttChartSquare className="mr-2 h-4 w-4"/> Timeline View
             </Button>
@@ -699,7 +700,7 @@ export default function EventTasksPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+          <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
             <div className="relative">
                 <Label htmlFor="search-tasks">Search Tasks</Label>
                 <Search className="absolute left-2.5 top-[calc(50%+0.3rem)] -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -734,7 +735,7 @@ export default function EventTasksPage() {
                 </SelectContent>
                 </Select>
             </div>
-            <div className="lg:col-span-1"> {}
+            <div className="lg:col-span-1">
                  <Popover open={isAddFilterPopoverOpen} onOpenChange={setIsAddFilterPopoverOpen}>
                     <PopoverTrigger asChild>
                         <Button variant="outline" className="w-full">
@@ -833,19 +834,19 @@ export default function EventTasksPage() {
                     ))}
                     <TableHead className="text-right">
                         <AlertDialog open={isAddCustomTaskColumnDialogOpen} onOpenChange={setIsAddCustomTaskColumnDialogOpen}>
-                        <AlertDialogTrigger asChild>
+                          <DialogTrigger asChild>
                            <Button variant="outline" size="sm" className="border-dashed hover:border-primary hover:text-primary h-8">
                              <PlusCircle className="mr-2 h-4 w-4" /> Add Column
                            </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
+                          </DialogTrigger>
+                          <DialogContent>
                           <form onSubmit={handleAddCustomTaskColumnSubmit}>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Add New Custom Task Column</AlertDialogTitle>
-                              <AlertDialogDescription>
+                            <DialogHeader>
+                              <DialogTitle>Add New Custom Task Column</DialogTitle>
+                              <DialogDescription>
                                 Define a new column to track additional task information.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
+                              </DialogDescription>
+                            </DialogHeader>
                             <div className="space-y-4 py-4">
                               <div>
                                 <Label htmlFor="newCustomTaskColName">Column Name</Label>
@@ -875,12 +876,12 @@ export default function EventTasksPage() {
                                 <Input id="newCustomTaskColDefaultValue" value={newCustomTaskColumnForm.defaultValue} onChange={e => setNewCustomTaskColumnForm({...newCustomTaskColumnForm, defaultValue: e.target.value})} />
                               </div>
                             </div>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel onClick={() => setIsAddCustomTaskColumnDialogOpen(false)}>Cancel</AlertDialogCancel>
-                              <AlertDialogAction type="submit">Save Column</AlertDialogAction>
-                            </AlertDialogFooter>
+                            <DialogFooter>
+                              <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                              <Button type="submit">Save Column</Button>
+                            </DialogFooter>
                           </form>
-                        </AlertDialogContent>
+                          </DialogContent>
                        </AlertDialog>
                     </TableHead>
                   </TableRow>
@@ -919,12 +920,10 @@ export default function EventTasksPage() {
                           <Edit2 className="h-4 w-4" />
                            <span className="sr-only">Edit Task</span>
                         </Button>
-                        <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/80 hover:bg-destructive/10 h-8 w-8" onClick={() => setTaskToDelete(task)}>
-                              <Trash2 className="h-4 w-4" />
-                               <span className="sr-only">Delete Task</span>
-                            </Button>
-                        </AlertDialogTrigger>
+                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/80 hover:bg-destructive/10 h-8 w-8" onClick={() => openDeleteConfirmDialog(task)}>
+                            <Trash2 className="h-4 w-4" />
+                            <span className="sr-only">Delete Task</span>
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -945,8 +944,8 @@ export default function EventTasksPage() {
 
       <AlertDialog open={isDeleteConfirmDialogOpen} onOpenChange={(isOpen) => {
           setIsDeleteConfirmDialogOpen(isOpen);
-          if (!isOpen && taskToDelete) { // Ensure taskToDelete is reset only if it was set
-            setTimeout(() => setTaskToDelete(null), 150); // Delay reset to allow dialog to close gracefully
+          if (!isOpen && taskToDelete) { 
+            setTimeout(() => setTaskToDelete(null), 150); 
           } else if (!isOpen) {
             setTaskToDelete(null);
           }
@@ -970,4 +969,3 @@ export default function EventTasksPage() {
     </div>
   );
 }
-
