@@ -21,9 +21,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO, isValid, isPast, parse } from 'date-fns';
+import { format, parseISO, isValid, isPast, parse, startOfDay } from 'date-fns';
 import {
-  ListChecks, ShieldAlert, Loader2, Search, Filter, PlusCircle, Edit2, Trash2, CalendarIcon, ArrowUpDown, Tag, XIcon, ChevronDown
+  ListChecks, ShieldAlert, Loader2, Search, Filter, PlusCircle, Edit2, Trash2, CalendarIcon, ArrowUpDown, Tag, XIcon, ChevronDown, Rows
 } from 'lucide-react';
 
 // Mock users for assignment (in a real app, this would come from user data based on event context)
@@ -77,6 +77,7 @@ export default function EventTasksPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<TaskStatus | 'All'>('All');
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'All'>('All');
+  const [assignedToFilter, setAssignedToFilter] = useState('');
   
   const [activeDynamicFilters, setActiveDynamicFilters] = useState<ActiveTaskFilter[]>([]);
   const [isAddFilterPopoverOpen, setIsAddFilterPopoverOpen] = useState(false);
@@ -122,11 +123,10 @@ export default function EventTasksPage() {
       } else if (userProfile.role === 'event_representative' && userProfile.assignedEventSlug) {
         const assignedEvent = subEventsData.find(e => e.slug === userProfile.assignedEventSlug);
         setEventTitle(assignedEvent ? `Tasks for "${assignedEvent.title}"` : 'My Event Tasks');
-        // Filter tasks for the specific event if ER, or use all mock tasks for OH/Admin for broader testing
         setTasks(initialMockTasks.filter(t => t.eventSlug === userProfile.assignedEventSlug));
       } else if (userProfile.role === 'overall_head' || userProfile.role === 'admin') {
         setEventTitle('All Event Tasks Overview');
-        setTasks(initialMockTasks); // Admins/OH see all mock tasks
+        setTasks(initialMockTasks); 
       }
     } else if (!authLoading && !userProfile) {
       router.push('/login?redirect=/organizer/event-tasks');
@@ -234,12 +234,18 @@ export default function EventTasksPage() {
     // Static Filters
     sortableTasks = sortableTasks.filter(task => {
       const searchTermLower = searchTerm.toLowerCase();
+      const assignedToFilterLower = assignedToFilter.toLowerCase();
+
       const matchesSearch = searchTermLower === '' ||
         task.title.toLowerCase().includes(searchTermLower) ||
         (task.description && task.description.toLowerCase().includes(searchTermLower));
+      
+      const matchesAssignedTo = assignedToFilterLower === '' || 
+        (task.assignedTo && task.assignedTo.some(assignee => assignee.toLowerCase().includes(assignedToFilterLower)));
+
       const matchesStatus = statusFilter === 'All' || task.status === statusFilter;
       const matchesPriority = priorityFilter === 'All' || task.priority === priorityFilter;
-      return matchesSearch && matchesStatus && matchesPriority;
+      return matchesSearch && matchesAssignedTo && matchesStatus && matchesPriority;
     });
 
     // Dynamic Filters
@@ -308,19 +314,19 @@ export default function EventTasksPage() {
       });
     }
     return sortableTasks;
-  }, [tasks, searchTerm, statusFilter, priorityFilter, activeDynamicFilters, sortConfig]);
+  }, [tasks, searchTerm, statusFilter, priorityFilter, assignedToFilter, activeDynamicFilters, sortConfig]);
   
   const getPriorityBadgeVariant = (priority: TaskPriority) => {
     if (priority === 'High') return 'destructive';
-    if (priority === 'Medium') return 'secondary';
-    return 'outline';
+    if (priority === 'Medium') return 'secondary'; // Yellowish in some themes
+    return 'outline'; // Bluish or default for Low
   };
   
   const getStatusBadgeVariant = (status: TaskStatus) => {
-    if (status === 'Completed') return 'default'; // Using 'default' for a potentially more prominent look
-    if (status === 'In Progress') return 'secondary'; // Standard secondary
-    if (status === 'Pending Review') return 'outline'; // Consider a yellowish variant if theme supports
-    return 'outline'; // 'Not Started' and other fallbacks
+    if (status === 'Completed') return 'default'; // Greenish/default prominent
+    if (status === 'In Progress') return 'secondary'; // Blueish/standard secondary
+    if (status === 'Pending Review') return 'outline'; // Yellowish/orangish
+    return 'outline'; // Grey/neutral for 'Not Started'
   };
 
   const handleAddDynamicFilter = () => {
@@ -393,7 +399,7 @@ export default function EventTasksPage() {
     setTasks(prev => 
       prev.map(p => 
         p.id === taskId 
-        ? { ...p, customTaskData: { ...(p.customTaskData || {}), [columnId]: value } }
+        ? { ...p, customTaskData: { ...(p.customTaskData || {}), [columnId]: value }, updatedAt: new Date().toISOString() }
         : p
       )
     );
@@ -410,12 +416,9 @@ export default function EventTasksPage() {
         case 'number':
           return <Input type="number" value={Number(value)} onChange={(e) => handleCustomTaskDataChange(task.id, column.id, parseFloat(e.target.value) || 0)} onBlur={() => setEditingCustomCell(null)} autoFocus className="h-8 text-xs"/>;
         case 'date':
-          // Using a simple text input for date for inline editing; a popover calendar might be too complex here.
-          return <Input type="date" value={String(value)} onChange={(e) => handleCustomTaskDataChange(task.id, column.id, e.target.value)} onBlur={() => setEditingCustomCell(null)} autoFocus className="h-8 text-xs"/>;
+          return <Input type="date" value={value ? format(parseISO(String(value)), 'yyyy-MM-dd') : ''} onChange={(e) => handleCustomTaskDataChange(task.id, column.id, e.target.value ? new Date(e.target.value).toISOString() : '')} onBlur={() => setEditingCustomCell(null)} autoFocus className="h-8 text-xs"/>;
         case 'checkbox':
-           // Checkbox updates directly, no separate "editing" state needed, it's handled by renderCustomTaskCell's default case.
-           // This case might not be hit if !isEditing for checkbox.
-           return <Checkbox checked={!!value} onCheckedChange={(checked) => handleCustomTaskDataChange(task.id, column.id, !!checked)} />;
+           return <Checkbox checked={!!value} onCheckedChange={(checked) => {handleCustomTaskDataChange(task.id, column.id, !!checked); setEditingCustomCell(null);}} />;
         case 'dropdown':
           return (
             <Select value={String(value)} onValueChange={(val) => { handleCustomTaskDataChange(task.id, column.id, val); setEditingCustomCell(null); }} >
@@ -426,16 +429,16 @@ export default function EventTasksPage() {
             </Select>
           );
         default:
-          return String(value); // Fallback
+          return String(value); 
       }
     }
 
-    // Non-editing display
     switch (column.dataType) {
         case 'checkbox':
             return <Checkbox checked={!!value} onCheckedChange={(checked) => handleCustomTaskDataChange(task.id, column.id, !!checked)} aria-label={`Toggle ${column.name} for ${task.title}`}/>;
+        case 'date':
+            return <span onClick={() => setEditingCustomCell({ taskId: task.id, columnId: column.id })} className="cursor-pointer hover:bg-muted/50 p-1 rounded min-h-[2rem] block">{value ? format(parseISO(String(value)), 'MMM dd, yyyy') : 'N/A'}</span>;
         default:
-            // Make cell clickable to enter edit mode for non-checkbox types
             return <span onClick={() => column.dataType !== 'checkbox' && setEditingCustomCell({ taskId: task.id, columnId: column.id })} className="cursor-pointer hover:bg-muted/50 p-1 rounded min-h-[2rem] block">{String(value)}</span>;
     }
   };
@@ -460,6 +463,22 @@ export default function EventTasksPage() {
     );
   }
 
+  const getSortIndicator = (columnKey: SortableTaskFields) => {
+    if (sortConfig.key === columnKey) {
+      return sortConfig.direction === 'asc' ? '↑' : '↓';
+    }
+    return <ArrowUpDown className="h-3 w-3 opacity-30 group-hover:opacity-70" />;
+  };
+
+  const activeFiltersForDisplay = [
+    searchTerm && { label: 'Search', value: searchTerm },
+    statusFilter !== 'All' && { label: 'Status', value: statusFilter },
+    priorityFilter !== 'All' && { label: 'Priority', value: priorityFilter },
+    assignedToFilter && { label: 'Assigned To', value: assignedToFilter },
+    ...activeDynamicFilters.map(df => ({ label: df.columnName, value: df.value, id: df.id, isDynamic: true }))
+  ].filter(Boolean);
+
+
   return (
     <div className="space-y-6 animate-fade-in-up">
       <Card className="shadow-lg">
@@ -470,108 +489,125 @@ export default function EventTasksPage() {
             </CardTitle>
             <CardDescription>Manage, assign, and track tasks for your event(s).</CardDescription>
           </div>
-          <Dialog open={isTaskFormDialogOpen} onOpenChange={setIsTaskFormDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-accent hover:bg-accent/90 text-accent-foreground" onClick={() => { setEditingTaskId(null); setCurrentTaskForm(defaultTaskFormState); setIsTaskFormDialogOpen(true); }}>
-                <PlusCircle className="mr-2 h-5 w-5" /> Add New Task
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-lg">
-              <DialogHeader>
-                <DialogTitle>{editingTaskId ? 'Edit Task' : 'Create New Task'}</DialogTitle>
-                <DialogDescription>Fill in the details for the task.</DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="taskTitle" className="text-right">Title</Label>
-                  <Input id="taskTitle" value={currentTaskForm.title} onChange={e => setCurrentTaskForm(f => ({ ...f, title: e.target.value }))} className="col-span-3" placeholder="Task title" />
+          <div className="flex items-center gap-2">
+            <Button variant="outline" disabled className="text-muted-foreground">
+                <Rows className="mr-2 h-4 w-4"/> Timeline View (Soon)
+            </Button>
+            <Dialog open={isTaskFormDialogOpen} onOpenChange={(isOpen) => {
+                setIsTaskFormDialogOpen(isOpen);
+                if (!isOpen) {
+                    setEditingTaskId(null);
+                    setCurrentTaskForm(defaultTaskFormState);
+                }
+            }}>
+                <DialogTrigger asChild>
+                <Button className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-soft hover:shadow-md-soft" onClick={() => { setEditingTaskId(null); setCurrentTaskForm(defaultTaskFormState); setIsTaskFormDialogOpen(true); }}>
+                    <PlusCircle className="mr-2 h-5 w-5" /> Add New Task
+                </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>{editingTaskId ? 'Edit Task' : 'Create New Task'}</DialogTitle>
+                    <DialogDescription>Fill in the details for the task.</DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="taskTitle" className="text-right">Title</Label>
+                    <Input id="taskTitle" value={currentTaskForm.title} onChange={e => setCurrentTaskForm(f => ({ ...f, title: e.target.value }))} className="col-span-3" placeholder="Task title" />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="taskDesc" className="text-right">Description</Label>
+                    <Textarea id="taskDesc" value={currentTaskForm.description} onChange={e => setCurrentTaskForm(f => ({ ...f, description: e.target.value }))} className="col-span-3" placeholder="Detailed description" />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="taskAssignedTo" className="text-right">Assigned To</Label>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" className="col-span-3 justify-between text-left font-normal h-auto min-h-10">
+                                <span className="flex-1 truncate pr-1">
+                                {currentTaskForm.assignedTo.length > 0 ? currentTaskForm.assignedTo.join(', ') : "Select Assignees"}
+                                </span>
+                                <ChevronDown className="ml-2 h-4 w-4 opacity-50 shrink-0" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">
+                                <DropdownMenuLabel>Assignable Users</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                {mockAssignableUsersForEvent.map(user => (
+                                <DropdownMenuCheckboxItem
+                                    key={user}
+                                    checked={currentTaskForm.assignedTo.includes(user)}
+                                    onCheckedChange={(checked) => {
+                                    setCurrentTaskForm(f => {
+                                        const newAssignedTo = checked 
+                                        ? [...f.assignedTo, user] 
+                                        : f.assignedTo.filter(u => u !== user);
+                                        return { ...f, assignedTo: newAssignedTo };
+                                    });
+                                    }}
+                                >
+                                    {user}
+                                </DropdownMenuCheckboxItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="taskDueDate" className="text-right">Due Date</Label>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                        <Button variant="outline" className={`col-span-3 justify-start text-left font-normal ${!currentTaskForm.dueDate && "text-muted-foreground"}`}>
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {currentTaskForm.dueDate ? format(currentTaskForm.dueDate, "PPP") : <span>Pick a date</span>}
+                        </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                        <Calendar mode="single" selected={currentTaskForm.dueDate} onSelect={date => setCurrentTaskForm(f => ({ ...f, dueDate: date }))} initialFocus />
+                        </PopoverContent>
+                    </Popover>
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="taskPriority" className="text-right">Priority</Label>
+                    <Select value={currentTaskForm.priority} onValueChange={(value: TaskPriority) => setCurrentTaskForm(f => ({ ...f, priority: value }))}>
+                        <SelectTrigger className="col-span-3"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                        <SelectItem value="High">High</SelectItem>
+                        <SelectItem value="Medium">Medium</SelectItem>
+                        <SelectItem value="Low">Low</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="taskStatus" className="text-right">Status</Label>
+                    <Select value={currentTaskForm.status} onValueChange={(value: TaskStatus) => setCurrentTaskForm(f => ({ ...f, status: value }))}>
+                        <SelectTrigger className="col-span-3"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                        <SelectItem value="Not Started">Not Started</SelectItem>
+                        <SelectItem value="In Progress">In Progress</SelectItem>
+                        <SelectItem value="Pending Review">Pending Review</SelectItem>
+                        <SelectItem value="Completed">Completed</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    </div>
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="taskDesc" className="text-right">Description</Label>
-                  <Textarea id="taskDesc" value={currentTaskForm.description} onChange={e => setCurrentTaskForm(f => ({ ...f, description: e.target.value }))} className="col-span-3" placeholder="Detailed description" />
-                </div>
-                 <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="taskAssignedTo" className="text-right">Assigned To</Label>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline" className="col-span-3 justify-between">
-                            {currentTaskForm.assignedTo.length > 0 ? currentTaskForm.assignedTo.join(', ') : "Select Assignees"}
-                            <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">
-                            <DropdownMenuLabel>Assignable Users</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            {mockAssignableUsersForEvent.map(user => (
-                            <DropdownMenuCheckboxItem
-                                key={user}
-                                checked={currentTaskForm.assignedTo.includes(user)}
-                                onCheckedChange={(checked) => {
-                                setCurrentTaskForm(f => {
-                                    const newAssignedTo = checked 
-                                    ? [...f.assignedTo, user] 
-                                    : f.assignedTo.filter(u => u !== user);
-                                    return { ...f, assignedTo: newAssignedTo };
-                                });
-                                }}
-                            >
-                                {user}
-                            </DropdownMenuCheckboxItem>
-                            ))}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="taskDueDate" className="text-right">Due Date</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className={`col-span-3 justify-start text-left font-normal ${!currentTaskForm.dueDate && "text-muted-foreground"}`}>
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {currentTaskForm.dueDate ? format(currentTaskForm.dueDate, "PPP") : <span>Pick a date</span>}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar mode="single" selected={currentTaskForm.dueDate} onSelect={date => setCurrentTaskForm(f => ({ ...f, dueDate: date }))} initialFocus />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="taskPriority" className="text-right">Priority</Label>
-                  <Select value={currentTaskForm.priority} onValueChange={(value: TaskPriority) => setCurrentTaskForm(f => ({ ...f, priority: value }))}>
-                    <SelectTrigger className="col-span-3"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="High">High</SelectItem>
-                      <SelectItem value="Medium">Medium</SelectItem>
-                      <SelectItem value="Low">Low</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="taskStatus" className="text-right">Status</Label>
-                  <Select value={currentTaskForm.status} onValueChange={(value: TaskStatus) => setCurrentTaskForm(f => ({ ...f, status: value }))}>
-                    <SelectTrigger className="col-span-3"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Not Started">Not Started</SelectItem>
-                      <SelectItem value="In Progress">In Progress</SelectItem>
-                      <SelectItem value="Pending Review">Pending Review</SelectItem>
-                      <SelectItem value="Completed">Completed</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <DialogFooter>
-                <DialogClose asChild><Button variant="outline" onClick={() => { setIsTaskFormDialogOpen(false); setEditingTaskId(null); }}>Cancel</Button></DialogClose>
-                <Button onClick={handleTaskFormSubmit}>Save Task</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button onClick={handleTaskFormSubmit} className="bg-primary hover:bg-primary/90">Save Task</Button>
+                </DialogFooter>
+                </DialogContent>
+            </Dialog>
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="mb-4 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 items-end">
-            <div className="relative">
+          <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+            <div className="relative md:col-span-2 lg:col-span-1">
                 <Label htmlFor="search-tasks">Search</Label>
                 <Search className="absolute left-2.5 top-[calc(50%+0.3rem)] -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input id="search-tasks" placeholder="Search tasks..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-9" />
+                <Input id="search-tasks" placeholder="Title, description..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-9" />
+            </div>
+             <div>
+                <Label htmlFor="assignedTo-filter">Assigned To</Label>
+                <Input id="assignedTo-filter" placeholder="Assignee name..." value={assignedToFilter} onChange={e => setAssignedToFilter(e.target.value)} />
             </div>
             <div>
                 <Label htmlFor="status-filter">Status</Label>
@@ -646,17 +682,19 @@ export default function EventTasksPage() {
                 </PopoverContent>
             </Popover>
           </div>
-            {activeDynamicFilters.length > 0 && (
-                <div className="mt-4 space-y-2">
-                    <Label>Active Dynamic Filters:</Label>
-                    <div className="flex flex-wrap gap-2">
-                    {activeDynamicFilters.map(filter => (
-                        <Badge key={filter.id} variant="secondary" className="flex items-center gap-1 pr-1">
-                        {filter.columnName}: &quot;{filter.value}&quot;
-                        <button onClick={() => removeDynamicFilter(filter.id)} className="ml-1 rounded-full hover:bg-muted-foreground/20 p-0.5">
-                            <XIcon className="h-3 w-3" />
-                            <span className="sr-only">Remove filter</span>
-                        </button>
+            {activeFiltersForDisplay.length > 0 && (
+                <div className="mb-4 space-y-2">
+                    <div className="flex flex-wrap gap-2 items-center">
+                    <Label className="text-sm font-medium">Active Filters:</Label>
+                    {activeFiltersForDisplay.map((filter: any) => (
+                        <Badge key={filter.id || filter.label} variant="secondary" className="flex items-center gap-1 pr-1">
+                        {filter.label}: &quot;{filter.value}&quot;
+                        {filter.isDynamic && (
+                             <button onClick={() => removeDynamicFilter(filter.id)} className="ml-1 rounded-full hover:bg-muted-foreground/20 p-0.5">
+                                <XIcon className="h-3 w-3" />
+                                <span className="sr-only">Remove filter</span>
+                            </button>
+                        )}
                         </Badge>
                     ))}
                     </div>
@@ -665,23 +703,31 @@ export default function EventTasksPage() {
 
 
           {filteredAndSortedTasks.length > 0 ? (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[50px]"></TableHead>
-                    <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => requestSort('title')}>
-                        Task Title <ArrowUpDown className={`ml-2 h-3 w-3 inline ${sortConfig.key === 'title' ? 'opacity-100' : 'opacity-30'}`} />
+                    <TableHead className="cursor-pointer hover:bg-muted/50 group" onClick={() => requestSort('title')}>
+                        <div className="flex items-center gap-1">
+                            Task Title {getSortIndicator('title')}
+                        </div>
                     </TableHead>
                     <TableHead>Assigned To</TableHead>
-                    <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => requestSort('dueDate')}>
-                        Due Date <ArrowUpDown className={`ml-2 h-3 w-3 inline ${sortConfig.key === 'dueDate' ? 'opacity-100' : 'opacity-30'}`} />
+                    <TableHead className="cursor-pointer hover:bg-muted/50 group" onClick={() => requestSort('dueDate')}>
+                         <div className="flex items-center gap-1">
+                            Due Date {getSortIndicator('dueDate')}
+                        </div>
                     </TableHead>
-                    <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => requestSort('priority')}>
-                        Priority <ArrowUpDown className={`ml-2 h-3 w-3 inline ${sortConfig.key === 'priority' ? 'opacity-100' : 'opacity-30'}`} />
+                    <TableHead className="cursor-pointer hover:bg-muted/50 group" onClick={() => requestSort('priority')}>
+                        <div className="flex items-center gap-1">
+                            Priority {getSortIndicator('priority')}
+                        </div>
                     </TableHead>
-                     <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => requestSort('status')}>
-                        Status <ArrowUpDown className={`ml-2 h-3 w-3 inline ${sortConfig.key === 'status' ? 'opacity-100' : 'opacity-30'}`} />
+                     <TableHead className="cursor-pointer hover:bg-muted/50 group" onClick={() => requestSort('status')}>
+                        <div className="flex items-center gap-1">
+                            Status {getSortIndicator('status')}
+                        </div>
                     </TableHead>
                     {customTaskColumnDefinitions.map(col => (
                       <TableHead key={col.id}>{col.name}</TableHead>
@@ -689,7 +735,7 @@ export default function EventTasksPage() {
                     <TableHead className="text-right">
                         <AlertDialog open={isAddCustomTaskColumnDialogOpen} onOpenChange={setIsAddCustomTaskColumnDialogOpen}>
                         <AlertDialogTrigger asChild>
-                           <Button variant="outline" size="sm">
+                           <Button variant="outline" size="sm" className="border-dashed hover:border-primary hover:text-primary">
                              <PlusCircle className="mr-2 h-4 w-4" /> Add Column
                            </Button>
                         </AlertDialogTrigger>
@@ -742,7 +788,7 @@ export default function EventTasksPage() {
                 </TableHeader>
                 <TableBody>
                   {filteredAndSortedTasks.map((task) => (
-                    <TableRow key={task.id} className={`${task.status === 'Completed' ? 'opacity-70' : ''} ${taskToDelete?.id === task.id ? 'bg-destructive/20' : ''}`}>
+                    <TableRow key={task.id} className={`hover:bg-muted/20 ${task.status === 'Completed' ? 'opacity-70 bg-green-500/5' : ''} ${taskToDelete?.id === task.id ? 'bg-destructive/20' : ''}`}>
                       <TableCell>
                         <Checkbox
                           checked={task.status === 'Completed'}
@@ -751,15 +797,15 @@ export default function EventTasksPage() {
                         />
                       </TableCell>
                       <TableCell className="font-medium max-w-xs truncate" title={task.title}>{task.title}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{task.assignedTo && task.assignedTo.length > 0 ? task.assignedTo.join(', ') : 'Unassigned'}</TableCell>
-                      <TableCell className={`${task.dueDate && isPast(parseISO(task.dueDate)) && task.status !== 'Completed' ? 'text-destructive font-semibold' : ''}`}>
+                      <TableCell className="text-xs text-muted-foreground max-w-[150px] truncate">{task.assignedTo && task.assignedTo.length > 0 ? task.assignedTo.join(', ') : 'Unassigned'}</TableCell>
+                      <TableCell className={`${task.dueDate && isPast(startOfDay(parseISO(task.dueDate))) && task.status !== 'Completed' ? 'text-red-600 font-semibold' : ''}`}>
                         {task.dueDate && isValid(parseISO(task.dueDate)) ? format(parseISO(task.dueDate), 'MMM dd, yyyy') : 'N/A'}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={getPriorityBadgeVariant(task.priority)}>{task.priority}</Badge>
+                        <Badge variant={getPriorityBadgeVariant(task.priority)} className="capitalize">{task.priority}</Badge>
                       </TableCell>
                       <TableCell>
-                         <Badge variant={getStatusBadgeVariant(task.status)}>{task.status}</Badge>
+                         <Badge variant={getStatusBadgeVariant(task.status)} className="capitalize">{task.status.replace('-', ' ')}</Badge>
                       </TableCell>
                        {customTaskColumnDefinitions.map(colDef => (
                         <TableCell key={colDef.id}>
@@ -767,11 +813,13 @@ export default function EventTasksPage() {
                         </TableCell>
                       ))}
                       <TableCell className="text-right space-x-1">
-                        <Button variant="ghost" size="icon" onClick={() => openEditTaskDialog(task)}>
+                        <Button variant="ghost" size="icon" className="hover:bg-muted/50" onClick={() => openEditTaskDialog(task)}>
                           <Edit2 className="h-4 w-4" />
+                           <span className="sr-only">Edit Task</span>
                         </Button>
-                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/80" onClick={() => openDeleteConfirmDialog(task)}>
+                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/80 hover:bg-destructive/10" onClick={() => openDeleteConfirmDialog(task)}>
                           <Trash2 className="h-4 w-4" />
+                           <span className="sr-only">Delete Task</span>
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -782,13 +830,17 @@ export default function EventTasksPage() {
           ) : (
             <div className="text-center py-10 text-muted-foreground">
               <Filter className="h-12 w-12 mx-auto mb-3 text-primary/50" />
-              <p>No tasks match the current filters. Try adjusting your search or filters.</p>
+              <p className="text-lg">No tasks match the current filters.</p>
+              <p className="text-sm">Try adjusting your search or click 'Add New Task' to get started.</p>
             </div>
           )}
         </CardContent>
       </Card>
 
-      <AlertDialog open={isDeleteConfirmDialogOpen} onOpenChange={setIsDeleteConfirmDialogOpen}>
+      <AlertDialog open={isDeleteConfirmDialogOpen} onOpenChange={(isOpen) => {
+          setIsDeleteConfirmDialogOpen(isOpen);
+          if (!isOpen) setTaskToDelete(null);
+      }}>
         <AlertDialogContent>
             <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
@@ -798,7 +850,7 @@ export default function EventTasksPage() {
             </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => {setTaskToDelete(null); setIsDeleteConfirmDialogOpen(false);}}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteTask} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                 Confirm Delete
             </AlertDialogAction>
@@ -808,3 +860,4 @@ export default function EventTasksPage() {
     </div>
   );
 }
+
