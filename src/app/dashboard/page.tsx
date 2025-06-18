@@ -1,20 +1,23 @@
 
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/hooks/use-auth';
 import { subEventsData } from '@/data/subEvents';
-import type { UserRole, SubEvent, Task, RegisteredEventInfo } from '@/types';
+import type { UserRole, SubEvent, Task, RegisteredEventInfo, UserProfileData } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Checkbox } from "@/components/ui/checkbox";
+import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from "@/components/ui/table";
+import { format, isToday, isPast, isThisWeek, startOfDay, parseISO, isValid } from 'date-fns';
 import {
-  Loader2, BarChartBig, Edit, Users, FileScan, Settings, BookUser, ListChecks, CalendarDays, UserCircle, Bell, GraduationCap, School, Download, Info, Briefcase, Newspaper, Award, Star, CheckCircle, ClipboardList, TrendingUp, Building, Activity, ShieldCheck, ExternalLink, Home, Search, CalendarCheck, Ticket, Users2, Phone, Mail, Milestone, MapPin, Clock, UsersRound, CheckSquare, BarChartHorizontalBig, Rss
+  Loader2, BarChartBig, Edit, Users, FileScan, Settings, BookUser, ListChecks, CalendarDays, UserCircle, Bell, GraduationCap, School, Download, Info, Briefcase, Newspaper, Award, Star, CheckCircle, ClipboardList, TrendingUp, Building, Activity, ShieldCheck, ExternalLink, Home, Search, CalendarCheck, Ticket, Users2, Phone, Mail, Milestone, MapPin, Clock, UsersRound, CheckSquare, BarChartHorizontalBig, Rss, AlertTriangle
 } from 'lucide-react';
 
 interface RegisteredEventDisplay extends SubEvent {
@@ -23,46 +26,58 @@ interface RegisteredEventDisplay extends SubEvent {
   admitCardStatus?: 'published' | 'pending' | 'unavailable';
 }
 
-function TaskCard({ task }: { task: Task }) {
-  const getStatusColor = (status: Task['status']) => {
-    switch (status) {
-      case 'pending': return 'bg-yellow-500/10 text-yellow-700 border-yellow-500/30';
-      case 'in-progress': return 'bg-blue-500/10 text-blue-700 border-blue-500/30';
-      case 'completed': return 'bg-green-500/10 text-green-700 border-green-500/30';
-      case 'overdue': return 'bg-red-500/10 text-red-700 border-red-500/30';
-      default: return 'bg-muted text-muted-foreground border-border';
-    }
-  };
-  return (
-    <Card className={`shadow-soft hover:shadow-md-soft transition-shadow rounded-lg ${getStatusColor(task.status)}`}>
-      <CardHeader className="pb-2 pt-3 px-4">
-        <div className="flex justify-between items-start">
-          <CardTitle className="text-md font-semibold line-clamp-1">{task.title}</CardTitle>
-          <Badge variant="outline" className={`text-xs ${getStatusColor(task.status)} border-current capitalize`}>{task.status.replace('-', ' ')}</Badge>
-        </div>
-        {task.eventSlug && (
-          <CardDescription className="text-xs">Event: {subEventsData.find(e => e.slug === task.eventSlug)?.title || task.eventSlug}</CardDescription>
-        )}
-      </CardHeader>
-      <CardContent className="px-4 pb-3 pt-1">
-        <p className="text-xs text-muted-foreground line-clamp-2 mb-1">{task.description}</p>
-        {task.deadline && <p className="text-xs">Deadline: {new Date(task.deadline).toLocaleDateString()}</p>}
-        {task.points && <p className="text-xs">Points: {task.points}</p>}
-         {task.assignedByName && <p className="text-xs mt-1 text-muted-foreground/80">Assigned by: {task.assignedByName}</p>}
-      </CardContent>
-    </Card>
-  );
-}
+
+// Helper function to determine badge variant for task priority
+const getPriorityBadgeVariant = (priority: Task['priority']): "destructive" | "secondary" | "outline" => {
+  if (priority === 'High') return 'destructive';
+  if (priority === 'Medium') return 'secondary';
+  return 'outline';
+};
+
+// Helper function to determine badge variant for task status
+const getStatusBadgeVariant = (status: Task['status']): { variant: "default" | "secondary" | "outline" | "destructive", colorClass: string } => {
+  switch (status) {
+    case 'Completed': return { variant: 'default', colorClass: 'bg-green-500/10 border-green-500/30 text-green-700 dark:bg-green-700/20 dark:text-green-300' };
+    case 'In Progress': return { variant: 'secondary', colorClass: 'bg-blue-500/10 border-blue-500/30 text-blue-700 dark:bg-blue-700/20 dark:text-blue-300' };
+    case 'Pending Review': return { variant: 'outline', colorClass: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-700 dark:bg-yellow-700/20 dark:text-yellow-300' };
+    case 'Not Started': return { variant: 'outline', colorClass: 'bg-slate-500/10 border-slate-500/30 text-slate-700 dark:bg-slate-700/20 dark:text-slate-300' };
+    default: return { variant: 'outline', colorClass: 'bg-muted text-muted-foreground border-border' };
+  }
+};
+
 
 export default function DashboardPage() {
-  const { authUser, userProfile, loading } = useAuth();
+  const { authUser, userProfile, setUserProfile, loading } = useAuth();
   const router = useRouter();
+  const [localUserProfileTasks, setLocalUserProfileTasks] = useState<Task[]>(userProfile?.tasks || []);
 
   useEffect(() => {
     if (!loading && !authUser) {
       router.push('/login?redirect=/dashboard');
     }
-  }, [authUser, loading, router]);
+    if (userProfile?.tasks) {
+      setLocalUserProfileTasks(userProfile.tasks);
+    }
+  }, [authUser, userProfile, loading, router]);
+
+
+  const handleTaskCompletionToggle = (taskId: string) => {
+    if (!setUserProfile || !userProfile) return;
+
+    const updatedTasks = localUserProfileTasks.map(task =>
+      task.id === taskId
+        ? { ...task, status: task.status === 'Completed' ? 'In Progress' : 'Completed' as Task['status'], updatedAt: new Date().toISOString() }
+        : task
+    );
+    setLocalUserProfileTasks(updatedTasks);
+
+    // Also update the main userProfile context
+    setUserProfile(prevProfile => {
+      if (!prevProfile) return null;
+      return { ...prevProfile, tasks: updatedTasks };
+    });
+  };
+
 
   if (loading || !authUser || !userProfile) {
     return (
@@ -75,7 +90,7 @@ export default function DashboardPage() {
   const role: UserRole = userProfile.role;
 
   // Student Dashboard
-  if (role === 'student' || role === 'test') {
+  if (role === 'student' || (role === 'test' && !userProfile.tasks?.length)) { // Test user with NO tasks sees student dash
     const studentRegisteredFullEvents: RegisteredEventDisplay[] = userProfile.registeredEvents
       ?.map(registeredInfo => {
         const eventDetail = subEventsData.find(event => event.slug === registeredInfo.eventSlug);
@@ -228,25 +243,18 @@ export default function DashboardPage() {
                 </CardContent>
             </Card>
         </section>
-
-         <Separator />
-
-        { (userProfile.role === 'test' && userProfile.tasks && userProfile.tasks.length > 0) && (
-            <section>
-            <Card className="shadow-lg rounded-xl">
-                <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-xl"><ClipboardList className="h-5 w-5 text-primary"/>My Tasks (Test User)</CardTitle>
-                <CardDescription>Tasks assigned to you for testing purposes.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                {userProfile.tasks.map(task => <TaskCard key={task.id} task={task} />)}
-                </CardContent>
-            </Card>
-            </section>
-        )}
       </div>
     );
   }
+  
+  // For organizer, event_representative, overall_head, admin, or test user with tasks
+  // My Tasks Section
+  const tasks = localUserProfileTasks || [];
+  const today = startOfDay(new Date());
+  const tasksDueToday = tasks.filter(task => task.dueDate && isValid(parseISO(task.dueDate)) && isToday(parseISO(task.dueDate)) && task.status !== 'Completed').length;
+  const overdueTasks = tasks.filter(task => task.dueDate && isValid(parseISO(task.dueDate)) && isPast(parseISO(task.dueDate)) && !isToday(parseISO(task.dueDate)) && task.status !== 'Completed').length;
+  const tasksThisWeek = tasks.filter(task => task.dueDate && isValid(parseISO(task.dueDate)) && isThisWeek(parseISO(task.dueDate), { weekStartsOn: 1 }) && task.status !== 'Completed').length;
+
 
   if (role === 'event_representative') {
     const assignedEvent = userProfile.assignedEventSlug ? subEventsData.find(e => e.slug === userProfile.assignedEventSlug) : null;
@@ -297,7 +305,7 @@ export default function DashboardPage() {
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mb-4">
                                 <p className="flex items-center"><UsersRound className="mr-1.5 h-4 w-4 text-accent" /> Registered: <span className="font-semibold ml-1">57</span></p>
-                                <p className="flex items-center"><ListChecks className="mr-1.5 h-4 w-4 text-accent" /> Pending Tasks: <span className="font-semibold ml-1">3</span></p>
+                                <p className="flex items-center"><ListChecks className="mr-1.5 h-4 w-4 text-accent" /> Pending Tasks: <span className="font-semibold ml-1">{tasks.filter(t => t.status !== 'Completed').length}</span></p>
                                 <div className="flex items-center col-span-full text-sm"><Info className="mr-1.5 h-4 w-4 text-accent" /> Status: <Badge variant="secondary" className="ml-1">Planning</Badge></div>
                             </div>
                             <div className="flex flex-wrap gap-2 mt-4">
@@ -307,7 +315,7 @@ export default function DashboardPage() {
                                 <Button asChild variant="outline" size="sm">
                                     <Link href={`/organizer/events/manage/${assignedEvent.slug}/participants`}><Users className="mr-1.5 h-4 w-4" /> Manage Participants</Link>
                                 </Button>
-                                <Button asChild variant="outline" size="sm">
+                                <Button asChild variant="default" size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">
                                     <Link href={`/organizer/event-tasks`}><CheckSquare className="mr-1.5 h-4 w-4" /> Manage Tasks</Link>
                                 </Button>
                             </div>
@@ -323,6 +331,79 @@ export default function DashboardPage() {
                 </Card>
             )}
         </section>
+
+        <Separator />
+        
+        {tasks.length > 0 && (
+             <section id="my-tasks">
+              <Card className="shadow-md-soft rounded-xl">
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle className="flex items-center gap-2 text-xl text-primary"><ClipboardList className="h-6 w-6"/>My Tasks</CardTitle>
+                      <CardDescription>Tasks assigned to you for your event.</CardDescription>
+                    </div>
+                     <Button asChild variant="outline" size="sm">
+                        <Link href="/organizer/event-tasks">View All My Tasks</Link>
+                    </Button>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+                    <p>Due Today: <Badge variant={tasksDueToday > 0 ? "default" : "outline"}>{tasksDueToday}</Badge></p>
+                    <p>Overdue: <Badge variant={overdueTasks > 0 ? "destructive" : "outline"} className={overdueTasks > 0 ? "" : "text-muted-foreground"}>{overdueTasks}</Badge></p>
+                    <p>This Week: <Badge variant={tasksThisWeek > 0 ? "secondary" : "outline"}>{tasksThisWeek}</Badge></p>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {tasks.length > 0 ? (
+                    <div className="overflow-x-auto rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/20 hover:bg-muted/30">
+                            <TableHead className="w-[50px]"></TableHead>
+                            <TableHead>Task</TableHead>
+                            <TableHead>Due Date</TableHead>
+                            <TableHead>Priority</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {tasks.slice(0, 5).map((task) => ( // Show max 5 tasks in this condensed view
+                            <TableRow key={task.id} className={`hover:bg-muted/50 transition-colors duration-150 ${task.status === 'Completed' ? 'opacity-60' : ''}`}>
+                              <TableCell>
+                                <Checkbox
+                                  checked={task.status === 'Completed'}
+                                  onCheckedChange={() => handleTaskCompletionToggle(task.id)}
+                                  aria-label={`Mark task ${task.title} as ${task.status === 'Completed' ? 'incomplete' : 'complete'}`}
+                                />
+                              </TableCell>
+                              <TableCell className="font-medium max-w-xs truncate hover:underline">
+                                <Link href="/organizer/event-tasks" title={task.title}>{task.title}</Link>
+                              </TableCell>
+                              <TableCell className={`${task.dueDate && isValid(parseISO(task.dueDate)) && isPast(startOfDay(parseISO(task.dueDate))) && task.status !== 'Completed' ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
+                                {task.dueDate && isValid(parseISO(task.dueDate)) ? format(parseISO(task.dueDate), 'MMM dd') : 'N/A'}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={getPriorityBadgeVariant(task.priority)} className="capitalize text-xs py-0.5 px-1.5">{task.priority}</Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={getStatusBadgeVariant(task.status).variant} className={`capitalize text-xs py-0.5 px-1.5 ${getStatusBadgeVariant(task.status).colorClass}`}>{task.status.replace('-', ' ')}</Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ) : (
+                     <div className="text-center py-6 text-muted-foreground">
+                        <CheckSquare className="h-10 w-10 mx-auto mb-2 text-green-500" />
+                        <p>Great job! You have no tasks due.</p>
+                        <p className="text-xs">Check back later or view all event tasks.</p>
+                      </div>
+                  )}
+                </CardContent>
+              </Card>
+            </section>
+        )}
 
         <Separator />
 
@@ -347,21 +428,6 @@ export default function DashboardPage() {
                 </CardContent>
             </Card>
         </section>
-        
-        {userProfile.tasks && userProfile.tasks.length > 0 && (
-          <section>
-            <Card className="shadow-md-soft rounded-xl">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-xl"><ClipboardList className="h-5 w-5 text-primary"/>My Tasks</CardTitle>
-                <CardDescription>Tasks assigned to you. Click to see details (feature coming soon).</CardDescription>
-              </CardHeader>
-              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {userProfile.tasks.map(task => <TaskCard key={task.id} task={task} />)}
-              </CardContent>
-            </Card>
-          </section>
-        )}
-
       </div>
     );
   }
@@ -380,6 +446,7 @@ export default function DashboardPage() {
         { href: '/profile', label: 'My Profile', icon: UserCircle },
         { href: '/notifications', label: 'Notifications', icon: Bell },
         { href: '/ocr-tool', label: 'Scan Forms (OCR)', icon: FileScan },
+        { href: '/organizer/event-tasks', label: 'All Event Tasks', icon: ListChecks },
       ];
       break;
     case 'overall_head':
@@ -389,6 +456,7 @@ export default function DashboardPage() {
         { href: '/organizer/events/manage', label: 'Manage All Events', icon: Briefcase }, 
         { href: '/organizer/registrations', label: 'View Registrations', icon: Users }, 
         { href: '/ocr-tool', label: 'Scan Forms (OCR)', icon: FileScan },
+        { href: '/organizer/event-tasks', label: 'All Event Tasks', icon: ListChecks },
         { href: '/profile', label: 'My Profile', icon: UserCircle }, 
         { href: '/notifications', label: 'Notifications', icon: Bell },
       ];
@@ -401,10 +469,21 @@ export default function DashboardPage() {
         { href: '/organizer/registrations', label: 'View Registrations', icon: Users }, 
         { href: '/admin/users', label: 'Manage Users', icon: Users}, 
         { href: '/ocr-tool', label: 'Scan Forms (OCR)', icon: FileScan },
+        { href: '/organizer/event-tasks', label: 'All Event Tasks', icon: ListChecks },
         { href: '/profile', label: 'My Profile', icon: UserCircle }, 
         { href: '/notifications', label: 'Notifications', icon: Bell },
       ];
       break;
+    case 'test': // Test user with tasks sees this dashboard
+        dashboardTitle = "Test User Dashboard";
+        quickActions = [
+            { href: '/profile', label: 'My Profile', icon: UserCircle },
+            { href: '/notifications', label: 'Notifications', icon: Bell },
+            { href: '/events', label: 'Browse Events', icon: Search },
+            { href: '/ocr-tool', label: 'OCR Tool (Test)', icon: FileScan },
+            { href: '/organizer/event-tasks', label: 'All Event Tasks', icon: ListChecks },
+        ];
+        break;
     default:
       dashboardTitle = "User Dashboard";
   }
@@ -457,14 +536,14 @@ export default function DashboardPage() {
                 </CardContent>
             </Card>
         )}
-         {(userProfile.tasks && userProfile.tasks.length > 0) && (
+         {(tasks.length > 0) && (
             <Card className="shadow-soft rounded-xl">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium text-muted-foreground">Pending Tasks</CardTitle>
                     <ClipboardList className="h-5 w-5 text-blue-500" />
                 </CardHeader>
                 <CardContent>
-                    <div className="text-2xl font-bold text-blue-600">{userProfile.tasks.filter(t => t.status === 'pending' || t.status === 'in-progress').length}</div>
+                    <div className="text-2xl font-bold text-blue-600">{tasks.filter(t => t.status === 'pending' || t.status === 'in-progress' || t.status === 'Not Started').length}</div>
                 </CardContent>
             </Card>
         )}
@@ -486,15 +565,77 @@ export default function DashboardPage() {
       )}
 
 
-      {userProfile.tasks && userProfile.tasks.length > 0 && (
-        <section>
+      {(tasks.length > 0) && (
+        <section id="my-tasks">
           <Card className="shadow-md-soft rounded-xl">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl"><ClipboardList className="h-5 w-5 text-primary"/>My Tasks</CardTitle>
-              <CardDescription>Tasks assigned to you. Click to see details (feature coming soon).</CardDescription>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <div>
+                    <CardTitle className="flex items-center gap-2 text-xl text-primary"><ClipboardList className="h-6 w-6"/>My Tasks</CardTitle>
+                    <CardDescription>Overview of tasks assigned to you.</CardDescription>
+                </div>
+                <Button asChild variant="outline" size="sm">
+                    <Link href="/organizer/event-tasks">View All My Tasks</Link>
+                </Button>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm border-t pt-3">
+                <p>Due Today: <Badge variant={tasksDueToday > 0 ? "default" : "outline"} className="bg-blue-500/10 text-blue-700 border-blue-500/30">{tasksDueToday}</Badge></p>
+                <p>Overdue: <Badge variant={overdueTasks > 0 ? "destructive" : "outline"} className={overdueTasks > 0 ? "" : "text-muted-foreground"}>{overdueTasks}</Badge></p>
+                <p>This Week: <Badge variant={tasksThisWeek > 0 ? "secondary" : "outline"} className="bg-purple-500/10 text-purple-700 border-purple-500/30">{tasksThisWeek}</Badge></p>
+              </div>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {userProfile.tasks.map(task => <TaskCard key={task.id} task={task} />)}
+            <CardContent>
+              {tasks.length > 0 ? (
+                 <div className="overflow-x-auto rounded-md border">
+                    <Table>
+                        <TableHeader>
+                        <TableRow className="bg-muted/20 hover:bg-muted/30">
+                            <TableHead className="w-[50px]"></TableHead>
+                            <TableHead>Task</TableHead>
+                            <TableHead className="w-[100px]">Due</TableHead>
+                            <TableHead className="w-[100px]">Priority</TableHead>
+                            <TableHead className="w-[120px]">Status</TableHead>
+                        </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                        {tasks.slice(0, 7).map((task) => ( // Show max 7 tasks in this condensed view
+                            <TableRow 
+                                key={task.id} 
+                                className={`hover:bg-muted/50 transition-colors duration-150 ${task.status === 'Completed' ? 'opacity-60' : ''}`}
+                            >
+                            <TableCell>
+                                <Checkbox
+                                checked={task.status === 'Completed'}
+                                onCheckedChange={() => handleTaskCompletionToggle(task.id)}
+                                aria-label={`Mark task ${task.title} as ${task.status === 'Completed' ? 'incomplete' : 'complete'}`}
+                                />
+                            </TableCell>
+                            <TableCell className="font-medium max-w-[200px] sm:max-w-xs md:max-w-sm truncate">
+                                <Link href="/organizer/event-tasks" title={task.title} className="hover:underline">{task.title}</Link>
+                            </TableCell>
+                            <TableCell 
+                                className={`text-xs ${task.dueDate && isValid(parseISO(task.dueDate)) && isPast(startOfDay(parseISO(task.dueDate))) && task.status !== 'Completed' ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}
+                            >
+                                {task.dueDate && isValid(parseISO(task.dueDate)) ? format(parseISO(task.dueDate), 'MMM dd') : 'N/A'}
+                            </TableCell>
+                            <TableCell>
+                                <Badge variant={getPriorityBadgeVariant(task.priority)} className="capitalize text-xs py-0.5 px-1.5">{task.priority}</Badge>
+                            </TableCell>
+                            <TableCell>
+                                <Badge variant={getStatusBadgeVariant(task.status).variant} className={`capitalize text-xs py-0.5 px-1.5 ${getStatusBadgeVariant(task.status).colorClass}`}>{task.status.replace('-', ' ')}</Badge>
+                            </TableCell>
+                            </TableRow>
+                        ))}
+                        </TableBody>
+                    </Table>
+                 </div>
+              ) : (
+                <div className="text-center py-6 text-muted-foreground">
+                  <CheckSquare className="h-10 w-10 mx-auto mb-2 text-green-500" />
+                  <p>Great job! You have no tasks assigned.</p>
+                  <p className="text-xs">Check back later or view all event tasks.</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </section>
@@ -537,3 +678,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
