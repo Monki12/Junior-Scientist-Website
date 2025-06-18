@@ -305,7 +305,7 @@ export default function DashboardPage() {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mb-4">
                                 <p className="flex items-center"><UsersRound className="mr-1.5 h-4 w-4 text-accent" /> Registered: <span className="font-semibold ml-1">57</span></p>
                                 <p className="flex items-center"><ListChecks className="mr-1.5 h-4 w-4 text-accent" /> Pending Tasks: <span className="font-semibold ml-1">3</span></p>
-                                <p className="flex items-center col-span-full"><Info className="mr-1.5 h-4 w-4 text-accent" /> Status: <Badge variant="secondary" className="ml-1">Planning</Badge></p>
+                                <div className="flex items-center col-span-full text-sm"><Info className="mr-1.5 h-4 w-4 text-accent" /> Status: <Badge variant="secondary" className="ml-1">Planning</Badge></div>
                             </div>
                             <div className="flex flex-wrap gap-2 mt-4">
                                 <Button asChild variant="outline" size="sm">
