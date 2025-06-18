@@ -14,7 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
-  Loader2, BarChartBig, Edit, Users, FileScan, Settings, BookUser, ListChecks, CalendarDays, UserCircle, Bell, GraduationCap, School, Download, Info, Briefcase, Newspaper, Award, Star, CheckCircle, ClipboardList, TrendingUp, Building, Activity, ShieldCheck, ExternalLink, Home, Search, CalendarCheck, Ticket, Users2, Phone, Mail, Milestone
+  Loader2, BarChartBig, Edit, Users, FileScan, Settings, BookUser, ListChecks, CalendarDays, UserCircle, Bell, GraduationCap, School, Download, Info, Briefcase, Newspaper, Award, Star, CheckCircle, ClipboardList, TrendingUp, Building, Activity, ShieldCheck, ExternalLink, Home, Search, CalendarCheck, Ticket, Users2, Phone, Mail, Milestone, MapPin, Clock, UsersRound, CheckSquare, BarChartHorizontalBig, Rss
 } from 'lucide-react';
 
 interface RegisteredEventDisplay extends SubEvent {
@@ -239,7 +239,7 @@ export default function DashboardPage() {
 
         { (userProfile.role === 'test' && userProfile.tasks && userProfile.tasks.length > 0) && (
             <section>
-            <Card className="shadow-lg">
+            <Card className="shadow-lg rounded-xl">
                 <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-xl"><ClipboardList className="h-5 w-5 text-primary"/>My Tasks (Test User)</CardTitle>
                 <CardDescription>Tasks assigned to you for testing purposes.</CardDescription>
@@ -254,32 +254,134 @@ export default function DashboardPage() {
     );
   }
 
-  // Organizer/Admin/Representative Dashboard (Remains largely unchanged for now)
+  // Event Representative Dashboard
+  if (role === 'event_representative') {
+    const assignedEvent = userProfile.assignedEventSlug ? subEventsData.find(e => e.slug === userProfile.assignedEventSlug) : null;
+
+    return (
+      <div className="space-y-8 animate-fade-in-up">
+        <header className="flex flex-col md:flex-row justify-between items-start gap-4">
+          <div className="flex items-center gap-4">
+            <Avatar className="h-20 w-20 border-2 border-primary">
+              <AvatarImage src={userProfile.photoURL || undefined} alt={userProfile.displayName || 'User'} />
+              <AvatarFallback className="text-2xl bg-primary/10 text-primary">{(userProfile.displayName || userProfile.email || 'U')[0].toUpperCase()}</AvatarFallback>
+            </Avatar>
+            <div>
+              <h1 className="text-3xl md:text-4xl font-bold text-primary">{userProfile.displayName || "Event Representative Dashboard"}</h1>
+              <p className="text-muted-foreground mt-1">{userProfile.email}</p>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mt-1">
+                  <p className="flex items-center gap-1"><ShieldCheck className="h-4 w-4" /> Role: <span className="font-medium text-foreground capitalize">Event Representative</span></p>
+                  {userProfile.department && <p className="flex items-center gap-1"><Building className="h-4 w-4" /> {userProfile.department}</p>}
+              </div>
+            </div>
+          </div>
+        </header>
+        
+        <Separator />
+
+        <section id="event-summary-cards">
+            <h2 className="text-2xl font-semibold text-primary mb-4">My Assigned Event Overview</h2>
+            {assignedEvent ? (
+                <Card className="shadow-md-soft rounded-xl overflow-hidden">
+                    <div className="md:flex">
+                        <div className="md:shrink-0">
+                             <Image 
+                                src={assignedEvent.mainImage.src} 
+                                alt={assignedEvent.mainImage.alt} 
+                                width={300} 
+                                height={200} 
+                                style={{objectFit: 'cover'}} 
+                                className="h-48 w-full md:h-full md:w-64"
+                                data-ai-hint={assignedEvent.mainImage.dataAiHint}
+                            />
+                        </div>
+                        <div className="p-6 flex-grow">
+                            <CardTitle className="text-2xl font-bold text-primary mb-1">{assignedEvent.title}</CardTitle>
+                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mb-3">
+                                {assignedEvent.eventDate && <p className="flex items-center"><CalendarDays className="mr-1.5 h-4 w-4" /> Date: {new Date(assignedEvent.eventDate).toLocaleDateString()}</p>}
+                                <p className="flex items-center"><Clock className="mr-1.5 h-4 w-4" /> Time: (Mock) 10:00 AM</p>
+                                <p className="flex items-center"><MapPin className="mr-1.5 h-4 w-4" /> Venue: (Mock) Main Auditorium</p>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mb-4">
+                                <p className="flex items-center"><UsersRound className="mr-1.5 h-4 w-4 text-accent" /> Registered: <span className="font-semibold ml-1">57</span></p>
+                                <p className="flex items-center"><ListChecks className="mr-1.5 h-4 w-4 text-accent" /> Pending Tasks: <span className="font-semibold ml-1">3</span></p>
+                                <p className="flex items-center col-span-full"><Info className="mr-1.5 h-4 w-4 text-accent" /> Status: <Badge variant="secondary" className="ml-1">Planning</Badge></p>
+                            </div>
+                            <div className="flex flex-wrap gap-2 mt-4">
+                                <Button asChild variant="outline" size="sm">
+                                    <Link href={`/events/${assignedEvent.slug}`}><Info className="mr-1.5 h-4 w-4" /> View Details</Link>
+                                </Button>
+                                <Button variant="outline" size="sm" disabled> {/* Placeholder until page is built */}
+                                    <Users className="mr-1.5 h-4 w-4" /> Manage Participants
+                                </Button>
+                                <Button asChild variant="outline" size="sm">
+                                    <Link href={`/organizer/event-tasks`}><CheckSquare className="mr-1.5 h-4 w-4" /> Manage Tasks</Link>
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </Card>
+            ) : (
+                <Card className="shadow-soft rounded-xl">
+                    <CardContent className="text-center py-10 text-muted-foreground">
+                        <Briefcase className="h-12 w-12 mx-auto mb-3 text-primary/50" />
+                        <p>No event assigned to you currently.</p>
+                    </CardContent>
+                </Card>
+            )}
+        </section>
+
+        <Separator />
+
+        <section id="key-metrics">
+            <h2 className="text-2xl font-semibold text-primary mb-4">Key Metrics at a Glance</h2>
+             <Card className="shadow-soft rounded-xl">
+                <CardContent className="py-6 text-muted-foreground">
+                    <BarChartHorizontalBig className="h-10 w-10 mx-auto mb-3 text-primary/30" />
+                    <p className="text-center">Key metrics and statistics (e.g., total registrations, task completion rate, upcoming critical deadlines) will be displayed here soon.</p>
+                </CardContent>
+            </Card>
+        </section>
+        
+        <Separator />
+
+        <section id="recent-activity">
+            <h2 className="text-2xl font-semibold text-primary mb-4">Recent Activity Feed</h2>
+             <Card className="shadow-soft rounded-xl">
+                <CardContent className="py-6 text-muted-foreground">
+                    <Rss className="h-10 w-10 mx-auto mb-3 text-primary/30" />
+                    <p className="text-center">A feed of recent activities (new registrations, task updates, comments) related to your event(s) will appear here.</p>
+                </CardContent>
+            </Card>
+        </section>
+        
+        {userProfile.tasks && userProfile.tasks.length > 0 && (
+          <section>
+            <Card className="shadow-md-soft rounded-xl">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-xl"><ClipboardList className="h-5 w-5 text-primary"/>My Tasks</CardTitle>
+                <CardDescription>Tasks assigned to you. Click to see details (feature coming soon).</CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {userProfile.tasks.map(task => <TaskCard key={task.id} task={task} />)}
+              </CardContent>
+            </Card>
+          </section>
+        )}
+
+      </div>
+    );
+  }
+  
+  // Organizer, Overall Head, Admin Dashboards
   let dashboardTitle = "User Dashboard";
   let quickActions = [];
   
-  const assignedEvent = role === 'event_representative' && userProfile.assignedEventSlug 
-    ? subEventsData.find(e => e.slug === userProfile.assignedEventSlug) 
-    : null;
-
   const assignedOrganizerEvents = role === 'organizer' && userProfile.assignedEventSlugs
     ? userProfile.assignedEventSlugs.map(slug => subEventsData.find(e => e.slug === slug)?.title).filter(Boolean)
     : [];
 
   switch(role) {
-    case 'event_representative':
-      dashboardTitle = "Event Representative Dashboard";
-      quickActions = [
-        { href: '/profile', label: 'My Profile', icon: UserCircle },
-        { href: '/notifications', label: 'Notifications', icon: Bell },
-      ];
-      if (assignedEvent) {
-        quickActions.unshift({ href: `/organizer/events/manage/${assignedEvent.slug}`, label: 'Manage My Event', icon: Briefcase});
-        quickActions.splice(1,0, { href: `/organizer/event-tasks`, label: 'Event Tasks', icon: ListChecks});
-      } else {
-         quickActions.unshift({ href: '#', label: 'No Event Assigned', icon: Briefcase, disabled: true });
-      }
-      break;
     case 'organizer':
       dashboardTitle = "Organizer Dashboard";
       quickActions = [
@@ -305,18 +407,19 @@ export default function DashboardPage() {
         { href: '/admin/tasks', label: 'Global Task Mgmt', icon: Settings},
         { href: '/organizer/events/manage', label: 'Manage All Events', icon: Briefcase }, 
         { href: '/organizer/registrations', label: 'View Registrations', icon: Users }, 
-        { href: '/admin/users', label: 'Manage Users', icon: Users},
+        { href: '/admin/users', label: 'Manage Users', icon: Users}, // Corrected icon to Users
         { href: '/ocr-tool', label: 'Scan Forms (OCR)', icon: FileScan },
         { href: '/profile', label: 'My Profile', icon: UserCircle }, 
         { href: '/notifications', label: 'Notifications', icon: Bell },
       ];
       break;
     default:
+      // Should not reach here for ER, but good fallback
       dashboardTitle = "User Dashboard";
   }
 
 
-  return (
+  return ( // Fallback for Organizer, Overall Head, Admin
     <div className="space-y-8 animate-fade-in-up">
       <header className="flex flex-col md:flex-row justify-between items-start gap-4">
         <div className="flex items-center gap-4">
@@ -376,20 +479,6 @@ export default function DashboardPage() {
         )}
       </section>
       
-      {role === 'event_representative' && assignedEvent && (
-        <Card className="shadow-md-soft rounded-xl">
-            <CardHeader>
-                <CardTitle className="text-xl text-primary">Managing: {assignedEvent.title}</CardTitle>
-                <CardDescription>{assignedEvent.shortDescription}</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <Link href={`/events/${assignedEvent.slug}`} target="_blank" rel="noopener noreferrer">
-                    <Button variant="outline" className="rounded-md">View Event Page <ExternalLink className="ml-2 h-4 w-4" /></Button>
-                </Link>
-            </CardContent>
-        </Card>
-      )}
-
       {role === 'organizer' && assignedOrganizerEvents.length > 0 && (
         <Card className="shadow-md-soft rounded-xl">
             <CardHeader>
@@ -400,6 +489,7 @@ export default function DashboardPage() {
                 {assignedOrganizerEvents.map(title => (
                     <Badge key={title} variant="secondary" className="mr-2 mb-1 px-3 py-1 rounded-md">{title}</Badge>
                 ))}
+                <Button asChild variant="link" className="text-xs p-0 h-auto mt-2"><Link href="/organizer/events/manage">Manage My Events</Link></Button>
             </CardContent>
         </Card>
       )}
@@ -456,3 +546,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
