@@ -15,7 +15,7 @@ export type TaskStatus = 'Not Started' | 'In Progress' | 'Pending Review' | 'Com
 export interface Task {
   id: string;
   title: string;
-  description: string;
+  description?: string; // Optional as per new form
   assignedTo?: string[]; 
   assignedByName?: string;
   assignedByUid?: string;  
@@ -24,12 +24,12 @@ export interface Task {
   priority: TaskPriority;
   status: TaskStatus;
   points?: number;
-  attachments?: { name: string, url: string }[];
-  subtasks?: { text: string, completed: boolean }[];
+  attachments?: { name: string, url: string }[]; // Kept for future
+  subtasks?: { text: string, completed: boolean }[]; // Kept for future
   createdBy?: string; 
   createdAt: string;      
   updatedAt: string; 
-  customTaskData?: Record<string, any>; // For custom task columns
+  customTaskData?: Record<string, any>; 
 }
 
 export interface RegisteredEventInfo {
@@ -109,7 +109,7 @@ export interface StudentData {
   email: string;
 }
 
-export interface CustomColumnDefinition { // For Participant Custom Columns
+export interface CustomColumnDefinition {
   id: string; 
   name: string; 
   dataType: 'text' | 'number' | 'checkbox' | 'dropdown' | 'date';
@@ -118,17 +118,23 @@ export interface CustomColumnDefinition { // For Participant Custom Columns
   description?: string;
 }
 
-export interface CustomTaskColumnDefinition { // For Task Custom Columns
+export interface CustomTaskColumnDefinition {
   id: string; 
   name: string; 
   dataType: 'text' | 'number' | 'checkbox' | 'dropdown' | 'date';
   options?: string[]; 
   defaultValue?: any;
-  description?: string; // Optional: internal description for the column's purpose
+  description?: string;
 }
 
 
-export type ParticipantCustomData = Record<string, any>;
+export type ParticipantCustomData = Record<string, any> & {
+  levels?: Record<string, { // Keep levels for D-Day page if it's still separate
+    present: boolean;
+    venue?: string;
+    qualified: 'yes' | 'no' | 'auto';
+  }>;
+};
 
 
 export interface EventParticipant {
@@ -142,7 +148,7 @@ export interface EventParticipant {
   customData?: ParticipantCustomData; 
 }
 
-export interface ActiveDynamicFilter { // For Participant Page
+export interface ActiveDynamicFilter {
   id: string;
   columnId: string;
   columnName: string;
@@ -150,10 +156,10 @@ export interface ActiveDynamicFilter { // For Participant Page
   isCustom: boolean;
 }
 
-export interface ActiveTaskFilter { // For Task Page
+export interface ActiveTaskFilter {
   id: string;
   columnId: string; // keyof Task or custom column id
   columnName: string;
   value: string;
-  isCustom?: boolean; // true if it's a custom task column
+  isCustom?: boolean; 
 }

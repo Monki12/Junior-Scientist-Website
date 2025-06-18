@@ -21,25 +21,26 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO, isValid, isPast, parse, startOfDay } from 'date-fns';
+import { format, parseISO, isValid, isPast, startOfDay, differenceInDays, addDays } from 'date-fns';
 import {
-  ListChecks, ShieldAlert, Loader2, Search, Filter, PlusCircle, Edit2, Trash2, CalendarIcon, ArrowUpDown, Tag, XIcon, ChevronDown, Rows
+  ListChecks, ShieldAlert, Loader2, Search, Filter, PlusCircle, Edit2, Trash2, CalendarIcon, ArrowUpDown, Tag, XIcon, ChevronDown, Rows, GanttChartSquare
 } from 'lucide-react';
 
-// Mock users for assignment (in a real app, this would come from user data based on event context)
 const mockAssignableUsersForEvent = [
   'Alice (Organizer)', 
   'Bob (Event Rep for this Event)', 
   'Carol (Overall Head)', 
   'David (Organizer)',
-  'Self (Current User)' // Special keyword
+  'Self (Current User)' 
 ];
 
 const initialMockTasks: Task[] = [
-  { id: 'task-1', title: 'Prepare Quiz Questions Set A', description: 'Create 50 multiple choice questions for round 1.', assignedTo: ['Alice (Organizer)'], dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(), priority: 'High', status: 'In Progress', eventSlug: 'ex-quiz-it', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), createdBy: 'Event Rep Bob', customTaskData: { notes: 'Focus on STEM', difficulty: 5 } },
-  { id: 'task-2', title: 'Book Auditorium', description: 'Finalize booking for the main hall for Dec 5th.', assignedTo: ['Self (Current User)'], dueDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), priority: 'High', status: 'Pending Review', eventSlug: 'ex-quiz-it', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), createdBy: 'Event Rep Bob' },
-  { id: 'task-3', title: 'Design Participation Certificates', description: 'Create a template for certificates.', assignedTo: ['Carol (Overall Head)'], dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), priority: 'Medium', status: 'Not Started', eventSlug: 'ex-quiz-it', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), createdBy: 'Event Rep Bob' },
-  { id: 'task-4', title: 'Arrange Volunteer Refreshments', description: 'Coordinate with catering for volunteer snacks and drinks.', assignedTo: ['Bob (Event Rep for this Event)'], dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(), priority: 'Low', status: 'Completed', eventSlug: 'ex-quiz-it', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), createdBy: 'Admin' },
+  { id: 'task-1', title: 'Prepare Quiz Questions Set A', description: 'Create 50 multiple choice questions for round 1.', assignedTo: ['Alice (Organizer)'], dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(), priority: 'High', status: 'In Progress', eventSlug: 'ex-quiz-it', createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), updatedAt: new Date().toISOString(), createdBy: 'Event Rep Bob', customTaskData: { notes: 'Focus on STEM', difficulty: 5 } },
+  { id: 'task-2', title: 'Book Auditorium', description: 'Finalize booking for the main hall for Dec 5th.', assignedTo: ['Self (Current User)'], dueDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), priority: 'High', status: 'Pending Review', eventSlug: 'ex-quiz-it', createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), updatedAt: new Date().toISOString(), createdBy: 'Event Rep Bob' },
+  { id: 'task-3', title: 'Design Participation Certificates', description: 'Create a template for certificates.', assignedTo: ['Carol (Overall Head)'], dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), priority: 'Medium', status: 'Not Started', eventSlug: 'ex-quiz-it', createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), updatedAt: new Date().toISOString(), createdBy: 'Event Rep Bob' },
+  { id: 'task-4', title: 'Arrange Volunteer Refreshments', description: 'Coordinate with catering for volunteer snacks and drinks.', assignedTo: ['Bob (Event Rep for this Event)'], dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(), priority: 'Low', status: 'Completed', eventSlug: 'ex-quiz-it', createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), updatedAt: new Date().toISOString(), createdBy: 'Admin' },
+  { id: 'task-5', title: 'Setup Online Registration Form', description: 'Deploy and test the online registration portal for the event.', assignedTo: ['David (Organizer)', 'Self (Current User)'], dueDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(), priority: 'High', status: 'Not Started', eventSlug: 'ex-quiz-it', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), createdBy: 'Event Rep Bob' },
+  { id: 'task-6', title: 'Finalize Judge Panel', description: 'Confirm availability of all judges for the main event days.', assignedTo: ['Carol (Overall Head)'], dueDate: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).toISOString(), priority: 'Medium', status: 'In Progress', eventSlug: 'ex-quiz-it', createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(), updatedAt: new Date().toISOString(), createdBy: 'Event Rep Bob' },
 ];
 
 const defaultTaskFormState = {
@@ -64,6 +65,88 @@ const standardTaskFilterColumns: Array<{id: keyof Task | string, name: string, i
     { id: 'status', name: 'Status' },
 ];
 
+type TaskViewMode = 'list' | 'timeline';
+
+
+const getPriorityBadgeVariant = (priority: TaskPriority) => {
+  if (priority === 'High') return 'destructive';
+  if (priority === 'Medium') return 'secondary'; 
+  return 'outline'; 
+};
+
+const getStatusBadgeVariant = (status: TaskStatus): { variant: "default" | "secondary" | "outline" | "destructive", colorClass: string } => {
+  switch (status) {
+    case 'Completed': return { variant: 'default', colorClass: 'bg-green-500/10 border-green-500/30 text-green-700 dark:bg-green-700/20 dark:text-green-300' };
+    case 'In Progress': return { variant: 'secondary', colorClass: 'bg-blue-500/10 border-blue-500/30 text-blue-700 dark:bg-blue-700/20 dark:text-blue-300' };
+    case 'Pending Review': return { variant: 'outline', colorClass: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-700 dark:bg-yellow-700/20 dark:text-yellow-300' };
+    case 'Not Started': return { variant: 'outline', colorClass: 'bg-slate-500/10 border-slate-500/30 text-slate-700 dark:bg-slate-700/20 dark:text-slate-300' };
+    default: return { variant: 'outline', colorClass: 'bg-muted text-muted-foreground border-border' };
+  }
+};
+
+
+// Basic Timeline View Component (Placeholder)
+const BasicTimelineView = ({ tasks }: { tasks: Task[] }) => {
+  if (tasks.length === 0) {
+    return <div className="text-center py-10 text-muted-foreground">No tasks to display in timeline view.</div>;
+  }
+
+  // Determine a rough overall start and end date for the timeline display
+  const allDates = tasks.flatMap(task => [
+    task.createdAt ? parseISO(task.createdAt) : new Date(),
+    task.dueDate ? parseISO(task.dueDate) : addDays(new Date(), 1)
+  ]).filter(date => isValid(date));
+
+  const overallStartDate = allDates.length > 0 ? new Date(Math.min(...allDates.map(d => d.getTime()))) : new Date();
+  const overallEndDate = allDates.length > 0 ? new Date(Math.max(...allDates.map(d => d.getTime()))) : addDays(new Date(), 7);
+  const totalTimelineDays = Math.max(1, differenceInDays(overallEndDate, overallStartDate));
+
+  return (
+    <Card className="shadow-lg mt-6">
+      <CardHeader>
+        <CardTitle>Task Timeline (Basic View)</CardTitle>
+        <CardDescription>A simplified visual representation of task durations.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3 overflow-x-auto p-4">
+        <div className="relative min-w-[800px]" style={{ height: `${tasks.length * 40 + 50}px` }}>
+          {/* Mock time scale */}
+          <div className="flex justify-between text-xs text-muted-foreground border-b pb-1 mb-2">
+            <span>{format(overallStartDate, 'MMM dd')}</span>
+            <span>Timeline Span: ~{totalTimelineDays} days</span>
+            <span>{format(overallEndDate, 'MMM dd')}</span>
+          </div>
+
+          {tasks.map((task, index) => {
+            const taskStartDate = task.createdAt && isValid(parseISO(task.createdAt)) ? parseISO(task.createdAt) : overallStartDate;
+            const taskDueDate = task.dueDate && isValid(parseISO(task.dueDate)) ? parseISO(task.dueDate) : overallEndDate;
+            
+            const startOffsetPercent = (differenceInDays(taskStartDate, overallStartDate) / totalTimelineDays) * 100;
+            const durationPercent = (differenceInDays(taskDueDate, taskStartDate) / totalTimelineDays) * 100;
+            
+            const { colorClass } = getStatusBadgeVariant(task.status);
+
+            return (
+              <div
+                key={task.id}
+                className={`absolute h-8 rounded flex items-center px-2 text-xs shadow-sm ${colorClass}`}
+                style={{
+                  top: `${index * 40 + 30}px`,
+                  left: `${Math.max(0, Math.min(100, startOffsetPercent))}%`,
+                  width: `${Math.max(5, Math.min(100 - startOffsetPercent, durationPercent))}%`, // Ensure minimum width for visibility
+                  minWidth: '50px', // Ensure task bar is clickable/visible
+                }}
+                title={`${task.title} (Status: ${task.status})`}
+              >
+                <span className="truncate text-white mix-blend-difference">{task.title}</span>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
 
 export default function EventTasksPage() {
   const router = useRouter();
@@ -73,6 +156,7 @@ export default function EventTasksPage() {
   const [tasks, setTasks] = useState<Task[]>(initialMockTasks);
   const [eventTitle, setEventTitle] = useState<string>('Event Tasks');
   const [isClient, setIsClient] = useState(false);
+  const [currentView, setCurrentView] = useState<TaskViewMode>('list');
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<TaskStatus | 'All'>('All');
@@ -123,10 +207,11 @@ export default function EventTasksPage() {
       } else if (userProfile.role === 'event_representative' && userProfile.assignedEventSlug) {
         const assignedEvent = subEventsData.find(e => e.slug === userProfile.assignedEventSlug);
         setEventTitle(assignedEvent ? `Tasks for "${assignedEvent.title}"` : 'My Event Tasks');
+        // Filter initial tasks for the specific event if ER
         setTasks(initialMockTasks.filter(t => t.eventSlug === userProfile.assignedEventSlug));
       } else if (userProfile.role === 'overall_head' || userProfile.role === 'admin') {
         setEventTitle('All Event Tasks Overview');
-        setTasks(initialMockTasks); 
+        setTasks(initialMockTasks); // Show all tasks for OH/Admin
       }
     } else if (!authLoading && !userProfile) {
       router.push('/login?redirect=/organizer/event-tasks');
@@ -141,30 +226,30 @@ export default function EventTasksPage() {
 
     let finalAssignedTo = currentTaskForm.assignedTo;
     if (currentTaskForm.assignedTo.includes('Self (Current User)') && userProfile?.displayName) {
-      finalAssignedTo = finalAssignedTo.map(u => u === 'Self (Current User)' ? userProfile.displayName! : u);
+      finalAssignedTo = finalAssignedTo.map(u => u === 'Self (Current User)' ? userProfile.displayName! : u).filter((value, index, self) => self.indexOf(value) === index);
     }
     
     const taskDataToSave = {
       ...currentTaskForm,
       assignedTo: finalAssignedTo,
       dueDate: currentTaskForm.dueDate!.toISOString(),
+      updatedAt: new Date().toISOString(),
     };
-
 
     if (editingTaskId) { 
       setTasks(prev => prev.map(task => task.id === editingTaskId ? {
         ...task,
         ...taskDataToSave,
-        updatedAt: new Date().toISOString(),
+        // Retain original customData if not editing it through this form
+        customTaskData: tasks.find(t => t.id === editingTaskId)?.customTaskData || {},
       } : task));
       toast({ title: "Task Updated", description: `Task "${currentTaskForm.title}" has been updated.` });
     } else { 
       const newTask: Task = {
         id: `task-${Date.now()}`,
         ...taskDataToSave,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
         createdBy: userProfile?.displayName || 'Current User',
+        createdAt: new Date().toISOString(),
         eventSlug: (userProfile?.role === 'event_representative' && userProfile.assignedEventSlug) ? userProfile.assignedEventSlug : 'general',
         customTaskData: customTaskColumnDefinitions.reduce((acc, colDef) => {
           acc[colDef.id] = colDef.defaultValue || getInitialValueForTaskDataType(colDef.dataType);
@@ -187,9 +272,14 @@ export default function EventTasksPage() {
     }
 
     setCurrentTaskForm({
-      ...task,
+      id: task.id,
+      title: task.title,
+      description: task.description || '',
       assignedTo: assignedToForForm,
       dueDate: task.dueDate ? parseISO(task.dueDate) : undefined,
+      priority: task.priority,
+      status: task.status,
+      points: task.points || 0,
     });
     setIsTaskFormDialogOpen(true);
   };
@@ -225,13 +315,12 @@ export default function EventTasksPage() {
   };
 
   const priorityOrder: Record<TaskPriority, number> = { 'High': 1, 'Medium': 2, 'Low': 3 };
-  const statusOrder: Record<TaskStatus, number> = { 'Pending Review': 1, 'In Progress': 2, 'Not Started': 3, 'Completed': 4 };
+  const statusOrder: Record<TaskStatus, number> = { 'Not Started': 1, 'In Progress': 2, 'Pending Review': 3, 'Completed': 4 };
 
 
   const filteredAndSortedTasks = useMemo(() => {
     let sortableTasks = [...tasks];
     
-    // Static Filters
     sortableTasks = sortableTasks.filter(task => {
       const searchTermLower = searchTerm.toLowerCase();
       const assignedToFilterLower = assignedToFilter.toLowerCase();
@@ -248,7 +337,6 @@ export default function EventTasksPage() {
       return matchesSearch && matchesAssignedTo && matchesStatus && matchesPriority;
     });
 
-    // Dynamic Filters
     if (activeDynamicFilters.length > 0) {
         sortableTasks = sortableTasks.filter(task => {
             return activeDynamicFilters.every(filter => {
@@ -260,7 +348,7 @@ export default function EventTasksPage() {
                 }
 
                 if (taskValue === undefined || taskValue === null) {
-                    return filter.value.toLowerCase() === 'false' && typeof taskValue === 'boolean' ? true : false;
+                     return filter.value.toLowerCase() === 'false' && typeof taskValue === 'boolean' ? true : false;
                 }
                 
                 const valueStr = String(taskValue).toLowerCase();
@@ -270,14 +358,13 @@ export default function EventTasksPage() {
                     return taskValue.some(assignee => String(assignee).toLowerCase().includes(filterValueStr));
                 }
                 if (typeof taskValue === 'boolean') {
-                    return filterValueStr === valueStr;
+                    return filterValueStr === String(taskValue).toLowerCase();
                 }
                 return valueStr.includes(filterValueStr);
             });
         });
     }
 
-    // Sorting
     if (sortConfig.key) {
       sortableTasks.sort((a, b) => {
         let valA = a[sortConfig.key! as keyof Task];
@@ -316,18 +403,6 @@ export default function EventTasksPage() {
     return sortableTasks;
   }, [tasks, searchTerm, statusFilter, priorityFilter, assignedToFilter, activeDynamicFilters, sortConfig]);
   
-  const getPriorityBadgeVariant = (priority: TaskPriority) => {
-    if (priority === 'High') return 'destructive';
-    if (priority === 'Medium') return 'secondary'; // Yellowish in some themes
-    return 'outline'; // Bluish or default for Low
-  };
-  
-  const getStatusBadgeVariant = (status: TaskStatus) => {
-    if (status === 'Completed') return 'default'; // Greenish/default prominent
-    if (status === 'In Progress') return 'secondary'; // Blueish/standard secondary
-    if (status === 'Pending Review') return 'outline'; // Yellowish/orangish
-    return 'outline'; // Grey/neutral for 'Not Started'
-  };
 
   const handleAddDynamicFilter = () => {
     if (newFilterColumn && newFilterValue.trim() !== '') {
@@ -471,10 +546,10 @@ export default function EventTasksPage() {
   };
 
   const activeFiltersForDisplay = [
-    searchTerm && { label: 'Search', value: searchTerm },
-    statusFilter !== 'All' && { label: 'Status', value: statusFilter },
-    priorityFilter !== 'All' && { label: 'Priority', value: priorityFilter },
-    assignedToFilter && { label: 'Assigned To', value: assignedToFilter },
+    searchTerm && { label: 'Search', value: searchTerm, id: 'search', isDynamic: false },
+    statusFilter !== 'All' && { label: 'Status', value: statusFilter, id: 'status', isDynamic: false },
+    priorityFilter !== 'All' && { label: 'Priority', value: priorityFilter, id: 'priority', isDynamic: false },
+    assignedToFilter && { label: 'Assigned To', value: assignedToFilter, id: 'assignedTo', isDynamic: false },
     ...activeDynamicFilters.map(df => ({ label: df.columnName, value: df.value, id: df.id, isDynamic: true }))
   ].filter(Boolean);
 
@@ -490,8 +565,19 @@ export default function EventTasksPage() {
             <CardDescription>Manage, assign, and track tasks for your event(s).</CardDescription>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" disabled className="text-muted-foreground">
-                <Rows className="mr-2 h-4 w-4"/> Timeline View (Soon)
+            <Button 
+                variant={currentView === 'list' ? 'secondary' : 'outline'} 
+                onClick={() => setCurrentView('list')}
+                className="shadow-sm hover:shadow-md transition-shadow"
+            >
+                <Rows className="mr-2 h-4 w-4"/> List View
+            </Button>
+            <Button 
+                variant={currentView === 'timeline' ? 'secondary' : 'outline'} 
+                onClick={() => setCurrentView('timeline')}
+                className="shadow-sm hover:shadow-md transition-shadow"
+            >
+                <GanttChartSquare className="mr-2 h-4 w-4"/> Timeline View
             </Button>
             <Dialog open={isTaskFormDialogOpen} onOpenChange={(isOpen) => {
                 setIsTaskFormDialogOpen(isOpen);
@@ -501,7 +587,7 @@ export default function EventTasksPage() {
                 }
             }}>
                 <DialogTrigger asChild>
-                <Button className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-soft hover:shadow-md-soft" onClick={() => { setEditingTaskId(null); setCurrentTaskForm(defaultTaskFormState); setIsTaskFormDialogOpen(true); }}>
+                <Button className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-soft hover:shadow-md-soft transition-all hover:scale-105" onClick={() => { setEditingTaskId(null); setCurrentTaskForm(defaultTaskFormState); setIsTaskFormDialogOpen(true); }}>
                     <PlusCircle className="mr-2 h-5 w-5" /> Add New Task
                 </Button>
                 </DialogTrigger>
@@ -542,7 +628,7 @@ export default function EventTasksPage() {
                                         const newAssignedTo = checked 
                                         ? [...f.assignedTo, user] 
                                         : f.assignedTo.filter(u => u !== user);
-                                        return { ...f, assignedTo: newAssignedTo };
+                                        return { ...f, assignedTo: newAssignedTo.filter((v, i, a) => a.indexOf(v) === i) }; // Ensure uniqueness
                                     });
                                     }}
                                 >
@@ -599,18 +685,18 @@ export default function EventTasksPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
-            <div className="relative md:col-span-2 lg:col-span-1">
-                <Label htmlFor="search-tasks">Search</Label>
+          <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+            <div className="relative">
+                <Label htmlFor="search-tasks">Search Tasks</Label>
                 <Search className="absolute left-2.5 top-[calc(50%+0.3rem)] -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input id="search-tasks" placeholder="Title, description..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-9" />
             </div>
              <div>
-                <Label htmlFor="assignedTo-filter">Assigned To</Label>
+                <Label htmlFor="assignedTo-filter">Filter Assigned To</Label>
                 <Input id="assignedTo-filter" placeholder="Assignee name..." value={assignedToFilter} onChange={e => setAssignedToFilter(e.target.value)} />
             </div>
             <div>
-                <Label htmlFor="status-filter">Status</Label>
+                <Label htmlFor="status-filter">Filter Status</Label>
                 <Select value={statusFilter} onValueChange={(value: TaskStatus | 'All') => setStatusFilter(value)}>
                 <SelectTrigger id="status-filter"><SelectValue placeholder="Filter by status..." /></SelectTrigger>
                 <SelectContent>
@@ -623,7 +709,7 @@ export default function EventTasksPage() {
                 </Select>
             </div>
             <div>
-                <Label htmlFor="priority-filter">Priority</Label>
+                <Label htmlFor="priority-filter">Filter Priority</Label>
                 <Select value={priorityFilter} onValueChange={(value: TaskPriority | 'All') => setPriorityFilter(value)}>
                 <SelectTrigger id="priority-filter"><SelectValue placeholder="Filter by priority..." /></SelectTrigger>
                 <SelectContent>
@@ -634,16 +720,18 @@ export default function EventTasksPage() {
                 </SelectContent>
                 </Select>
             </div>
-             <Popover open={isAddFilterPopoverOpen} onOpenChange={setIsAddFilterPopoverOpen}>
+          </div>
+           <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+            <Popover open={isAddFilterPopoverOpen} onOpenChange={setIsAddFilterPopoverOpen}>
                 <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full md:w-auto mt-auto">
+                    <Button variant="outline" className="w-full md:w-auto">
                         <Tag className="mr-2 h-4 w-4" /> Add Dynamic Filter
                     </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-80">
                     <div className="grid gap-4">
                         <div className="space-y-2">
-                            <h4 className="font-medium leading-none">Add New Filter</h4>
+                            <h4 className="font-medium leading-none">Add New Dynamic Filter</h4>
                             <p className="text-sm text-muted-foreground">Select a column and value to filter tasks.</p>
                         </div>
                         <div className="grid gap-2">
@@ -681,17 +769,16 @@ export default function EventTasksPage() {
                     </div>
                 </PopoverContent>
             </Popover>
-          </div>
             {activeFiltersForDisplay.length > 0 && (
-                <div className="mb-4 space-y-2">
-                    <div className="flex flex-wrap gap-2 items-center">
-                    <Label className="text-sm font-medium">Active Filters:</Label>
+                <div className="space-y-1">
+                    <Label className="text-xs font-medium text-muted-foreground">Active Filters:</Label>
+                    <div className="flex flex-wrap gap-1.5 items-center">
                     {activeFiltersForDisplay.map((filter: any) => (
-                        <Badge key={filter.id || filter.label} variant="secondary" className="flex items-center gap-1 pr-1">
-                        {filter.label}: &quot;{filter.value}&quot;
+                        <Badge key={filter.id || filter.label} variant="secondary" className="flex items-center gap-1 pr-1 text-xs py-0.5 px-1.5 rounded">
+                        {filter.label}: {filter.value}
                         {filter.isDynamic && (
                              <button onClick={() => removeDynamicFilter(filter.id)} className="ml-1 rounded-full hover:bg-muted-foreground/20 p-0.5">
-                                <XIcon className="h-3 w-3" />
+                                <XIcon className="h-2.5 w-2.5" />
                                 <span className="sr-only">Remove filter</span>
                             </button>
                         )}
@@ -700,31 +787,33 @@ export default function EventTasksPage() {
                     </div>
                 </div>
             )}
+          </div>
 
 
-          {filteredAndSortedTasks.length > 0 ? (
+          {currentView === 'list' ? (
+            filteredAndSortedTasks.length > 0 ? (
             <div className="overflow-x-auto rounded-md border">
               <Table>
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="bg-muted/50">
                     <TableHead className="w-[50px]"></TableHead>
-                    <TableHead className="cursor-pointer hover:bg-muted/50 group" onClick={() => requestSort('title')}>
+                    <TableHead className="cursor-pointer hover:bg-muted/80 group" onClick={() => requestSort('title')}>
                         <div className="flex items-center gap-1">
                             Task Title {getSortIndicator('title')}
                         </div>
                     </TableHead>
                     <TableHead>Assigned To</TableHead>
-                    <TableHead className="cursor-pointer hover:bg-muted/50 group" onClick={() => requestSort('dueDate')}>
+                    <TableHead className="cursor-pointer hover:bg-muted/80 group" onClick={() => requestSort('dueDate')}>
                          <div className="flex items-center gap-1">
                             Due Date {getSortIndicator('dueDate')}
                         </div>
                     </TableHead>
-                    <TableHead className="cursor-pointer hover:bg-muted/50 group" onClick={() => requestSort('priority')}>
+                    <TableHead className="cursor-pointer hover:bg-muted/80 group" onClick={() => requestSort('priority')}>
                         <div className="flex items-center gap-1">
                             Priority {getSortIndicator('priority')}
                         </div>
                     </TableHead>
-                     <TableHead className="cursor-pointer hover:bg-muted/50 group" onClick={() => requestSort('status')}>
+                     <TableHead className="cursor-pointer hover:bg-muted/80 group" onClick={() => requestSort('status')}>
                         <div className="flex items-center gap-1">
                             Status {getSortIndicator('status')}
                         </div>
@@ -788,7 +877,10 @@ export default function EventTasksPage() {
                 </TableHeader>
                 <TableBody>
                   {filteredAndSortedTasks.map((task) => (
-                    <TableRow key={task.id} className={`hover:bg-muted/20 ${task.status === 'Completed' ? 'opacity-70 bg-green-500/5' : ''} ${taskToDelete?.id === task.id ? 'bg-destructive/20' : ''}`}>
+                    <TableRow 
+                        key={task.id} 
+                        className={`hover:bg-muted/30 transition-colors duration-150 ${task.status === 'Completed' ? 'opacity-60 bg-green-500/5' : ''} ${taskToDelete?.id === task.id ? 'bg-destructive/10' : ''}`}
+                    >
                       <TableCell>
                         <Checkbox
                           checked={task.status === 'Completed'}
@@ -797,15 +889,15 @@ export default function EventTasksPage() {
                         />
                       </TableCell>
                       <TableCell className="font-medium max-w-xs truncate" title={task.title}>{task.title}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground max-w-[150px] truncate">{task.assignedTo && task.assignedTo.length > 0 ? task.assignedTo.join(', ') : 'Unassigned'}</TableCell>
-                      <TableCell className={`${task.dueDate && isPast(startOfDay(parseISO(task.dueDate))) && task.status !== 'Completed' ? 'text-red-600 font-semibold' : ''}`}>
+                      <TableCell className="text-xs text-muted-foreground max-w-[150px] truncate">{task.assignedTo && task.assignedTo.length > 0 ? task.assignedTo.join(', ') : <span className="italic">Unassigned</span>}</TableCell>
+                      <TableCell className={`${task.dueDate && isPast(startOfDay(parseISO(task.dueDate))) && task.status !== 'Completed' ? 'text-red-600 font-semibold animate-pulse' : 'text-muted-foreground'}`}>
                         {task.dueDate && isValid(parseISO(task.dueDate)) ? format(parseISO(task.dueDate), 'MMM dd, yyyy') : 'N/A'}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={getPriorityBadgeVariant(task.priority)} className="capitalize">{task.priority}</Badge>
+                        <Badge variant={getPriorityBadgeVariant(task.priority)} className="capitalize text-xs py-0.5 px-2">{task.priority}</Badge>
                       </TableCell>
                       <TableCell>
-                         <Badge variant={getStatusBadgeVariant(task.status)} className="capitalize">{task.status.replace('-', ' ')}</Badge>
+                         <Badge variant={getStatusBadgeVariant(task.status).variant} className={`capitalize text-xs py-0.5 px-2 ${getStatusBadgeVariant(task.status).colorClass}`}>{task.status.replace('-', ' ')}</Badge>
                       </TableCell>
                        {customTaskColumnDefinitions.map(colDef => (
                         <TableCell key={colDef.id}>
@@ -813,11 +905,11 @@ export default function EventTasksPage() {
                         </TableCell>
                       ))}
                       <TableCell className="text-right space-x-1">
-                        <Button variant="ghost" size="icon" className="hover:bg-muted/50" onClick={() => openEditTaskDialog(task)}>
+                        <Button variant="ghost" size="icon" className="hover:bg-muted/50 h-8 w-8" onClick={() => openEditTaskDialog(task)}>
                           <Edit2 className="h-4 w-4" />
                            <span className="sr-only">Edit Task</span>
                         </Button>
-                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/80 hover:bg-destructive/10" onClick={() => openDeleteConfirmDialog(task)}>
+                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/80 hover:bg-destructive/10 h-8 w-8" onClick={() => openDeleteConfirmDialog(task)}>
                           <Trash2 className="h-4 w-4" />
                            <span className="sr-only">Delete Task</span>
                         </Button>
@@ -828,11 +920,13 @@ export default function EventTasksPage() {
               </Table>
             </div>
           ) : (
-            <div className="text-center py-10 text-muted-foreground">
-              <Filter className="h-12 w-12 mx-auto mb-3 text-primary/50" />
-              <p className="text-lg">No tasks match the current filters.</p>
-              <p className="text-sm">Try adjusting your search or click 'Add New Task' to get started.</p>
+            <div className="text-center py-10 text-muted-foreground border rounded-md">
+              <Filter className="h-12 w-12 mx-auto mb-3 text-primary/30" />
+              <p className="text-lg">No tasks match your current filters.</p>
+              <p className="text-sm">Try adjusting your search criteria or add a new task.</p>
             </div>
+          )) : (
+            <BasicTimelineView tasks={filteredAndSortedTasks} />
           )}
         </CardContent>
       </Card>
@@ -860,4 +954,3 @@ export default function EventTasksPage() {
     </div>
   );
 }
-
