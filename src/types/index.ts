@@ -16,19 +16,20 @@ export interface Task {
   id: string;
   title: string;
   description: string;
-  assignedTo?: string[]; // Array of user names or IDs
+  assignedTo?: string[]; 
   assignedByName?: string;
   assignedByUid?: string;  
   eventSlug?: string;      
-  dueDate?: string; // ISO string date
+  dueDate?: string; 
   priority: TaskPriority;
   status: TaskStatus;
   points?: number;
-  attachments?: { name: string, url: string }[]; // Array of attachment objects
+  attachments?: { name: string, url: string }[];
   subtasks?: { text: string, completed: boolean }[];
-  createdBy?: string; // User ID or name
-  createdAt: string; // ISO string date       
-  updatedAt: string; // ISO string date
+  createdBy?: string; 
+  createdAt: string;      
+  updatedAt: string; 
+  customTaskData?: Record<string, any>; // For custom task columns
 }
 
 export interface RegisteredEventInfo {
@@ -108,7 +109,7 @@ export interface StudentData {
   email: string;
 }
 
-export interface CustomColumnDefinition {
+export interface CustomColumnDefinition { // For Participant Custom Columns
   id: string; 
   name: string; 
   dataType: 'text' | 'number' | 'checkbox' | 'dropdown' | 'date';
@@ -116,6 +117,16 @@ export interface CustomColumnDefinition {
   defaultValue?: any;
   description?: string;
 }
+
+export interface CustomTaskColumnDefinition { // For Task Custom Columns
+  id: string; 
+  name: string; 
+  dataType: 'text' | 'number' | 'checkbox' | 'dropdown' | 'date';
+  options?: string[]; 
+  defaultValue?: any;
+  description?: string; // Optional: internal description for the column's purpose
+}
+
 
 export type ParticipantCustomData = Record<string, any>;
 
@@ -128,5 +139,21 @@ export interface EventParticipant {
   schoolName?: string;
   registrationDate: string; 
   paymentStatus: 'paid' | 'pending' | 'waived' | 'failed';
-  customData?: ParticipantCustomData;
+  customData?: ParticipantCustomData; 
+}
+
+export interface ActiveDynamicFilter { // For Participant Page
+  id: string;
+  columnId: string;
+  columnName: string;
+  value: string;
+  isCustom: boolean;
+}
+
+export interface ActiveTaskFilter { // For Task Page
+  id: string;
+  columnId: string; // keyof Task or custom column id
+  columnName: string;
+  value: string;
+  isCustom?: boolean; // true if it's a custom task column
 }
