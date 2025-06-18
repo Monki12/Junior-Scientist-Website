@@ -85,8 +85,6 @@ export default function DashboardPage() {
             teamName: registeredInfo.teamName, 
             teamMembers: registeredInfo.teamMembers,
             admitCardStatus: registeredInfo.admitCardStatus,
-            // eventDate is already on subEventData, but if we need to override from registration:
-            // eventDate: registeredInfo.eventDate || eventDetail.eventDate 
           };
         }
         return null; 
@@ -95,7 +93,6 @@ export default function DashboardPage() {
 
     return (
       <div className="space-y-10 animate-fade-in-up">
-        {/* Student Identity Section */}
         <Card className="shadow-md-soft rounded-xl overflow-hidden">
           <CardContent className="p-6 flex flex-col sm:flex-row items-center gap-6 bg-gradient-to-br from-primary/5 via-background to-background">
             <Avatar className="h-24 w-24 text-3xl border-2 border-primary shadow-md shrink-0">
@@ -126,7 +123,6 @@ export default function DashboardPage() {
         
         <Separator />
 
-        {/* My Registered Events Section */}
         <section id="my-events">
           <h2 className="text-2xl font-semibold text-primary mb-1">My Registered Events</h2>
           <p className="text-muted-foreground mb-6">Events you are currently participating in.</p>
@@ -184,7 +180,6 @@ export default function DashboardPage() {
 
         <Separator />
         
-        {/* Admit Card Section */}
         <section id="admit-cards">
           <h2 className="text-2xl font-semibold text-primary mb-1">Admit Cards</h2>
           <p className="text-muted-foreground mb-6">Download your admit cards for upcoming events.</p>
@@ -222,7 +217,6 @@ export default function DashboardPage() {
 
         <Separator />
 
-        {/* Teams Section Placeholder */}
         <section id="teams">
              <h2 className="text-2xl font-semibold text-primary mb-1">My Teams</h2>
             <p className="text-muted-foreground mb-6">Manage your teams for group events.</p>
@@ -254,7 +248,6 @@ export default function DashboardPage() {
     );
   }
 
-  // Event Representative Dashboard
   if (role === 'event_representative') {
     const assignedEvent = userProfile.assignedEventSlug ? subEventsData.find(e => e.slug === userProfile.assignedEventSlug) : null;
 
@@ -311,8 +304,8 @@ export default function DashboardPage() {
                                 <Button asChild variant="outline" size="sm">
                                     <Link href={`/events/${assignedEvent.slug}`}><Info className="mr-1.5 h-4 w-4" /> View Details</Link>
                                 </Button>
-                                <Button variant="outline" size="sm" disabled> {/* Placeholder until page is built */}
-                                    <Users className="mr-1.5 h-4 w-4" /> Manage Participants
+                                <Button asChild variant="outline" size="sm">
+                                    <Link href={`/organizer/events/manage/${assignedEvent.slug}/participants`}><Users className="mr-1.5 h-4 w-4" /> Manage Participants</Link>
                                 </Button>
                                 <Button asChild variant="outline" size="sm">
                                     <Link href={`/organizer/event-tasks`}><CheckSquare className="mr-1.5 h-4 w-4" /> Manage Tasks</Link>
@@ -373,7 +366,6 @@ export default function DashboardPage() {
     );
   }
   
-  // Organizer, Overall Head, Admin Dashboards
   let dashboardTitle = "User Dashboard";
   let quickActions = [];
   
@@ -407,19 +399,18 @@ export default function DashboardPage() {
         { href: '/admin/tasks', label: 'Global Task Mgmt', icon: Settings},
         { href: '/organizer/events/manage', label: 'Manage All Events', icon: Briefcase }, 
         { href: '/organizer/registrations', label: 'View Registrations', icon: Users }, 
-        { href: '/admin/users', label: 'Manage Users', icon: Users}, // Corrected icon to Users
+        { href: '/admin/users', label: 'Manage Users', icon: Users}, 
         { href: '/ocr-tool', label: 'Scan Forms (OCR)', icon: FileScan },
         { href: '/profile', label: 'My Profile', icon: UserCircle }, 
         { href: '/notifications', label: 'Notifications', icon: Bell },
       ];
       break;
     default:
-      // Should not reach here for ER, but good fallback
       dashboardTitle = "User Dashboard";
   }
 
 
-  return ( // Fallback for Organizer, Overall Head, Admin
+  return ( 
     <div className="space-y-8 animate-fade-in-up">
       <header className="flex flex-col md:flex-row justify-between items-start gap-4">
         <div className="flex items-center gap-4">
@@ -546,4 +537,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-

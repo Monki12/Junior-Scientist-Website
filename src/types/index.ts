@@ -28,9 +28,11 @@ export interface Task {
 export interface RegisteredEventInfo {
   eventSlug: string;
   teamName?: string;
-  teamMembers?: { id: string, name: string, role?: string }[]; // Simplified team members
+  teamMembers?: { id: string, name: string, role?: string }[]; 
   admitCardStatus?: 'published' | 'pending' | 'unavailable';
-  eventDate?: string; // Added eventDate here
+  eventDate?: string; 
+  registrationDate?: string; // Added for student's own registration view
+  paymentStatus?: 'paid' | 'pending' | 'waived' | 'failed'; // Added for student's own registration view
 }
 
 export interface UserProfileData {
@@ -41,8 +43,8 @@ export interface UserProfileData {
   photoURL?: string | null; 
   school?: string; 
   grade?: string; 
-  phoneNumbers?: string[]; // Added phoneNumbers
-  registeredEvents?: RegisteredEventInfo[]; // Updated to new type
+  phoneNumbers?: string[]; 
+  registeredEvents?: RegisteredEventInfo[]; 
   department?: string; 
   assignedEventSlug?: string; 
   assignedEventSlugs?: string[]; 
@@ -51,7 +53,7 @@ export interface UserProfileData {
   credibilityScore?: number; 
 }
 
-export interface Event { // General event type, potentially for future use
+export interface Event { 
   id: string;
   title: string;
   description: string;
@@ -74,10 +76,10 @@ export interface SubEvent {
   detailedDescription: string; 
   mainImage: { src: string; alt: string; dataAiHint: string };
   galleryImages?: Array<{ src: string; alt: string; dataAiHint: string }>;
-  registrationLink: string; // Kept for now, though registration flow changes for logged-in users
+  registrationLink: string; 
   deadline?: string; 
   isTeamEvent?: boolean; 
-  eventDate?: string; // Added eventDate
+  eventDate?: string; 
 }
 
 export interface SignUpFormData {
@@ -92,10 +94,22 @@ export interface LoginFormData {
   password: string;
 }
 
-export interface StudentData { // For OCR
+export interface StudentData { 
   name: string;
   school: string;
   grade: string;
   contactNumber: string;
   email: string;
+}
+
+// New interface for participant data viewable by Event Reps
+export interface EventParticipant {
+  id: string; // Student's UID
+  name: string;
+  email: string;
+  contactNumber?: string;
+  schoolName?: string;
+  registrationDate: string; // ISO Date string
+  paymentStatus: 'paid' | 'pending' | 'waived' | 'failed';
+  // Later: customColumns, notes etc.
 }
