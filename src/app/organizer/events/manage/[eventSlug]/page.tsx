@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -13,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Settings, ArrowLeft, ShieldAlert, Info, CalendarDays, MapPin, Users, ListChecks, Edit, LayoutDashboard } from 'lucide-react';
+import { Loader2, Settings, ArrowLeft, ShieldAlert, Info, CalendarDays, MapPin, Users, ListChecks, Edit, LayoutDashboard, Users2 } from 'lucide-react';
 
 const getEventStatusBadgeVariant = (status: EventStatus | undefined): "default" | "secondary" | "outline" | "destructive" => {
     switch (status) {
@@ -51,11 +52,12 @@ export default function ManageEventDashboardPage() {
   }, [eventSlug]);
 
   useEffect(() => {
-    if (!authLoading && userProfile && event) { // Check event also
+    if (!authLoading && userProfile && event) { 
       const isOverallHead = userProfile.role === 'overall_head';
       const isEventManagerForThisEvent = userProfile.role === 'event_representative' && userProfile.assignedEventSlug === eventSlug;
+      const isAdmin = userProfile.role === 'admin'; // Admins might also have access
       
-      if (!isOverallHead && !isEventManagerForThisEvent) {
+      if (!isOverallHead && !isEventManagerForThisEvent && !isAdmin) {
         toast({ title: "Access Denied", description: "You are not authorized to manage this event.", variant: "destructive"});
         router.push('/dashboard'); 
       }
@@ -64,8 +66,7 @@ export default function ManageEventDashboardPage() {
     }
   }, [userProfile, authLoading, router, eventSlug, event, toast]);
 
-  // Mock task count for this event (can be refined later if tasks are loaded here)
-  const mockPendingTasksCount = useAuth().userProfile?.tasks?.filter(task => task.eventSlug === eventSlug && task.status !== 'Completed').length || 5;
+  const mockPendingTasksCount = userProfile?.tasks?.filter(task => task.eventSlug === eventSlug && task.status !== 'Completed').length || 0;
 
 
   if (authLoading || loadingEvent || !userProfile || !event) {
@@ -76,12 +77,11 @@ export default function ManageEventDashboardPage() {
     );
   }
   
-  const canManageGlobally = userProfile.role === 'overall_head';
+  const canManageGlobally = userProfile.role === 'overall_head' || userProfile.role === 'admin';
 
 
   return (
     <div className="space-y-6 animate-fade-in-up">
-      {/* Event Header / Overview Section */}
       <Card className="shadow-lg overflow-hidden">
         <div className="md:flex">
             <div className="md:shrink-0 relative w-full md:w-72 h-48 md:h-auto">
@@ -104,11 +104,11 @@ export default function ManageEventDashboardPage() {
                     )}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm mb-4">
-                    <p className="flex items-center gap-1.5"><CalendarDays className="h-4 w-4 text-accent" /> Date: <span className="font-medium">{event.eventDate ? new Date(event.eventDate).toLocaleDateString() : 'TBA'}</span></p>
-                    <p className="flex items-center gap-1.5"><MapPin className="h-4 w-4 text-accent" /> Venue: <span className="font-medium">{event.venue || 'TBD'}</span></p>
-                    <p className="flex items-center gap-1.5"><Info className="h-4 w-4 text-accent" /> Status: <Badge variant={getEventStatusBadgeVariant(event.status)} className="ml-1 capitalize text-xs">{event.status || 'N/A'}</Badge></p>
-                    <p className="flex items-center gap-1.5"><Users className="h-4 w-4 text-accent" /> Registered: <span className="font-medium">{event.registeredParticipantCount || 0}</span></p>
-                    <p className="flex items-center gap-1.5"><ListChecks className="h-4 w-4 text-accent" /> Pending Tasks: <span className="font-medium">{mockPendingTasksCount}</span></p>
+                    <span className="flex items-center gap-1.5"><CalendarDays className="h-4 w-4 text-accent" /> Date: <span className="font-medium">{event.eventDate ? new Date(event.eventDate).toLocaleDateString() : 'TBA'}</span></span>
+                    <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4 text-accent" /> Venue: <span className="font-medium">{event.venue || 'TBD'}</span></span>
+                    <span className="flex items-center gap-1.5"><Info className="h-4 w-4 text-accent" /> Status: <Badge variant={getEventStatusBadgeVariant(event.status)} className="ml-1 capitalize text-xs">{event.status || 'N/A'}</Badge></span>
+                    <span className="flex items-center gap-1.5"><Users2 className="h-4 w-4 text-accent" /> Registered: <span className="font-medium">{event.registeredParticipantCount || 0}</span></span>
+                    <span className="flex items-center gap-1.5"><ListChecks className="h-4 w-4 text-accent" /> Pending Tasks: <span className="font-medium">{mockPendingTasksCount}</span></span>
                 </div>
                 <div className="flex flex-wrap gap-2 mt-4">
                     <Button variant="default" size="sm" onClick={() => setIsDetailsDialogOpen(true)} className="bg-primary hover:bg-primary/90 text-primary-foreground">
@@ -122,9 +122,8 @@ export default function ManageEventDashboardPage() {
         </div>
       </Card>
 
-      {/* Tabs for Different Management Sections */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-4">
+        <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 mb-4">
           <TabsTrigger value="participants">Participants</TabsTrigger>
           <TabsTrigger value="tasks">Tasks</TabsTrigger>
           <TabsTrigger value="dday">D-Day Operations</TabsTrigger>
@@ -137,8 +136,7 @@ export default function ManageEventDashboardPage() {
               <CardDescription>View, filter, and manage all participants registered for this event.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 text-center">
-              <p className="text-muted-foreground">Full participant management features for this event (including custom columns, stats, and filters) will be integrated here soon.</p>
-              <p className="text-muted-foreground">For now, you can manage participants for this specific event on its dedicated page.</p>
+              <p className="text-muted-foreground">Participant management for this event will be fully integrated here. For now, you can manage participants on its dedicated page.</p>
               <Button asChild variant="secondary">
                 <Link href={`/organizer/events/manage/${eventSlug}/participants`}>
                   Go to Event Participant Management
@@ -155,8 +153,7 @@ export default function ManageEventDashboardPage() {
               <CardDescription>Assign, track, and manage all tasks related to the organization of this event.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 text-center">
-               <p className="text-muted-foreground">Full task management features (including list view, timeline view, and creation/editing) for this event will be integrated here soon.</p>
-               <p className="text-muted-foreground">Currently, you can manage tasks on the general tasks page. You might need to filter by this event.</p>
+               <p className="text-muted-foreground">Task management (list & timeline) for this event will be fully integrated here. For now, you can use the general tasks page and filter by this event if needed.</p>
               <Button asChild variant="secondary">
                 <Link href={`/organizer/event-tasks?event=${eventSlug}`}>
                   Go to Event Tasks Page (Filter Manually)
@@ -181,7 +178,6 @@ export default function ManageEventDashboardPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Event Details Dialog */}
       <AlertDialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
         <AlertDialogContent className="max-w-2xl">
           <AlertDialogHeader>
@@ -192,7 +188,6 @@ export default function ManageEventDashboardPage() {
           </AlertDialogHeader>
           <div className="prose prose-sm dark:prose-invert max-h-[60vh] overflow-y-auto py-4">
             <p>{event.detailedDescription}</p>
-            {/* Add more details here if needed, e.g., rules, schedule */}
           </div>
           <AlertDialogFooter>
             <AlertDialogAction onClick={() => setIsDetailsDialogOpen(false)}>Close</AlertDialogAction>
@@ -200,7 +195,6 @@ export default function ManageEventDashboardPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Edit Event Settings Dialog (OH Only) */}
       {canManageGlobally && (
         <AlertDialog open={isEditSettingsDialogOpen} onOpenChange={setIsEditSettingsDialogOpen}>
             <AlertDialogContent>
@@ -225,3 +219,4 @@ export default function ManageEventDashboardPage() {
     </div>
   );
 }
+
