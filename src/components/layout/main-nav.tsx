@@ -17,8 +17,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
+import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { 
-  Atom, Menu, LogOut, UserCircle, Home, Search, Briefcase, Settings, BarChart3, LayoutDashboard, Users, FileText, Bell, CalendarCheck, ShieldCheck, ListChecks, FileScan, ClipboardList, Newspaper, Award, Activity, Building, ExternalLink, GraduationCap, School, Download, Info, CalendarDays, MessageSquare, UserCheck, Ticket, Users2, Phone
+  Atom, Menu, LogOut, UserCircle, Home, Search, Briefcase, Settings, LayoutDashboard, Users, Bell, CalendarCheck, ShieldCheck, ListChecks, FileScan, Phone, MoreHorizontal, ChevronDown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { UserProfileData } from '@/types';
@@ -26,16 +27,16 @@ import type { UserProfileData } from '@/types';
 
 const commonBaseLinks = [
   { href: '/', label: 'Home', icon: Home },
-  { href: '/events', label: 'Browse Events', icon: Search }, // Changed from CalendarDays to Search for "Browse"
+  { href: '/events', label: 'Browse Events', icon: Search },
 ];
 
 const studentNavLinks = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/dashboard#my-events', label: 'My Events', icon: CalendarCheck }, // Anchor link to section
-  { href: '/dashboard#teams', label: 'Teams', icon: Users2 }, // Anchor link to section
-  { href: '/dashboard#admit-cards', label: 'Admit Cards', icon: Ticket }, // Anchor link to section
+  { href: '/dashboard#my-events', label: 'My Events', icon: CalendarCheck },
+  { href: '/dashboard#teams', label: 'Teams', icon: Users }, 
+  { href: '/dashboard#admit-cards', label: 'Admit Cards', icon: ShieldCheck }, // Changed Icon
   { href: '/notifications', label: 'Notifications', icon: Bell },
-  { href: '/profile', label: 'Profile', icon: UserCircle }, // Changed from Settings to UserCircle
+  { href: '/profile', label: 'Profile', icon: UserCircle },
 ];
 
 const baseOrganizerLinks = [
@@ -45,6 +46,7 @@ const baseOrganizerLinks = [
   { href: '/profile', label: 'My Profile', icon: UserCircle },
 ];
 
+const MAX_DESKTOP_NAV_LINKS_DIRECT = 3; // Max links to show directly before collapsing to "Menu" icon
 
 export default function MainNav() {
   const { authUser, userProfile, logOut, loading } = useAuth();
@@ -69,21 +71,34 @@ export default function MainNav() {
       });
     }
   };
+  
+  const handleLinkClick = (href: string, e?: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => {
+    if (href.includes('#')) {
+      const [path, anchor] = href.split('#');
+      // Check if currently on the page that the anchor link targets
+      // For root anchors like '/#contact-us', `path` will be empty.
+      const targetPath = path || '/'; 
+      if (pathname === targetPath || (targetPath === '/' && pathname === '/')) {
+        e?.preventDefault();
+        const targetElement = document.getElementById(anchor);
+        if (targetElement) {
+          targetElement.scrollIntoView({ behavior: 'smooth' });
+        }
+      } else {
+        // If navigating to a different page with an anchor, just let NextLink handle it.
+        // The browser should jump to the anchor after page load.
+      }
+    }
+    // For non-anchor links, or links to different pages, no special handling needed here.
+    // The NextLink default behavior is sufficient.
+  };
+
 
   const NavLinkItem: React.FC<{ href: string; label: string; Icon: React.ElementType; onClick?: () => void; isBranding?: boolean; }> = ({ href, label, Icon, onClick, isBranding = false }) => (
     <Link
       href={href}
       onClick={(e) => {
-        if (href.includes('#') && pathname === '/dashboard') { // Only smooth scroll if on dashboard page
-          e.preventDefault();
-          const targetId = href.split('#')[1];
-          const targetElement = document.getElementById(targetId);
-          if (targetElement) {
-            targetElement.scrollIntoView({ behavior: 'smooth' });
-          }
-        } else if (href.includes('#')) { // If not on dashboard, navigate then scroll
-           router.push(href);
-        }
+        handleLinkClick(href, e);
         if (onClick) onClick();
         if (!isBranding) setIsMobileMenuOpen(false);
       }}
@@ -150,13 +165,14 @@ export default function MainNav() {
         default:
           userSpecificLinks = []; 
       }
-       return [...commonBaseLinks, ...userSpecificLinks.filter(sl => !commonBaseLinks.find(cl => cl.label === sl.label))]; // Combine and remove duplicates by label
+       return [...commonBaseLinks, ...userSpecificLinks.filter(sl => !commonBaseLinks.find(cl => cl.label === sl.label))];
     }
-    return commonBaseLinks; // Only common links for unauthenticated users
+    return commonBaseLinks;
   };
 
-  const currentNavLinks = getNavLinksForRole(userProfile);
-  const contactUsLink = { href: '/#contact-us', label: 'Contact', icon: Phone }; // Separate for consistent placement
+  const currentRoleNavLinks = getNavLinksForRole(userProfile);
+  const contactUsLink = { href: '/#contact-us', label: 'Contact', icon: Phone };
+  const allDisplayableNavLinks = [...currentRoleNavLinks, contactUsLink];
 
 
   if (!mounted) {
@@ -178,14 +194,39 @@ export default function MainNav() {
       <div className="container flex h-16 items-center">
         <NavLinkItem href="/" label="EventFlow" Icon={Atom} isBranding />
 
-        <nav className="hidden md:flex items-center space-x-1 lg:space-x-2 ml-auto mr-4">
-          {currentNavLinks.map(link => (
-            <NavLinkItem key={link.href} href={link.href} label={link.label} Icon={link.icon} />
-          ))}
-          <NavLinkItem key={contactUsLink.href} href={contactUsLink.href} label={contactUsLink.label} Icon={contactUsLink.icon} />
+        <nav className="hidden md:flex items-center space-x-1 lg:space-x-2 ml-auto">
+          {allDisplayableNavLinks.length <= MAX_DESKTOP_NAV_LINKS_DIRECT ? (
+            allDisplayableNavLinks.map(link => (
+              <NavLinkItem key={link.href} href={link.href} label={link.label} Icon={link.icon} />
+            ))
+          ) : (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-9 w-9">
+                  <Menu className="h-5 w-5" />
+                  <span className="sr-only">More navigation links</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                {allDisplayableNavLinks.map(link => (
+                  <DropdownMenuItem key={link.href} asChild>
+                    <Link 
+                      href={link.href} 
+                      onClick={(e) => handleLinkClick(link.href, e)}
+                      className="flex items-center w-full"
+                    >
+                      <link.icon className="mr-2 h-4 w-4" />
+                      {link.label}
+                    </Link>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </nav>
 
-        <div className="flex items-center gap-3 md:ml-0 ml-auto"> {/* Ensure avatar/login buttons are at the end */}
+        <div className="flex items-center gap-2 md:ml-4 ml-auto">
+          <ThemeToggle />
           {loading ? (
              <div className="h-9 w-9 animate-pulse rounded-full bg-muted"></div>
           ) : authUser ? (
@@ -233,7 +274,7 @@ export default function MainNav() {
 
           <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
             <SheetTrigger asChild className="md:hidden">
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" className="h-9 w-9">
                 <Menu className="h-6 w-6" />
                 <span className="sr-only">Toggle menu</span>
               </Button>
@@ -244,10 +285,9 @@ export default function MainNav() {
                   <NavLinkItem href="/" label="EventFlow" Icon={Atom} isBranding onClick={() => setIsMobileMenuOpen(false)}/>
                 </SheetHeader>
                 <nav className="flex-grow space-y-1 p-4 overflow-y-auto">
-                  {currentNavLinks.map(link => (
+                  {allDisplayableNavLinks.map(link => (
                      <NavLinkItem key={link.href} href={link.href} label={link.label} Icon={link.icon} onClick={() => setIsMobileMenuOpen(false)} />
                   ))}
-                  <NavLinkItem key={contactUsLink.href} href={contactUsLink.href} label={contactUsLink.label} Icon={contactUsLink.icon} onClick={() => setIsMobileMenuOpen(false)} />
                 </nav>
                 {!authUser && !loading && (
                   <div className="border-t p-4 space-y-2">
