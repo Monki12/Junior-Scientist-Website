@@ -111,7 +111,7 @@ export default function DashboardPage() {
     // Local state will update via useEffect when userProfile changes
   };
 
-  const myTasks = localUserProfileTasks; // Already filtered in useEffect
+  const myTasks = localUserProfileTasks; 
 
   const today = startOfDay(new Date());
   const tasksDueToday = myTasks.filter(task => task.dueDate && isValid(parseISO(task.dueDate)) && isToday(parseISO(task.dueDate)) && task.status !== 'Completed').length;
@@ -795,12 +795,8 @@ export default function DashboardPage() {
                                                     );
                                                 }) : <span className="text-xs text-muted-foreground">None</span>}
                                             </TableCell>
-                                            {globalCustomColumnDefinitions.map(colDef => (
-                                                <TableCell key={colDef.id}>
-                                                    {renderGlobalParticipantCustomCell(p, colDef)}
-                                                </TableCell>
-                                            ))}
-                                            <TableCell></TableCell> {/* Placeholder for potential actions or to balance the Add Column button */}
+                                            {globalCustomColumnDefinitions.map(colDef => <TableCell key={colDef.id}>{renderGlobalParticipantCustomCell(p, colDef)}</TableCell>)}
+                                            <TableCell></TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
