@@ -18,7 +18,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -52,6 +52,7 @@ const defaultTaskFormState = {
   priority: 'Medium' as TaskPriority,
   status: 'Not Started' as TaskStatus,
   points: 0,
+  customTaskData: {},
 };
 
 type SortableTaskFields = 'dueDate' | 'priority' | 'status' | 'title';
@@ -98,7 +99,8 @@ const BasicTimelineView = ({ tasks }: { tasks: Task[] }) => {
 
   const overallStartDate = allDates.length > 0 ? new Date(Math.min(...allDates.map(d => d.getTime()))) : new Date();
   const overallEndDate = allDates.length > 0 ? new Date(Math.max(...allDates.map(d => d.getTime()))) : addDays(new Date(), 7);
-  const totalTimelineDays = Math.max(1, differenceInDays(overallEndDate, overallStartDate) || 1);
+  let totalTimelineDays = Math.max(1, differenceInDays(overallEndDate, overallStartDate) || 1);
+  if (totalTimelineDays === 0) totalTimelineDays = 1;
 
 
   return (
@@ -111,7 +113,7 @@ const BasicTimelineView = ({ tasks }: { tasks: Task[] }) => {
         <div className="relative min-w-[800px]" style={{ height: `${tasks.length * 40 + 50}px` }}>
           <div className="flex justify-between text-xs text-muted-foreground border-b pb-1 mb-2">
             <span>{format(overallStartDate, 'MMM dd, yyyy')}</span>
-            <span>Timeline Span: ~{totalTimelineDays} days</span>
+            <span>Timeline Span: ~{totalTimelineDays} day{totalTimelineDays === 1 ? '' : 's'}</span>
             <span>{format(overallEndDate, 'MMM dd, yyyy')}</span>
           </div>
 
@@ -119,8 +121,18 @@ const BasicTimelineView = ({ tasks }: { tasks: Task[] }) => {
             const taskStartDate = task.createdAt && isValid(parseISO(task.createdAt)) ? parseISO(task.createdAt) : overallStartDate;
             const taskDueDate = task.dueDate && isValid(parseISO(task.dueDate)) ? parseISO(task.dueDate) : overallEndDate;
             
-            const startOffsetPercent = (differenceInDays(taskStartDate, overallStartDate) / totalTimelineDays) * 100;
-            const durationPercent = (Math.max(1, differenceInDays(taskDueDate, taskStartDate)) / totalTimelineDays) * 100;
+            let startOffsetPercent = 0;
+            if (totalTimelineDays > 0) {
+              startOffsetPercent = (differenceInDays(taskStartDate, overallStartDate) / totalTimelineDays) * 100;
+            }
+
+            let durationDays = Math.max(1, differenceInDays(taskDueDate, taskStartDate));
+            if(taskStartDate > taskDueDate) durationDays = 0; // Handle cases where start is after due
+
+            let durationPercent = 0;
+            if (totalTimelineDays > 0) {
+                 durationPercent = (durationDays / totalTimelineDays) * 100;
+            }
             
             const { colorClass } = getStatusBadgeVariant(task.status);
 
@@ -207,10 +219,10 @@ export default function EventTasksPage() {
       } else if (userProfile.role === 'event_representative' && userProfile.assignedEventSlug) {
         const assignedEvent = subEventsData.find(e => e.slug === userProfile.assignedEventSlug);
         setEventTitle(assignedEvent ? `Tasks for "${assignedEvent.title}"` : 'My Event Tasks');
-        setTasks(initialMockTasks.filter(t => t.eventSlug === userProfile.assignedEventSlug));
+        // Mock: Filter tasks by assigned event if needed for specific user views, or show all for admin/overall head
+        // For now, using initialMockTasks which may not be event-specific
       } else if (userProfile.role === 'overall_head' || userProfile.role === 'admin') {
         setEventTitle('All Event Tasks Overview');
-        setTasks(initialMockTasks); 
       }
     } else if (!authLoading && !userProfile) {
       router.push('/login?redirect=/organizer/event-tasks');
@@ -345,7 +357,6 @@ export default function EventTasksPage() {
           }
 
           if (taskValue === undefined || taskValue === null) {
-             // Handle cases where value might be legitimately null or undefined, e.g. for booleans
             if (typeof taskValue === 'boolean' && filter.value.toLowerCase() === 'false') return true;
             return false;
           }
@@ -493,7 +504,7 @@ export default function EventTasksPage() {
         case 'number':
           return <Input type="number" value={Number(value)} onChange={(e) => handleCustomTaskDataChange(task.id, column.id, parseFloat(e.target.value) || 0)} onBlur={() => setEditingCustomCell(null)} autoFocus className="h-8 text-xs"/>;
         case 'date':
-          return <Input type="date" value={value ? format(parseISO(String(value)), 'yyyy-MM-dd') : ''} onChange={(e) => handleCustomTaskDataChange(task.id, column.id, e.target.value ? new Date(e.target.value).toISOString() : '')} onBlur={() => setEditingCustomCell(null)} autoFocus className="h-8 text-xs"/>;
+          return <Input type="date" value={value && isValid(parseISO(String(value))) ? format(parseISO(String(value)), 'yyyy-MM-dd') : ''} onChange={(e) => handleCustomTaskDataChange(task.id, column.id, e.target.value ? new Date(e.target.value).toISOString() : '')} onBlur={() => setEditingCustomCell(null)} autoFocus className="h-8 text-xs"/>;
         case 'checkbox':
            return <Checkbox checked={!!value} onCheckedChange={(checked) => {handleCustomTaskDataChange(task.id, column.id, !!checked); setEditingCustomCell(null);}} />;
         case 'dropdown':
@@ -536,6 +547,7 @@ export default function EventTasksPage() {
         <ShieldAlert className="h-16 w-16 text-destructive mb-4" />
         <h1 className="text-2xl font-bold text-destructive mb-2">Access Denied</h1>
         <p className="text-muted-foreground">You do not have permission to view this page.</p>
+        <Button onClick={() => router.push('/dashboard')} className="mt-4">Go to Dashboard</Button>
       </div>
     );
   }
@@ -738,7 +750,7 @@ export default function EventTasksPage() {
             <div className="lg:col-span-1">
                  <Popover open={isAddFilterPopoverOpen} onOpenChange={setIsAddFilterPopoverOpen}>
                     <PopoverTrigger asChild>
-                        <Button variant="outline" className="w-full">
+                        <Button variant="outline" className="w-full hover:bg-accent/10">
                             <Tag className="mr-2 h-4 w-4" /> Add Dynamic Filter
                         </Button>
                     </PopoverTrigger>
@@ -834,11 +846,11 @@ export default function EventTasksPage() {
                     ))}
                     <TableHead className="text-right">
                         <AlertDialog open={isAddCustomTaskColumnDialogOpen} onOpenChange={setIsAddCustomTaskColumnDialogOpen}>
-                          <DialogTrigger asChild>
+                          <AlertDialogTrigger asChild>
                            <Button variant="outline" size="sm" className="border-dashed hover:border-primary hover:text-primary h-8">
                              <PlusCircle className="mr-2 h-4 w-4" /> Add Column
                            </Button>
-                          </DialogTrigger>
+                          </AlertDialogTrigger>
                           <DialogContent>
                           <form onSubmit={handleAddCustomTaskColumnSubmit}>
                             <DialogHeader>
@@ -901,7 +913,7 @@ export default function EventTasksPage() {
                       </TableCell>
                       <TableCell className="font-medium max-w-xs truncate" title={task.title}>{task.title}</TableCell>
                       <TableCell className="text-xs text-muted-foreground max-w-[150px] truncate">{task.assignedTo && task.assignedTo.length > 0 ? task.assignedTo.join(', ') : <span className="italic">Unassigned</span>}</TableCell>
-                      <TableCell className={`${task.dueDate && isPast(startOfDay(parseISO(task.dueDate))) && task.status !== 'Completed' ? 'text-red-600 font-semibold' : 'text-muted-foreground'}`}>
+                      <TableCell className={`${task.dueDate && isValid(parseISO(task.dueDate)) && isPast(startOfDay(parseISO(task.dueDate))) && task.status !== 'Completed' ? 'text-red-600 font-semibold' : 'text-muted-foreground'}`}>
                         {task.dueDate && isValid(parseISO(task.dueDate)) ? format(parseISO(task.dueDate), 'MMM dd, yyyy') : 'N/A'}
                       </TableCell>
                       <TableCell>
@@ -969,3 +981,4 @@ export default function EventTasksPage() {
     </div>
   );
 }
+
