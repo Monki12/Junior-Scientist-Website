@@ -11,6 +11,8 @@ export type UserRole =
 
 export type TaskPriority = 'High' | 'Medium' | 'Low';
 export type TaskStatus = 'Not Started' | 'In Progress' | 'Pending Review' | 'Completed';
+export type EventStatus = 'Planning' | 'Active' | 'Completed' | 'Cancelled';
+
 
 export interface Task {
   id: string;
@@ -88,6 +90,11 @@ export interface SubEvent {
   deadline?: string; 
   isTeamEvent?: boolean; 
   eventDate?: string; 
+  status?: EventStatus;
+  venue?: string;
+  organizers?: string[];
+  event_representatives?: string[];
+  registeredParticipantCount?: number;
 }
 
 export interface SignUpFormData {
@@ -147,7 +154,7 @@ export interface EventParticipant {
   registrationDate: string; 
   paymentStatus: 'paid' | 'pending' | 'waived' | 'failed';
   customData?: ParticipantCustomData; 
-  registeredEventSlugs?: string[]; // Added for global participant view
+  registeredEventSlugs?: string[]; 
 }
 
 export interface ActiveDynamicFilter {

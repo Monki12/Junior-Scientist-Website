@@ -1,5 +1,5 @@
 
-import type { SubEvent } from '@/types';
+import type { SubEvent, EventStatus } from '@/types';
 
 export const subEventsData: SubEvent[] = [
   {
@@ -17,8 +17,13 @@ export const subEventsData: SubEvent[] = [
     ],
     registrationLink: '/signup?event=mun', 
     deadline: '2024-11-15',
-    eventDate: '2024-12-01', // Added mock event date
+    eventDate: '2024-12-01',
     isTeamEvent: false,
+    status: 'Planning' as EventStatus,
+    venue: 'Main Auditorium Hall A',
+    organizers: ['Test Organizer Alice', 'David (Organizer)'],
+    event_representatives: ['Test Event Rep Bob'],
+    registeredParticipantCount: 120,
   },
   {
     id: '2',
@@ -34,8 +39,13 @@ export const subEventsData: SubEvent[] = [
     ],
     registrationLink: '/signup?event=ex-quiz-it',
     deadline: '2024-11-18',
-    eventDate: '2024-12-05', // Added mock event date
+    eventDate: '2024-12-05',
     isTeamEvent: true,
+    status: 'Planning' as EventStatus,
+    venue: 'Seminar Hall 1',
+    organizers: ['Test Organizer Alice'],
+    event_representatives: ['Test Event Rep Bob'],
+    registeredParticipantCount: 75,
   },
   {
     id: '3',
@@ -51,7 +61,12 @@ export const subEventsData: SubEvent[] = [
     ],
     registrationLink: '/signup?event=olympiad',
     deadline: '2024-11-20',
-    eventDate: '2024-12-10', // Added mock event date
+    eventDate: '2024-12-10',
+    status: 'Active' as EventStatus,
+    venue: 'Physics Lab Complex',
+    organizers: ['Test Organizer Alice'],
+    event_representatives: ['Another Event Rep'],
+    registeredParticipantCount: 250,
   },
   {
     id: '4',
@@ -67,7 +82,12 @@ export const subEventsData: SubEvent[] = [
     ],
     registrationLink: '/signup?event=math-a-maze',
     deadline: '2024-11-22',
-    eventDate: '2024-12-12', // Added mock event date
+    eventDate: '2024-12-12',
+    status: 'Active' as EventStatus,
+    venue: 'Mathematics Department Wing',
+    organizers: ['David (Organizer)'],
+    event_representatives: ['Test Event Rep Bob'],
+    registeredParticipantCount: 90,
   },
   {
     id: '5',
@@ -83,8 +103,13 @@ export const subEventsData: SubEvent[] = [
     ],
     registrationLink: '/signup?event=maze-mastery',
     deadline: '2024-11-25',
-    eventDate: '2024-12-15', // Added mock event date
+    eventDate: '2024-12-15',
     isTeamEvent: true, 
+    status: 'Completed' as EventStatus,
+    venue: 'Library Quiet Zone',
+    organizers: ['Test Organizer Alice', 'David (Organizer)'],
+    event_representatives: ['Another Event Rep'],
+    registeredParticipantCount: 60,
   },
   {
     id: '6',
@@ -100,7 +125,48 @@ export const subEventsData: SubEvent[] = [
     ],
     registrationLink: '/signup?event=robo-challenge',
     deadline: '2024-11-28',
-    eventDate: '2024-12-18', // Added mock event date
+    eventDate: '2024-12-18',
     isTeamEvent: true, 
+    status: 'Planning' as EventStatus,
+    venue: 'Workshop Hangar',
+    organizers: ['David (Organizer)'],
+    event_representatives: ['Test Event Rep Bob'],
+    registeredParticipantCount: 45,
+  },
+  {
+    id: '7',
+    slug: 'code-wars',
+    title: 'Code Wars',
+    superpowerCategory: 'The Innovator',
+    shortDescription: 'Competitive programming contest to solve algorithmic challenges.',
+    detailedDescription: 'Put your coding skills to the test in Code Wars! A timed competition where participants solve complex algorithmic problems. Speed, efficiency, and accuracy are key. Multiple rounds with increasing difficulty.',
+    mainImage: { src: 'https://placehold.co/600x400.png', alt: 'Coding on laptop', dataAiHint: 'coding programming' },
+    registrationLink: '/signup?event=code-wars',
+    deadline: '2024-11-30',
+    eventDate: '2024-12-20',
+    isTeamEvent: false,
+    status: 'Planning' as EventStatus,
+    venue: 'Computer Center Lab 1',
+    organizers: ['Test Organizer Alice'],
+    event_representatives: ['Another Event Rep'],
+    registeredParticipantCount: 150,
+  },
+  {
+    id: '8',
+    slug: 'art-exhibition',
+    title: 'Student Art Exhibition',
+    superpowerCategory: 'The Thinker', // Can be debated, more artistic
+    shortDescription: 'Showcase your artistic talents in various mediums.',
+    detailedDescription: 'A platform for young artists to display their creativity. Submit your paintings, sculptures, digital art, and more. Categories for different age groups and themes will be available. Judged by local artists.',
+    mainImage: { src: 'https://placehold.co/600x400.png', alt: 'Art gallery display', dataAiHint: 'art gallery exhibition' },
+    registrationLink: '/signup?event=art-exhibition',
+    deadline: '2024-11-10',
+    eventDate: '2024-12-08',
+    status: 'Completed' as EventStatus,
+    venue: 'Fine Arts Building',
+    organizers: ['David (Organizer)'],
+    event_representatives: ['Test Event Rep Bob'],
+    registeredParticipantCount: 80,
   },
 ];
+

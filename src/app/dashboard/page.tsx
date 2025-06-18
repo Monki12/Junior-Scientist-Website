@@ -7,7 +7,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/hooks/use-auth';
 import { subEventsData } from '@/data/subEvents';
-import type { UserRole, SubEvent, Task, RegisteredEventInfo, UserProfileData, EventParticipant, CustomColumnDefinition, ActiveDynamicFilter, ParticipantCustomData } from '@/types';
+import type { UserRole, SubEvent, Task, RegisteredEventInfo, UserProfileData, EventParticipant, CustomColumnDefinition, ActiveDynamicFilter, ParticipantCustomData, EventStatus } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -20,12 +20,13 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from "@/components/ui/table";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 import { format, isToday, isPast, isThisWeek, startOfDay, parseISO, isValid } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import {
-  Loader2, BarChartBig, Edit, Users, FileScan, Settings, BookUser, ListChecks, CalendarDays, UserCircle, Bell, GraduationCap, School, Download, Info, Briefcase, Newspaper, Award, Star, CheckCircle, ClipboardList, TrendingUp, Building, Activity, ShieldCheck, ExternalLink, Home, Search, CalendarCheck, Ticket, Users2, Phone, Mail, Milestone, MapPin, Clock, UsersRound, CheckSquare, BarChartHorizontalBig, Rss, AlertTriangle, Filter as FilterIcon, PlusCircle, GanttChartSquare, Rows, Tag, XIcon
+  Loader2, BarChartBig, Edit, Users, FileScan, Settings, BookUser, ListChecks, CalendarDays, UserCircle, Bell, GraduationCap, School, Download, Info, Briefcase, Newspaper, Award, Star, CheckCircle, ClipboardList, TrendingUp, Building, Activity, ShieldCheck, ExternalLink, Home, Search, CalendarCheck, Ticket, Users2, Phone, Mail, Milestone, MapPin, Clock, UsersRound, CheckSquare, BarChartHorizontalBig, Rss, AlertTriangle, Filter as FilterIcon, PlusCircle, GanttChartSquare, Rows, Tag, XIcon, Pencil, Trash2, CalendarRange, LayoutDashboard
 } from 'lucide-react';
 
 interface RegisteredEventDisplay extends SubEvent {
@@ -53,6 +54,16 @@ const getStatusBadgeVariant = (status: Task['status']): { variant: "default" | "
   }
 };
 
+const getEventStatusBadgeVariant = (status: EventStatus | undefined): "default" | "secondary" | "outline" | "destructive" => {
+    switch (status) {
+        case 'Active': return 'default'; // Primary/Active color
+        case 'Planning': return 'secondary';
+        case 'Completed': return 'outline'; // Muted green or similar
+        case 'Cancelled': return 'destructive';
+        default: return 'outline';
+    }
+};
+
 
 export default function DashboardPage() {
   const { authUser, userProfile, setUserProfile, loading } = useAuth();
@@ -76,6 +87,16 @@ export default function DashboardPage() {
   const [isAddGlobalFilterPopoverOpen, setIsAddGlobalFilterPopoverOpen] = useState(false);
   const [newGlobalFilterColumn, setNewGlobalFilterColumn] = useState<{ id: string, name: string, isCustom: boolean } | null>(null);
   const [newGlobalFilterValue, setNewGlobalFilterValue] = useState('');
+
+  // State for Overall Head's Event Management View
+  const [allPlatformEvents, setAllPlatformEvents] = useState<SubEvent[]>(subEventsData); // Initialize with all mock events
+  const [eventSearchTerm, setEventSearchTerm] = useState('');
+  const [eventStatusFilter, setEventStatusFilter] = useState<EventStatus | 'all'>('all');
+  const [isCreateEventDialogOpen, setIsCreateEventDialogOpen] = useState(false);
+  const [isEditEventDialogOpen, setIsEditEventDialogOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<SubEvent | null>(null);
+  const [isDeleteEventConfirmOpen, setIsDeleteEventConfirmOpen] = useState(false);
+  const [eventToDelete, setEventToDelete] = useState<SubEvent | null>(null);
 
 
   useEffect(() => {
@@ -108,7 +129,6 @@ export default function DashboardPage() {
       if (!prevProfile) return null;
       return { ...prevProfile, tasks: updatedTasksForContext };
     });
-    // Local state will update via useEffect when userProfile changes
   };
 
   const myTasks = localUserProfileTasks; 
@@ -168,7 +188,7 @@ export default function DashboardPage() {
           }
 
           if (participantValue === undefined || participantValue === null) {
-            if (typeof participantValue === 'boolean' && filter.value.toLowerCase() === 'false') return true; // Handle 'false' for undefined booleans
+            if (typeof participantValue === 'boolean' && filter.value.toLowerCase() === 'false') return true; 
             return false;
           }
           
@@ -309,6 +329,41 @@ export default function DashboardPage() {
             return <span onClick={() => column.dataType !== 'checkbox' && setEditingGlobalCustomCell({ participantId: participant.id, columnId: column.id })} className="cursor-pointer hover:bg-muted/50 p-1 rounded min-h-[2rem] block">{String(value)}</span>;
     }
   };
+
+  // Event Management specific logic for Overall Head
+  const filteredEventsForOverallHead = useMemo(() => {
+    return allPlatformEvents.filter(event => {
+      const searchTermLower = eventSearchTerm.toLowerCase();
+      const matchesSearch = searchTermLower === '' ||
+        event.title.toLowerCase().includes(searchTermLower) ||
+        (event.venue && event.venue.toLowerCase().includes(searchTermLower));
+      const matchesStatus = eventStatusFilter === 'all' || event.status === eventStatusFilter;
+      // Add date range filter logic here when implemented
+      return matchesSearch && matchesStatus;
+    });
+  }, [allPlatformEvents, eventSearchTerm, eventStatusFilter]);
+
+  const handleOpenCreateEventDialog = () => {
+    setEditingEvent(null);
+    setIsCreateEventDialogOpen(true);
+  };
+  const handleOpenEditEventDialog = (event: SubEvent) => {
+    setEditingEvent(event);
+    setIsEditEventDialogOpen(true); // Use separate state for edit if needed, or reuse create
+  };
+  const handleOpenDeleteEventDialog = (event: SubEvent) => {
+    setEventToDelete(event);
+    setIsDeleteEventConfirmOpen(true);
+  };
+  const confirmDeleteEvent = () => {
+    if (eventToDelete) {
+      setAllPlatformEvents(prev => prev.filter(e => e.id !== eventToDelete.id));
+      toast({ title: `Mock: Event "${eventToDelete.title}" deleted.`});
+      setIsDeleteEventConfirmOpen(false);
+      setEventToDelete(null);
+    }
+  };
+
 
   if (loading || !authUser || !userProfile) {
     return (
@@ -479,7 +534,6 @@ export default function DashboardPage() {
   }
 
   if (role === 'overall_head') {
-    // Overall Head Dashboard
     const activeGlobalStaticFiltersForDisplay = [
         globalSearchTerm && { label: 'Search', value: globalSearchTerm },
         globalSchoolFilter !== 'all' && { label: 'School', value: globalSchoolFilter },
@@ -514,7 +568,6 @@ export default function DashboardPage() {
           </Button>
         </header>
 
-        {/* My Tasks Section for Overall Head */}
         {myTasks.length > 0 && (
         <section id="my-tasks-overall-head">
           <Card className="shadow-md-soft rounded-xl">
@@ -589,6 +642,99 @@ export default function DashboardPage() {
           </Card>
         </section>
         )}
+        
+        <Separator />
+
+         {/* Manage All Platform Events Section */}
+        <section id="manage-all-events">
+          <Card className="shadow-md-soft rounded-xl">
+            <CardHeader>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-2xl text-primary"><CalendarRange className="h-7 w-7"/>Manage All Platform Events</CardTitle>
+                <Button className="bg-accent hover:bg-accent/90 text-accent-foreground" onClick={handleOpenCreateEventDialog}>
+                    <PlusCircle className="mr-2 h-4 w-4"/> Add New Event
+                </Button>
+              </div>
+              <CardDescription>Oversee, edit, or create new events on the platform.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                <div className="relative">
+                  <Label htmlFor="event-search">Search Events</Label>
+                  <Search className="absolute left-2.5 top-[calc(50%+0.3rem)] -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input id="event-search" placeholder="Name, venue..." value={eventSearchTerm} onChange={e => setEventSearchTerm(e.target.value)} className="pl-9" />
+                </div>
+                <div>
+                  <Label htmlFor="event-status-filter">Event Status</Label>
+                  <Select value={eventStatusFilter} onValueChange={(value: EventStatus | 'all') => setEventStatusFilter(value)}>
+                    <SelectTrigger id="event-status-filter"><SelectValue placeholder="Filter by status..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="Planning">Planning</SelectItem>
+                      <SelectItem value="Active">Active</SelectItem>
+                      <SelectItem value="Completed">Completed</SelectItem>
+                      <SelectItem value="Cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="text-muted-foreground text-sm items-center flex h-10">Date Range Filter (Coming Soon)</div>
+                <div className="text-muted-foreground text-sm items-center flex h-10">Dynamic Event Filter (Coming Soon)</div>
+              </div>
+              {filteredEventsForOverallHead.length > 0 ? (
+                <div className="overflow-x-auto rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Event Name</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Venue</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Participants</TableHead>
+                        <TableHead>ERs</TableHead>
+                        <TableHead>Organizers</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredEventsForOverallHead.map(event => (
+                        <TableRow key={event.id}>
+                          <TableCell className="font-medium hover:underline">
+                            <Link href={`/organizer/events/manage/${event.slug}`}>{event.title}</Link>
+                          </TableCell>
+                          <TableCell>{event.eventDate ? format(parseISO(event.eventDate), 'MMM dd, yyyy') : 'TBA'}</TableCell>
+                          <TableCell>{event.venue || 'N/A'}</TableCell>
+                          <TableCell>
+                            <Badge variant={getEventStatusBadgeVariant(event.status)} className="capitalize">{event.status || 'N/A'}</Badge>
+                          </TableCell>
+                          <TableCell>{event.registeredParticipantCount || 0}</TableCell>
+                          <TableCell className="text-xs max-w-[150px] truncate">
+                            {event.event_representatives && event.event_representatives.length > 0 ? event.event_representatives.join(', ') : <span className="text-muted-foreground italic">None</span>}
+                          </TableCell>
+                           <TableCell className="text-xs max-w-[150px] truncate">
+                             {event.organizers && event.organizers.length > 0 ? event.organizers.join(', ') : <span className="text-muted-foreground italic">None</span>}
+                           </TableCell>
+                          <TableCell className="text-right space-x-1">
+                            <Button variant="ghost" size="icon" className="hover:bg-muted/50 h-8 w-8" onClick={() => handleOpenEditEventDialog(event)}>
+                              <Pencil className="h-4 w-4" /> <span className="sr-only">Edit Event</span>
+                            </Button>
+                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/80 hover:bg-destructive/10 h-8 w-8" onClick={() => handleOpenDeleteEventDialog(event)}>
+                              <Trash2 className="h-4 w-4" /> <span className="sr-only">Delete Event</span>
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="text-center py-10 text-muted-foreground">
+                  <CalendarDays className="h-12 w-12 mx-auto mb-3 text-primary/30" />
+                  <p>No events match the current filters.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </section>
         
         <Separator />
 
@@ -811,6 +957,44 @@ export default function DashboardPage() {
                 </CardContent>
             </Card>
         </section>
+
+        {/* Dialog for Create/Edit Event (Placeholder) */}
+        <Dialog open={isCreateEventDialogOpen || isEditEventDialogOpen} onOpenChange={editingEvent ? setIsEditEventDialogOpen : setIsCreateEventDialogOpen}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{editingEvent ? `Edit Event: ${editingEvent.title}` : "Create New Event"}</DialogTitle>
+                    <DialogDescription>
+                        Event creation and editing form will appear here. (Mock for now)
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                    <p className="text-muted-foreground">Form fields for event name, date, venue, status, assigning ERs/Organizers will be here.</p>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => editingEvent ? setIsEditEventDialogOpen(false) : setIsCreateEventDialogOpen(false)}>Cancel</Button>
+                    <Button onClick={() => {
+                        toast({title: "Mock Save", description: "Event data would be saved."});
+                        editingEvent ? setIsEditEventDialogOpen(false) : setIsCreateEventDialogOpen(false);
+                    }}>Save Event</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
+        {/* AlertDialog for Delete Event Confirmation (Placeholder) */}
+        <AlertDialog open={isDeleteEventConfirmOpen} onOpenChange={setIsDeleteEventConfirmOpen}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Confirm Delete Event</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Are you sure you want to delete the event &quot;{eventToDelete?.title}&quot;? This action cannot be undone. (Mock for now)
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={confirmDeleteEvent} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
       </div>
     );
   }
@@ -861,12 +1045,12 @@ export default function DashboardPage() {
                             <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mb-3">
                                 {assignedEvent.eventDate && <p className="flex items-center"><CalendarDays className="mr-1.5 h-4 w-4" /> Date: {new Date(assignedEvent.eventDate).toLocaleDateString()}</p>}
                                 <p className="flex items-center"><Clock className="mr-1.5 h-4 w-4" /> Time: (Mock) 10:00 AM</p>
-                                <p className="flex items-center"><MapPin className="mr-1.5 h-4 w-4" /> Venue: (Mock) Main Auditorium</p>
+                                <p className="flex items-center"><MapPin className="mr-1.5 h-4 w-4" /> Venue: {assignedEvent.venue || '(Mock) Main Auditorium'}</p>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mb-4">
-                                <p className="flex items-center"><UsersRound className="mr-1.5 h-4 w-4 text-accent" /> Registered: <span className="font-semibold ml-1">57</span></p>
+                                <p className="flex items-center"><UsersRound className="mr-1.5 h-4 w-4 text-accent" /> Registered: <span className="font-semibold ml-1">{assignedEvent.registeredParticipantCount || 0}</span></p>
                                 <p className="flex items-center"><ListChecks className="mr-1.5 h-4 w-4 text-accent" /> Pending Tasks: <span className="font-semibold ml-1">{myTasks.filter(t => t.status !== 'Completed').length}</span></p>
-                                <div className="flex items-center col-span-full text-sm"><Info className="mr-1.5 h-4 w-4 text-accent" /> Status: <Badge variant="secondary" className="ml-1">Planning</Badge></div>
+                                <div className="flex items-center col-span-full text-sm"><Info className="mr-1.5 h-4 w-4 text-accent" /> Status: <Badge variant={getEventStatusBadgeVariant(assignedEvent.status)} className="ml-1 capitalize">{assignedEvent.status || 'Planning'}</Badge></div>
                             </div>
                             <div className="flex flex-wrap gap-2 mt-4">
                                 <Button asChild variant="outline" size="sm">
@@ -1010,10 +1194,6 @@ export default function DashboardPage() {
         { href: '/organizer/event-tasks', label: 'All Event Tasks', icon: ListChecks },
       ];
       break;
-    // case 'overall_head': -- Handled above
-    //   dashboardTitle = "Overall Head Dashboard";
-    //    quickActions = [ /* ... */ ];
-    //   break;
     case 'admin':
       dashboardTitle = "Admin Dashboard";
        quickActions = [
@@ -1027,7 +1207,7 @@ export default function DashboardPage() {
         { href: '/notifications', label: 'Notifications', icon: Bell },
       ];
       break;
-    case 'test': // Test user with tasks sees this dashboard
+    case 'test': 
         dashboardTitle = "Test User Dashboard";
         quickActions = [
             { href: '/profile', label: 'My Profile', icon: UserCircle },
