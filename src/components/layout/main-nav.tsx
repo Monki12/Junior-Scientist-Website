@@ -17,26 +17,30 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import { Atom, Menu, LogOut, UserCircle, Home, CalendarDays, Phone, ScanLine, Bell, Briefcase, Settings, BarChart3, LayoutDashboard } from 'lucide-react';
+import { 
+  Atom, Menu, LogOut, UserCircle, Home, Search, Briefcase, Settings, BarChart3, LayoutDashboard, Users, FileText, Bell, CalendarCheck, ShieldCheck, ListChecks, FileScan, ClipboardList, Newspaper, Award, Activity, Building, ExternalLink, GraduationCap, School, Download, Info, CalendarDays, MessageSquare, UserCheck, Ticket, Users2, Phone
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { UserRole } from '@/types';
+import type { UserProfileData } from '@/types';
 
-const commonLinks = [
+
+const commonBaseLinks = [
   { href: '/', label: 'Home', icon: Home },
-  { href: '/events', label: 'Events', icon: CalendarDays },
-  { href: '/#contact-us', label: 'Contact Us', icon: Phone },
+  { href: '/events', label: 'Browse Events', icon: Search }, // Changed from CalendarDays to Search for "Browse"
 ];
 
-const studentLinks = [
+const studentNavLinks = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/dashboard#my-events', label: 'My Events', icon: CalendarCheck }, // Anchor link to section
+  { href: '/dashboard#teams', label: 'Teams', icon: Users2 }, // Anchor link to section
+  { href: '/dashboard#admit-cards', label: 'Admit Cards', icon: Ticket }, // Anchor link to section
   { href: '/notifications', label: 'Notifications', icon: Bell },
-  { href: '/profile', label: 'My Profile', icon: UserCircle },
+  { href: '/profile', label: 'Profile', icon: UserCircle }, // Changed from Settings to UserCircle
 ];
 
 const baseOrganizerLinks = [
   { href: '/dashboard', label: 'My Dashboard', icon: LayoutDashboard },
-  // Manage Events link will be conditional based on role and assigned event for event_representative
-  { href: '/ocr-tool', label: 'OCR Tool', icon: ScanLine },
+  { href: '/ocr-tool', label: 'OCR Tool', icon: FileScan },
   { href: '/notifications', label: 'Notifications', icon: Bell },
   { href: '/profile', label: 'My Profile', icon: UserCircle },
 ];
@@ -70,24 +74,26 @@ export default function MainNav() {
     <Link
       href={href}
       onClick={(e) => {
-        if (href.includes('#')) {
+        if (href.includes('#') && pathname === '/dashboard') { // Only smooth scroll if on dashboard page
           e.preventDefault();
           const targetId = href.split('#')[1];
           const targetElement = document.getElementById(targetId);
           if (targetElement) {
             targetElement.scrollIntoView({ behavior: 'smooth' });
           }
+        } else if (href.includes('#')) { // If not on dashboard, navigate then scroll
+           router.push(href);
         }
         if (onClick) onClick();
-        if (!isBranding) setIsMobileMenuOpen(false); // Close mobile menu on item click unless it's the brand logo
+        if (!isBranding) setIsMobileMenuOpen(false);
       }}
       className={cn(
         "flex items-center gap-2 rounded-md text-sm font-medium transition-colors",
         isBranding 
-          ? "text-xl font-bold text-primary font-headline hover:opacity-90 p-0" // Branding has no padding from NavLinkItem
-          : "px-2 py-1.5 hover:bg-primary/10 hover:text-primary", // Adjusted padding
-        !isBranding && (pathname === href || (href.includes('#') && pathname + (window.location.hash || '') === href) ) ? "text-primary bg-primary/5" : "text-muted-foreground",
-        isBranding && "p-0" // Ensure branding item does not get padding
+          ? "text-xl font-bold text-primary font-headline hover:opacity-90 p-0" 
+          : "px-2 py-1.5 hover:bg-primary/10 hover:text-primary", 
+        !isBranding && (pathname === href || (pathname + (typeof window !== 'undefined' ? window.location.hash : '')) === href ) ? "text-primary bg-primary/5" : "text-muted-foreground hover:text-primary/80",
+        isBranding && "p-0" 
       )}
     >
       <Icon className={cn(isBranding ? "h-7 w-7" : "h-5 w-5")} />
@@ -96,62 +102,62 @@ export default function MainNav() {
   );
 
   const UserAvatar = () => (
-    <Avatar className="h-8 w-8 border border-transparent group-hover:border-primary/50 transition-colors">
+    <Avatar className="h-9 w-9 border border-transparent group-hover:border-primary/50 transition-colors">
       <AvatarImage src={authUser?.photoURL || userProfile?.photoURL || undefined} alt={authUser?.displayName || userProfile?.displayName || authUser?.email || 'User'} />
-      <AvatarFallback>{(userProfile?.displayName || authUser?.displayName || userProfile?.email || authUser?.email)?.[0].toUpperCase() || 'U'}</AvatarFallback>
+      <AvatarFallback className="text-sm bg-primary/20 text-primary">{(userProfile?.displayName || authUser?.displayName || userProfile?.email || authUser?.email)?.[0].toUpperCase() || 'U'}</AvatarFallback>
     </Avatar>
   );
   
   const getNavLinksForRole = (profile?: UserProfileData | null) => {
-    let specificLinks: Array<{ href: string; label: string; icon: React.ElementType; }> = [];
+    let userSpecificLinks: Array<{ href: string; label: string; icon: React.ElementType; }> = [];
     if (authUser && profile) {
       switch (profile.role) {
         case 'student':
         case 'test':
-          specificLinks = studentLinks;
+          userSpecificLinks = studentNavLinks;
           break;
         case 'event_representative':
-          specificLinks = [...baseOrganizerLinks];
+          userSpecificLinks = [...baseOrganizerLinks];
           if (profile.assignedEventSlug) {
-            specificLinks.splice(1, 0, { href: `/organizer/events/manage/${profile.assignedEventSlug}`, label: 'Manage My Event', icon: Briefcase });
-            specificLinks.splice(2, 0, { href: `/organizer/event-tasks`, label: 'Event Tasks', icon: Settings });
-
+            userSpecificLinks.splice(1, 0, { href: `/organizer/events/manage/${profile.assignedEventSlug}`, label: 'Manage My Event', icon: Briefcase });
+            userSpecificLinks.splice(2, 0, { href: `/organizer/event-tasks`, label: 'Event Tasks', icon: ListChecks});
           }
           break;
         case 'organizer':
-          specificLinks = [...baseOrganizerLinks];
-          // Organizers might get a link to a page showing all events they contribute to later
+          userSpecificLinks = [...baseOrganizerLinks];
           break;
         case 'overall_head':
-          specificLinks = [
+          userSpecificLinks = [
             { href: '/dashboard', label: 'OH Dashboard', icon: LayoutDashboard },
             { href: '/admin/tasks', label: 'Global Tasks', icon: Settings },
             { href: '/organizer/events/manage', label: 'Manage All Events', icon: Briefcase },
-            { href: '/ocr-tool', label: 'OCR Tool', icon: ScanLine },
+            { href: '/ocr-tool', label: 'OCR Tool', icon: FileScan },
             { href: '/notifications', label: 'Notifications', icon: Bell },
             { href: '/profile', label: 'My Profile', icon: UserCircle },
           ];
           break;
         case 'admin':
-          specificLinks = [
+          userSpecificLinks = [
             { href: '/dashboard', label: 'Admin Dashboard', icon: LayoutDashboard },
             { href: '/admin/tasks', label: 'Global Tasks', icon: Settings },
             { href: '/organizer/events/manage', label: 'Manage All Events', icon: Briefcase },
-            { href: '/admin/users', label: 'Manage Users', icon: UserCircle }, // Placeholder
-            { href: '/ocr-tool', label: 'OCR Tool', icon: ScanLine },
+            { href: '/admin/users', label: 'Manage Users', icon: Users}, 
+            { href: '/ocr-tool', label: 'OCR Tool', icon: FileScan },
             { href: '/notifications', label: 'Notifications', icon: Bell },
             { href: '/profile', label: 'My Profile', icon: UserCircle },
           ];
           break;
         default:
-          specificLinks = studentLinks; // Fallback, should ideally not happen
+          userSpecificLinks = []; 
       }
-       return [...commonLinks, ...specificLinks.filter(sl => !commonLinks.find(cl => cl.href === sl.href))];
+       return [...commonBaseLinks, ...userSpecificLinks.filter(sl => !commonBaseLinks.find(cl => cl.label === sl.label))]; // Combine and remove duplicates by label
     }
-    return commonLinks;
+    return commonBaseLinks; // Only common links for unauthenticated users
   };
 
   const currentNavLinks = getNavLinksForRole(userProfile);
+  const contactUsLink = { href: '/#contact-us', label: 'Contact', icon: Phone }; // Separate for consistent placement
+
 
   if (!mounted) {
     return (
@@ -168,23 +174,24 @@ export default function MainNav() {
   }
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center justify-between">
-        <NavLinkItem href="/" label="JUNIOR SCIENTIST" Icon={Atom} isBranding />
+    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
+      <div className="container flex h-16 items-center">
+        <NavLinkItem href="/" label="EventFlow" Icon={Atom} isBranding />
 
-        <nav className="hidden md:flex items-center space-x-1 lg:space-x-2">
+        <nav className="hidden md:flex items-center space-x-1 lg:space-x-2 ml-auto mr-4">
           {currentNavLinks.map(link => (
             <NavLinkItem key={link.href} href={link.href} label={link.label} Icon={link.icon} />
           ))}
+          <NavLinkItem key={contactUsLink.href} href={contactUsLink.href} label={contactUsLink.label} Icon={contactUsLink.icon} />
         </nav>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 md:ml-0 ml-auto"> {/* Ensure avatar/login buttons are at the end */}
           {loading ? (
-             <div className="h-8 w-8 animate-pulse rounded-full bg-muted"></div>
+             <div className="h-9 w-9 animate-pulse rounded-full bg-muted"></div>
           ) : authUser ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-9 w-9 rounded-full group">
+                <Button variant="ghost" className="relative h-10 w-10 rounded-full group p-0">
                   <UserAvatar />
                 </Button>
               </DropdownMenuTrigger>
@@ -218,7 +225,7 @@ export default function MainNav() {
               <Button variant="outline" asChild>
                 <Link href="/login">Log In</Link>
               </Button>
-              <Button asChild className="bg-accent hover:bg-accent/90 text-accent-foreground">
+              <Button asChild className="bg-accent hover:bg-accent/80 text-accent-foreground">
                 <Link href="/signup">Sign Up</Link>
               </Button>
             </div>
@@ -231,22 +238,23 @@ export default function MainNav() {
                 <span className="sr-only">Toggle menu</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-[280px] p-0 flex flex-col">
+            <SheetContent side="right" className="w-[280px] p-0 flex flex-col bg-card">
                 <SheetHeader className="border-b p-4">
                   <SheetTitle className="sr-only">Main Navigation Menu</SheetTitle>
-                  <NavLinkItem href="/" label="JUNIOR SCIENTIST" Icon={Atom} isBranding onClick={() => setIsMobileMenuOpen(false)}/>
+                  <NavLinkItem href="/" label="EventFlow" Icon={Atom} isBranding onClick={() => setIsMobileMenuOpen(false)}/>
                 </SheetHeader>
                 <nav className="flex-grow space-y-1 p-4 overflow-y-auto">
                   {currentNavLinks.map(link => (
                      <NavLinkItem key={link.href} href={link.href} label={link.label} Icon={link.icon} onClick={() => setIsMobileMenuOpen(false)} />
                   ))}
+                  <NavLinkItem key={contactUsLink.href} href={contactUsLink.href} label={contactUsLink.label} Icon={contactUsLink.icon} onClick={() => setIsMobileMenuOpen(false)} />
                 </nav>
                 {!authUser && !loading && (
                   <div className="border-t p-4 space-y-2">
                     <Button variant="outline" className="w-full" asChild onClick={() => setIsMobileMenuOpen(false)}>
                       <Link href="/login">Log In</Link>
                     </Button>
-                    <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" asChild onClick={() => setIsMobileMenuOpen(false)}>
+                    <Button className="w-full bg-accent hover:bg-accent/80 text-accent-foreground" asChild onClick={() => setIsMobileMenuOpen(false)}>
                       <Link href="/signup">Sign Up</Link>
                     </Button>
                   </div>
@@ -266,4 +274,3 @@ export default function MainNav() {
     </header>
   );
 }
-

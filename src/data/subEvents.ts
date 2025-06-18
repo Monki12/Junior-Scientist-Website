@@ -17,6 +17,7 @@ export const subEventsData: SubEvent[] = [
     ],
     registrationLink: '/signup?event=mun', 
     deadline: '2024-11-15',
+    eventDate: '2024-12-01', // Added mock event date
     isTeamEvent: false,
   },
   {
@@ -33,7 +34,8 @@ export const subEventsData: SubEvent[] = [
     ],
     registrationLink: '/signup?event=ex-quiz-it',
     deadline: '2024-11-18',
-    isTeamEvent: true, // This is a team event
+    eventDate: '2024-12-05', // Added mock event date
+    isTeamEvent: true,
   },
   {
     id: '3',
@@ -49,6 +51,7 @@ export const subEventsData: SubEvent[] = [
     ],
     registrationLink: '/signup?event=olympiad',
     deadline: '2024-11-20',
+    eventDate: '2024-12-10', // Added mock event date
   },
   {
     id: '4',
@@ -64,6 +67,7 @@ export const subEventsData: SubEvent[] = [
     ],
     registrationLink: '/signup?event=math-a-maze',
     deadline: '2024-11-22',
+    eventDate: '2024-12-12', // Added mock event date
   },
   {
     id: '5',
@@ -79,7 +83,8 @@ export const subEventsData: SubEvent[] = [
     ],
     registrationLink: '/signup?event=maze-mastery',
     deadline: '2024-11-25',
-    isTeamEvent: true, // Example: this could also be a team event
+    eventDate: '2024-12-15', // Added mock event date
+    isTeamEvent: true, 
   },
   {
     id: '6',
@@ -95,7 +100,7 @@ export const subEventsData: SubEvent[] = [
     ],
     registrationLink: '/signup?event=robo-challenge',
     deadline: '2024-11-28',
-    isTeamEvent: true, // Example: robotics often team-based
+    eventDate: '2024-12-18', // Added mock event date
+    isTeamEvent: true, 
   },
 ];
-

@@ -3,30 +3,48 @@
 
 import type { User as FirebaseUser, AuthError } from 'firebase/auth';
 import { createContext, useState, useEffect, ReactNode } from 'react';
-import type { SignUpFormData, LoginFormData, UserProfileData, UserRole, Task } from '@/types';
-import { subEventsData } from '@/data/subEvents'; // For event titles
+import type { SignUpFormData, LoginFormData, UserProfileData, UserRole, Task, RegisteredEventInfo } from '@/types';
+// subEventsData can be imported if needed for event titles etc., but dashboard will fetch from its own data source for now.
 
-// --- MOCK DATA ---
 const mockTasksBase: Omit<Task, 'id' | 'assignedToUid' | 'assignedToName'>[] = [
   { title: 'Prepare presentation slides', description: 'Draft slides for the opening ceremony.', status: 'pending', deadline: '2024-08-15', points: 20, createdAt: '2024-07-20', updatedAt: '2024-07-20', assignedByName: 'Admin User' },
   { title: 'Coordinate with vendors', description: 'Finalize contracts with catering and AV.', status: 'in-progress', deadline: '2024-08-10', points: 30, createdAt: '2024-07-15', updatedAt: '2024-07-18', assignedByName: 'Overall Head' },
   { title: 'Update social media', description: 'Post daily updates about event registrations.', status: 'completed', deadline: '2024-07-25', points: 10, createdAt: '2024-07-01', updatedAt: '2024-07-25', assignedByName: 'Event Rep' },
 ];
 
+const mockStudentRegisteredEvents: RegisteredEventInfo[] = [
+  { 
+    eventSlug: 'model-united-nations', 
+    eventDate: '2024-12-01', 
+    admitCardStatus: 'pending' 
+  }, 
+  { 
+    eventSlug: 'ex-quiz-it', 
+    teamName: 'Quiz Wizards', 
+    eventDate: '2024-12-05', 
+    admitCardStatus: 'published',
+    teamMembers: [{id: 'mem1', name: 'Jane Doe'}, {id: 'mem2', name: 'John Smith'}] 
+  },
+  {
+    eventSlug: 'robo-challenge',
+    eventDate: '2024-11-28',
+    admitCardStatus: 'unavailable',
+    teamName: 'RoboKnights',
+    teamMembers: [{id: 'mem3', name: 'Alice Wonder'}]
+  }
+];
 
 const mockUserProfiles: Record<UserRole, UserProfileData> = {
   student: {
-    uid: 'mock-student-uid',
+    uid: 'mock-student-uid-12345', // More unique looking ID
     email: 'student.test@example.com',
-    displayName: 'Test Student',
+    displayName: 'Alex Johnson',
     role: 'student',
-    photoURL: 'https://placehold.co/100x100.png?text=TS',
-    school: 'Springfield High',
-    grade: '10th Grade',
-    registeredEvents: [
-      { eventSlug: 'model-united-nations' }, 
-      { eventSlug: 'ex-quiz-it', teamName: 'Quiz Wizards' }
-    ], 
+    photoURL: 'https://placehold.co/120x120.png?text=AJ',
+    school: 'Springfield High International',
+    grade: '10th Grade - Section A',
+    phoneNumbers: ['+1-555-0101', '+1-555-0102'],
+    registeredEvents: mockStudentRegisteredEvents, 
   },
   organizer: {
     uid: 'mock-organizer-uid',
@@ -50,7 +68,7 @@ const mockUserProfiles: Record<UserRole, UserProfileData> = {
     role: 'event_representative',
     photoURL: 'https://placehold.co/100x100.png?text=ERB',
     department: 'Event Management',
-    assignedEventSlug: 'ex-quiz-it', // Manages "Ex-Quiz-It"
+    assignedEventSlug: 'ex-quiz-it',
     tasks: [
         { id: 'task3', ...mockTasksBase[2], assignedToUid: 'mock-representative-uid', assignedToName: 'Test Event Rep Bob', status: 'in-progress', eventSlug: 'ex-quiz-it', title: 'Finalize Quiz Questions' },
     ],
@@ -84,18 +102,21 @@ const mockUserProfiles: Record<UserRole, UserProfileData> = {
     credibilityScore: 95,
   },
   test: { 
-    uid: 'mock-test-uid',
+    uid: 'mock-test-uid-67890',
     email: 'generic.test@example.com',
-    displayName: 'Generic Test User Eve',
+    displayName: 'Sam Williams (Test)',
     role: 'test', 
-    photoURL: 'https://placehold.co/100x100.png?text=TUE',
-    school: 'Testington Academy',
-    grade: '12th Grade',
-    registeredEvents: [{ eventSlug: 'robo-challenge', teamName: 'RoboKnights' }],
-    // Test users can also have tasks/points for testing those UI parts
+    photoURL: 'https://placehold.co/120x120.png?text=SW',
+    school: 'Testington Academy Global',
+    grade: '12th Grade - Section B',
+    phoneNumbers: ['+1-555-0201'],
+    registeredEvents: [
+        { eventSlug: 'robo-challenge', teamName: 'RoboKnights', eventDate: '2024-11-28', admitCardStatus: 'pending' },
+        { eventSlug: 'math-a-maze', eventDate: '2024-11-22', admitCardStatus: 'unavailable'}
+    ],
     department: 'QA',
     tasks: [
-        { id: 'task6', title: 'Test student dashboard', description: 'Verify all student dashboard features.', status: 'pending', deadline: '2024-08-01', points: 10, createdAt: '2024-07-25', updatedAt: '2024-07-25', assignedToUid: 'mock-test-uid', assignedToName: 'Generic Test User Eve', assignedByName: 'Overall Head' }
+        { id: 'task6', title: 'Test student dashboard', description: 'Verify all student dashboard features.', status: 'pending', deadline: '2024-08-01', points: 10, createdAt: '2024-07-25', updatedAt: '2024-07-25', assignedToUid: 'mock-test-uid-67890', assignedToName: 'Sam Williams (Test)', assignedByName: 'Overall Head' }
     ],
     points: 50,
     credibilityScore: 60,
@@ -121,8 +142,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setAuthUser(null);
-    setUserProfile(null);
+    // Attempt to retrieve stored role, or default to null
+    const storedRole = typeof window !== "undefined" ? localStorage.getItem('mockUserRole') as UserRole | null : null;
+    if (storedRole) {
+      setMockUserRole(storedRole);
+    } else {
+      setAuthUser(null);
+      setUserProfile(null);
+    }
     setLoading(false);
   }, []);
 
@@ -151,9 +178,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       setAuthUser(mockFbUser);
       setUserProfile(profile);
+      if (typeof window !== "undefined") {
+        localStorage.setItem('mockUserRole', role);
+      }
     } else {
       setAuthUser(null);
       setUserProfile(null);
+      if (typeof window !== "undefined") {
+        localStorage.removeItem('mockUserRole');
+      }
     }
     setLoading(false);
   };
@@ -166,18 +199,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logIn = async (data: LoginFormData | UserRole): Promise<{ message: string } | FirebaseUser> => {
     console.warn("Mock Auth: logIn called.");
     let loggedInUser: FirebaseUser | null = null;
+    let roleToSet: UserRole | null = null;
+
     if (typeof data === 'string' && mockUserProfiles[data as UserRole]) { 
-      setMockUserRole(data as UserRole);
-      const profile = mockUserProfiles[data as UserRole];
-      loggedInUser = { uid: profile.uid, email: profile.email, displayName: profile.displayName, photoURL: profile.photoURL } as FirebaseUser;
+      roleToSet = data as UserRole;
     } else if (typeof data === 'object' && data.email) { 
-        const roleToLogin = Object.values(mockUserProfiles).find(p => p.email === data.email)?.role;
-        if (roleToLogin) {
-            setMockUserRole(roleToLogin);
-            const profile = mockUserProfiles[roleToLogin];
-            loggedInUser = { uid: profile.uid, email: profile.email, displayName: profile.displayName, photoURL: profile.photoURL } as FirebaseUser;
+        const foundRole = Object.values(mockUserProfiles).find(p => p.email === data.email)?.role;
+        if (foundRole) {
+            roleToSet = foundRole;
         }
+    }
+    
+    if (roleToSet) {
+      setMockUserRole(roleToSet);
+      const profile = mockUserProfiles[roleToSet];
+      loggedInUser = { uid: profile.uid, email: profile.email, displayName: profile.displayName, photoURL: profile.photoURL } as FirebaseUser;
     } else {
+      // Default to student if no match or invalid input, or handle error
       setMockUserRole('student'); 
       const profile = mockUserProfiles['student'];
       loggedInUser = { uid: profile.uid, email: profile.email, displayName: profile.displayName, photoURL: profile.photoURL } as FirebaseUser;

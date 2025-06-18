@@ -1,7 +1,6 @@
 
 import type { User as FirebaseUser } from 'firebase/auth';
 
-// Defines the possible roles a user can have in the application
 export type UserRole = 
   | 'student' 
   | 'organizer' 
@@ -14,19 +13,26 @@ export interface Task {
   id: string;
   title: string;
   description: string;
-  assignedToName?: string; // Name of the user it's assigned to (for display)
-  assignedToUid?: string;   // UID of the user it's assigned to
-  assignedByName?: string; // Name of the user who assigned it (for display)
-  assignedByUid?: string;   // UID of the user who assigned it
-  eventSlug?: string;       // Optional, if task is event-specific
-  deadline?: string;        // ISO date string
+  assignedToName?: string;
+  assignedToUid?: string;  
+  assignedByName?: string;
+  assignedByUid?: string;  
+  eventSlug?: string;      
+  deadline?: string;       
   points?: number;
   status: 'pending' | 'in-progress' | 'completed' | 'overdue';
-  createdAt: string;         // ISO date string
-  updatedAt: string;         // ISO date string
+  createdAt: string;        
+  updatedAt: string;        
 }
 
-// Interface for custom user profile data stored in Firestore
+export interface RegisteredEventInfo {
+  eventSlug: string;
+  teamName?: string;
+  teamMembers?: { id: string, name: string, role?: string }[]; // Simplified team members
+  admitCardStatus?: 'published' | 'pending' | 'unavailable';
+  eventDate?: string; // Added eventDate here
+}
+
 export interface UserProfileData {
   uid: string;
   email: string | null;
@@ -35,21 +41,17 @@ export interface UserProfileData {
   photoURL?: string | null; 
   school?: string; 
   grade?: string; 
-  registeredEvents?: Array<{
-    eventSlug: string;
-    teamName?: string; 
-  }>;
-  department?: string; // e.g., "Marketing", "Logistics"
-  assignedEventSlug?: string; // For event_representative: the slug of the event they manage
-  assignedEventSlugs?: string[]; // For organizers: slugs of events they are part of
-  tasks?: Task[]; // Tasks assigned to this user
-  points?: number; // Gamification points
-  credibilityScore?: number; // Calculated score
+  phoneNumbers?: string[]; // Added phoneNumbers
+  registeredEvents?: RegisteredEventInfo[]; // Updated to new type
+  department?: string; 
+  assignedEventSlug?: string; 
+  assignedEventSlugs?: string[]; 
+  tasks?: Task[]; 
+  points?: number; 
+  credibilityScore?: number; 
 }
 
-// This Event interface seems to be for a generic event, not the sub-events.
-// It's kept for now if used elsewhere.
-export interface Event {
+export interface Event { // General event type, potentially for future use
   id: string;
   title: string;
   description: string;
@@ -63,7 +65,6 @@ export interface Event {
   dataAiHint?: string;
 }
 
-// Interface for the Junior Scientist Sub-Events
 export interface SubEvent {
   id: string;
   slug: string;
@@ -73,9 +74,10 @@ export interface SubEvent {
   detailedDescription: string; 
   mainImage: { src: string; alt: string; dataAiHint: string };
   galleryImages?: Array<{ src: string; alt: string; dataAiHint: string }>;
-  registrationLink: string;
+  registrationLink: string; // Kept for now, though registration flow changes for logged-in users
   deadline?: string; 
   isTeamEvent?: boolean; 
+  eventDate?: string; // Added eventDate
 }
 
 export interface SignUpFormData {
@@ -90,7 +92,7 @@ export interface LoginFormData {
   password: string;
 }
 
-export interface StudentData {
+export interface StudentData { // For OCR
   name: string;
   school: string;
   grade: string;
