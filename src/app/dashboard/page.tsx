@@ -86,11 +86,23 @@ const getEventStatusBadgeVariant = (status: EventStatus | undefined): "default" 
     }
 };
 
-
-export default function DashboardPage() {
+// Explicitly type props for the page component, even if not directly used in a Client Component
+// This is a speculative change to address potential Next.js internal prop handling.
+export default function DashboardPage({
+  params, // Route parameters (e.g., for dynamic routes like /dashboard/[id])
+  searchParams, // URL query parameters
+}: {
+  params: { [key: string]: string | string[] | undefined };
+  searchParams: { [key: string]: string | string[] | undefined };
+}) {
   const { authUser, userProfile, setUserProfile, loading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
+  
+  // Client components usually use hooks for params, so these props are not used directly.
+  // const routeParams = useParams(); 
+  // const queryParams = useSearchParams();
+
   const [localUserProfileTasks, setLocalUserProfileTasks] = useState<Task[]>([]);
 
   // State for Overall Head's Global Participant View
@@ -128,8 +140,11 @@ export default function DashboardPage() {
       router.push('/login?redirect=/dashboard');
     }
     if (userProfile) {
-      const assignedTasks = userProfile.tasks?.filter(task => task.assignedTo?.includes(userProfile.displayName!)) || [];
-      setLocalUserProfileTasks(assignedTasks);
+      const personallyAssignedTasks = userProfile.tasks?.filter(task => 
+        task.assignedTo?.includes(userProfile.displayName!)
+      ) || [];
+      setLocalUserProfileTasks(personallyAssignedTasks);
+
       if (userProfile.role === 'overall_head' && userProfile.allPlatformParticipants) {
         setGlobalParticipants(userProfile.allPlatformParticipants);
       }
@@ -362,7 +377,6 @@ export default function DashboardPage() {
         event.title.toLowerCase().includes(searchTermLower) ||
         (event.venue && event.venue.toLowerCase().includes(searchTermLower));
       const matchesStatus = eventStatusFilter === 'all' || event.status === eventStatusFilter;
-      // Add date range filter logic here when implemented
       return matchesSearch && matchesStatus;
     });
   }, [allPlatformEvents, eventSearchTerm, eventStatusFilter]);
@@ -411,7 +425,7 @@ export default function DashboardPage() {
         const updatedEvent = { 
             ...allPlatformEvents.find(e => e.id === editingEventId)!,
             ...eventData,
-            slug: eventData.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, ''), // Re-generate slug on title change
+            slug: eventData.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, ''), 
         };
         setAllPlatformEvents(prev => prev.map(event => event.id === editingEventId ? updatedEvent : event));
         toast({ title: "Event Updated", description: `Event "${eventData.title}" has been updated.`});
@@ -482,7 +496,7 @@ export default function DashboardPage() {
   const role: UserRole = userProfile.role;
 
   // Student Dashboard
-  if (role === 'student' || (role === 'test' && myTasks.length === 0)) {
+  if (role === 'student' || (role === 'test' && myTasks.length === 0 && !userProfile.assignedEventSlugs?.length)) { // Test user as student if no specific tasks/assignments
     const studentRegisteredFullEvents: RegisteredEventDisplay[] = userProfile.registeredEvents
       ?.map(registeredInfo => {
         const eventDetail = subEventsData.find(event => event.slug === registeredInfo.eventSlug);
@@ -648,7 +662,7 @@ export default function DashboardPage() {
     ].filter(Boolean);
 
     const allActiveGlobalFiltersForDisplay = [
-        ...activeGlobalStaticFiltersForDisplay.map(f => ({ ...f, isDynamic: false, id: f!.label.toLowerCase()})),
+        ...activeGlobalStaticFiltersForDisplay.map(f => ({ ...f!, isDynamic: false, id: f!.label.toLowerCase()})),
         ...activeGlobalDynamicFilters.map(df => ({ label: df.columnName, value: df.value, id: df.id, isDynamic: true }))
     ];
     
@@ -1658,6 +1672,3 @@ export default function DashboardPage() {
   );
 }
 
-    
-
-    
