@@ -28,16 +28,16 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Loader2, Users, Search, ShieldAlert, Filter, PlusCircle, BarChart2, PieChart, Users2, Tag, XIcon } from 'lucide-react';
+import { ArrowLeft, Loader2, Users, Search, ShieldAlert, Filter, PlusCircle, BarChart2, PieChart, Users2, Tag, XIcon, Check, X, HelpCircle } from 'lucide-react';
 
 // Enhanced mock data
 const initialMockEventParticipants: EventParticipant[] = [
-  { id: 'stud1', name: 'Alice Smith', email: 'alice.smith@example.com', contactNumber: '555-0101', schoolName: 'Springfield High', registrationDate: new Date('2024-07-01T10:00:00Z').toISOString(), paymentStatus: 'paid', customData: {} },
-  { id: 'stud2', name: 'Bob Johnson', email: 'bob.johnson@example.com', contactNumber: '555-0102', schoolName: 'Northwood Academy', registrationDate: new Date('2024-07-02T11:30:00Z').toISOString(), paymentStatus: 'pending', customData: {} },
-  { id: 'stud3', name: 'Charlie Brown', email: 'charlie.brown@example.com', contactNumber: '555-0103', schoolName: 'Springfield High', registrationDate: new Date('2024-07-03T09:15:00Z').toISOString(), paymentStatus: 'paid', customData: {} },
-  { id: 'stud4', name: 'Diana Prince', email: 'diana.prince@example.com', contactNumber: '555-0104', schoolName: 'Riverside Prep', registrationDate: new Date('2024-07-04T14:00:00Z').toISOString(), paymentStatus: 'waived', customData: {} },
-  { id: 'stud5', name: 'Edward Nigma', email: 'edward.nigma@example.com', contactNumber: '555-0105', schoolName: 'Northwood Academy', registrationDate: new Date('2024-07-05T16:45:00Z').toISOString(), paymentStatus: 'failed', customData: {} },
-  { id: 'stud6', name: 'Fiona Gallagher', email: 'fiona.gallagher@example.com', contactNumber: '555-0106', schoolName: 'Springfield High', registrationDate: new Date('2024-07-06T08:00:00Z').toISOString(), paymentStatus: 'paid', customData: {} },
+  { id: 'stud1', name: 'Alice Smith', email: 'alice.smith@example.com', schoolName: 'Springfield High', registrationDate: new Date('2024-07-01T10:00:00Z').toISOString(), paymentStatus: 'paid', customData: { levels: { '1': { present: true, venue: 'Auditorium A', qualified: 'auto'}, '2': { present: true, qualified: 'yes' } } } },
+  { id: 'stud2', name: 'Bob Johnson', email: 'bob.johnson@example.com', schoolName: 'Northwood Academy', registrationDate: new Date('2024-07-02T11:30:00Z').toISOString(), paymentStatus: 'pending', customData: { levels: { '1': { present: true, venue: 'Hall B', qualified: 'auto'}, '2': { present: false, qualified: 'no' } } } },
+  { id: 'stud3', name: 'Charlie Brown', email: 'charlie.brown@example.com', schoolName: 'Springfield High', registrationDate: new Date('2024-07-03T09:15:00Z').toISOString(), paymentStatus: 'paid', customData: { levels: { '1': { present: false, venue: 'Room C1', qualified: 'auto'}, '2': { present: false, qualified: 'auto' } } } },
+  { id: 'stud4', name: 'Diana Prince', email: 'diana.prince@example.com', schoolName: 'Riverside Prep', registrationDate: new Date('2024-07-04T14:00:00Z').toISOString(), paymentStatus: 'waived', customData: { levels: { '1': { present: true, venue: 'Auditorium A', qualified: 'auto'}, '2': { present: true, qualified: 'auto' } } } },
+  { id: 'stud5', name: 'Edward Nigma', email: 'edward.nigma@example.com', schoolName: 'Northwood Academy', registrationDate: new Date('2024-07-05T16:45:00Z').toISOString(), paymentStatus: 'failed', customData: { levels: { '1': { present: true, venue: 'Hall B', qualified: 'auto'}, '2': { present: true, qualified: 'yes' } } } },
+  { id: 'stud6', name: 'Fiona Gallagher', email: 'fiona.gallagher@example.com', schoolName: 'Springfield High', registrationDate: new Date('2024-07-06T08:00:00Z').toISOString(), paymentStatus: 'paid', customData: { levels: { '1': { present: true, venue: 'Room C1', qualified: 'auto'}, '2': { present: false, qualified: 'no' } } } },
 ];
 
 interface ActiveDynamicFilter {
@@ -111,14 +111,17 @@ export default function ManageParticipantsPage() {
   }, [participants]);
 
   const paymentStatuses: Array<EventParticipant['paymentStatus'] | 'all'> = ['all', 'paid', 'pending', 'waived', 'failed'];
-
+  
   const availableFilterColumns = useMemo(() => {
     const standardCols = [
       { id: 'name', name: 'Name', isCustom: false },
       { id: 'email', name: 'Email', isCustom: false },
-      { id: 'contactNumber', name: 'Contact Number', isCustom: false },
+      // { id: 'contactNumber', name: 'Contact Number', isCustom: false }, // Removed from direct filter options for brevity
       { id: 'schoolName', name: 'School Name', isCustom: false },
       { id: 'paymentStatus', name: 'Payment Status', isCustom: false },
+      { id: 'levels.1.present', name: 'Lvl 1 Present', isCustom: false }, // Example for level filtering
+      { id: 'levels.1.venue', name: 'Lvl 1 Venue', isCustom: false },
+      { id: 'levels.2.qualified', name: 'Lvl 2 Qualify Status', isCustom: false },
     ];
     const customCols = customColumnDefinitions.map(col => ({ id: col.id, name: col.name, isCustom: true }));
     return [...standardCols, ...customCols];
@@ -142,14 +145,26 @@ export default function ManageParticipantsPage() {
           if (filter.isCustom) {
             participantValue = participant.customData?.[filter.columnId];
           } else {
-            participantValue = (participant as any)[filter.columnId];
+            // Handle nested standard properties like levels
+            if (filter.columnId.startsWith('levels.')) {
+                const parts = filter.columnId.split('.'); // e.g., ['levels', '1', 'present']
+                participantValue = participant.customData?.[parts[0]]?.[parts[1]]?.[parts[2]];
+            } else {
+                participantValue = (participant as any)[filter.columnId];
+            }
           }
 
-          if (participantValue === undefined || participantValue === null) return false;
+          if (participantValue === undefined || participantValue === null) {
+            // If filter value is for 'empty' or 'not set', this logic might need adjustment
+            return filter.value.toLowerCase() === 'false' && typeof participantValue === 'boolean' ? true : false;
+          }
           
-          // Simple "contains" for strings, exact match for others (converted to string for comparison)
           const valueStr = String(participantValue).toLowerCase();
           const filterValueStr = filter.value.toLowerCase();
+
+          if (typeof participantValue === 'boolean') {
+             return filterValueStr === valueStr;
+          }
           return valueStr.includes(filterValueStr);
         });
       }
@@ -183,7 +198,7 @@ export default function ManageParticipantsPage() {
       toast({ title: "Error", description: "Column Name and Data Type are required.", variant: "destructive" });
       return;
     }
-    const newColumnId = `custom_${Date.now()}`;
+    const newColumnId = `custom_${Date.now()}_${newColumnForm.name.toLowerCase().replace(/\s+/g, '_')}`;
     const newDefinition: CustomColumnDefinition = {
       id: newColumnId,
       name: newColumnForm.name,
@@ -226,6 +241,31 @@ export default function ManageParticipantsPage() {
       )
     );
   };
+  
+  const handleLevelQualificationChange = (participantId: string, level: string, qualification: 'yes' | 'no' | 'auto') => {
+    setParticipants(prev =>
+      prev.map(p => {
+        if (p.id === participantId) {
+          const updatedLevels = {
+            ...(p.customData?.levels || {}),
+            [level]: {
+              ...(p.customData?.levels?.[level] || { present: false, qualified: 'auto' }), // Ensure level object exists
+              qualified: qualification,
+            },
+          };
+          return {
+            ...p,
+            customData: {
+              ...p.customData,
+              levels: updatedLevels,
+            },
+          };
+        }
+        return p;
+      })
+    );
+  };
+
 
   const renderCustomCell = (participant: EventParticipant, column: CustomColumnDefinition) => {
     const value = participant.customData?.[column.id] ?? column.defaultValue ?? getInitialValueForDataType(column.dataType);
@@ -234,16 +274,16 @@ export default function ManageParticipantsPage() {
     if (isEditing) {
        switch (column.dataType) {
         case 'text':
-          return <Input type="text" value={value} onChange={(e) => handleCustomDataChange(participant.id, column.id, e.target.value)} onBlur={() => setEditingCell(null)} autoFocus className="h-8 text-xs"/>;
+          return <Input type="text" value={value as string} onChange={(e) => handleCustomDataChange(participant.id, column.id, e.target.value)} onBlur={() => setEditingCell(null)} autoFocus className="h-8 text-xs"/>;
         case 'number':
-          return <Input type="number" value={value} onChange={(e) => handleCustomDataChange(participant.id, column.id, parseFloat(e.target.value) || 0)} onBlur={() => setEditingCell(null)} autoFocus className="h-8 text-xs"/>;
+          return <Input type="number" value={value as number} onChange={(e) => handleCustomDataChange(participant.id, column.id, parseFloat(e.target.value) || 0)} onBlur={() => setEditingCell(null)} autoFocus className="h-8 text-xs"/>;
         case 'date':
-          return <Input type="date" value={value} onChange={(e) => handleCustomDataChange(participant.id, column.id, e.target.value)} onBlur={() => setEditingCell(null)} autoFocus className="h-8 text-xs"/>;
+          return <Input type="date" value={value as string} onChange={(e) => handleCustomDataChange(participant.id, column.id, e.target.value)} onBlur={() => setEditingCell(null)} autoFocus className="h-8 text-xs"/>;
         case 'checkbox':
            return <Checkbox checked={!!value} onCheckedChange={(checked) => handleCustomDataChange(participant.id, column.id, !!checked)} />;
         case 'dropdown':
           return (
-            <Select value={value} onValueChange={(val) => { handleCustomDataChange(participant.id, column.id, val); setEditingCell(null); }} >
+            <Select value={value as string} onValueChange={(val) => { handleCustomDataChange(participant.id, column.id, val); setEditingCell(null); }} >
               <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select..." /></SelectTrigger>
               <SelectContent>
                 {column.options?.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
@@ -260,6 +300,22 @@ export default function ManageParticipantsPage() {
             return <Checkbox checked={!!value} onCheckedChange={(checked) => handleCustomDataChange(participant.id, column.id, !!checked)} aria-label={`Toggle ${column.name} for ${participant.name}`}/>;
         default:
             return <span onClick={() => column.dataType !== 'checkbox' && setEditingCell({ participantId: participant.id, columnId: column.id })} className="cursor-pointer hover:bg-muted/50 p-1 rounded min-h-[2rem] block">{String(value)}</span>;
+    }
+  };
+  
+  const getQualificationRowClass = (status?: 'yes' | 'no' | 'auto') => {
+    switch (status) {
+      case 'yes': return 'bg-green-500/10 hover:bg-green-500/20';
+      case 'no': return 'bg-red-500/10 hover:bg-red-500/20';
+      default: return '';
+    }
+  };
+
+  const getQualificationIcon = (status?: 'yes' | 'no' | 'auto') => {
+    switch (status) {
+      case 'yes': return <Check className="h-4 w-4 text-green-600" />;
+      case 'no': return <X className="h-4 w-4 text-red-600" />;
+      default: return <HelpCircle className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
@@ -313,14 +369,16 @@ export default function ManageParticipantsPage() {
   return (
     <div className="max-w-full mx-auto py-8 px-4 animate-fade-in-up space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <Button variant="outline" size="sm" onClick={() => router.back()} className="mb-2 sm:mb-0">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:gap-4">
+           <Button variant="outline" size="sm" onClick={() => router.back()} className="mb-2 sm:mb-0 self-start sm:self-center">
             <ArrowLeft className="mr-2 h-4 w-4" /> Back
           </Button>
-          <h1 className="text-3xl font-bold text-primary flex items-center gap-2">
-            <Users className="h-8 w-8" /> Manage Participants: {event.title}
-          </h1>
-          <p className="text-muted-foreground">View, filter, and manage registered participants for this event.</p>
+          <div className="mt-2 sm:mt-0">
+            <h1 className="text-3xl font-bold text-primary flex items-center gap-2">
+                <Users className="h-8 w-8" /> Manage Participants: {event.title}
+            </h1>
+            <p className="text-muted-foreground">View, filter, and manage registered participants for this event.</p>
+          </div>
         </div>
         <Button variant="default" className="bg-accent hover:bg-accent/90 text-accent-foreground" disabled>
           Export Data (CSV)
@@ -332,7 +390,7 @@ export default function ManageParticipantsPage() {
           <CardTitle className="flex items-center gap-2"><BarChart2 className="h-6 w-6 text-primary" />Statistics Overview</CardTitle>
           <CardDescription>Quick insights into your participant data. Updates with filters.</CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="bg-secondary/30">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1"><Users2 className="h-4 w-4"/>Total Participants</CardTitle>
@@ -349,7 +407,7 @@ export default function ManageParticipantsPage() {
               {Object.entries(schoolBreakdown).map(([school, count]) => (
                 <p key={school}>{school}: {count}</p>
               ))}
-              {Object.keys(schoolBreakdown).length === 0 && <p className="text-muted-foreground">No school data in current view.</p>}
+              {Object.keys(schoolBreakdown).length === 0 && <p className="text-muted-foreground">No school data.</p>}
             </CardContent>
           </Card>
           <Card className="bg-secondary/30">
@@ -361,6 +419,14 @@ export default function ManageParticipantsPage() {
                 <p key={status} className="capitalize">{status}: {count}</p>
               ))}
               {Object.keys(paymentStatusBreakdown).length === 0 && <p className="text-muted-foreground">No payment data.</p>}
+            </CardContent>
+          </Card>
+           <Card className="bg-secondary/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Custom Column Stats</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground">Visualizations for custom columns will appear here.</p>
             </CardContent>
           </Card>
         </CardContent>
@@ -487,7 +553,7 @@ export default function ManageParticipantsPage() {
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle>Participant List ({filteredParticipants.length} found)</CardTitle>
-          <CardDescription>Total Participants: {participants.length}</CardDescription>
+          <CardDescription>Total Participants: {participants.length}. Click cells in custom columns or Lvl 2 Qualify to edit.</CardDescription>
         </CardHeader>
         <CardContent>
           {filteredParticipants.length > 0 ? (
@@ -497,10 +563,12 @@ export default function ManageParticipantsPage() {
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
-                    <TableHead>Contact</TableHead>
                     <TableHead>School</TableHead>
                     <TableHead>Registered On</TableHead>
                     <TableHead>Payment</TableHead>
+                    <TableHead>Lvl 1 Present</TableHead>
+                    <TableHead>Lvl 1 Venue</TableHead>
+                    <TableHead>Lvl 2 Qualify Status</TableHead>
                     {customColumnDefinitions.map(col => (
                       <TableHead key={col.id}>{col.name}</TableHead>
                     ))}
@@ -563,30 +631,53 @@ export default function ManageParticipantsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredParticipants.map((participant) => (
-                    <TableRow key={participant.id}>
-                      <TableCell className="font-medium">{participant.name}</TableCell>
-                      <TableCell>{participant.email}</TableCell>
-                      <TableCell>{participant.contactNumber || 'N/A'}</TableCell>
-                      <TableCell>{participant.schoolName || 'N/A'}</TableCell>
-                      <TableCell>{new Date(participant.registrationDate).toLocaleDateString()}</TableCell>
-                      <TableCell>
-                        <Badge variant={
-                          participant.paymentStatus === 'paid' ? 'default' :
-                          participant.paymentStatus === 'pending' ? 'secondary' :
-                          'outline' 
-                        } className="capitalize">
-                          {participant.paymentStatus}
-                        </Badge>
-                      </TableCell>
-                      {customColumnDefinitions.map(col => (
-                        <TableCell key={col.id}>
-                          {renderCustomCell(participant, col)}
+                  {filteredParticipants.map((participant) => {
+                    const level1Data = participant.customData?.levels?.['1'] || { present: false, venue: '', qualified: 'auto' };
+                    const level2Data = participant.customData?.levels?.['2'] || { present: false, venue: '', qualified: 'auto' };
+                    return (
+                      <TableRow key={participant.id} className={getQualificationRowClass(level2Data.qualified)}>
+                        <TableCell className="font-medium">{participant.name}</TableCell>
+                        <TableCell>{participant.email}</TableCell>
+                        <TableCell>{participant.schoolName || 'N/A'}</TableCell>
+                        <TableCell>{new Date(participant.registrationDate).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          <Badge variant={
+                            participant.paymentStatus === 'paid' ? 'default' :
+                            participant.paymentStatus === 'pending' ? 'secondary' :
+                            'outline' 
+                          } className="capitalize">
+                            {participant.paymentStatus}
+                          </Badge>
                         </TableCell>
-                      ))}
-                       <TableCell></TableCell>
-                    </TableRow>
-                  ))}
+                        <TableCell className="text-center">
+                            <Checkbox checked={level1Data.present} disabled aria-label={`Level 1 Present for ${participant.name}`}/>
+                        </TableCell>
+                        <TableCell>{level1Data.venue || 'N/A'}</TableCell>
+                        <TableCell className="flex items-center gap-1">
+                           {getQualificationIcon(level2Data.qualified)}
+                           <Select
+                              value={level2Data.qualified}
+                              onValueChange={(value: 'yes' | 'no' | 'auto') => handleLevelQualificationChange(participant.id, '2', value)}
+                            >
+                              <SelectTrigger className="h-8 text-xs w-[150px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="auto">Auto (Based on Lvl 1)</SelectItem>
+                                <SelectItem value="yes">Yes (Qualify)</SelectItem>
+                                <SelectItem value="no">No (Disqualify)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                        </TableCell>
+                        {customColumnDefinitions.map(col => (
+                          <TableCell key={col.id}>
+                            {renderCustomCell(participant, col)}
+                          </TableCell>
+                        ))}
+                        <TableCell></TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -606,4 +697,3 @@ export default function ManageParticipantsPage() {
     </div>
   );
 }
-

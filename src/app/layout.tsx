@@ -34,7 +34,7 @@ export default function RootLayout({
         >
           <AuthProvider>
             <MainNav />
-            <main className="flex-grow container mx-auto px-4 py-8">
+            <main className="flex-grow container mx-auto px-4 py-6"> {/* Changed py-8 to py-6 */}
               {children}
             </main>
             <SiteFooter />
