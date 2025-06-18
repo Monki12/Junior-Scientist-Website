@@ -102,6 +102,9 @@ export interface StudentData {
   email: string;
 }
 
+// Represents the custom data stored for a participant, keyed by columnId
+export type ParticipantCustomData = Record<string, any>;
+
 export interface EventParticipant {
   id: string; 
   name: string;
@@ -110,9 +113,7 @@ export interface EventParticipant {
   schoolName?: string;
   registrationDate: string; 
   paymentStatus: 'paid' | 'pending' | 'waived' | 'failed';
-  // notes?: string; // Removed as per redesign
-  // followUpCompleted?: boolean; // Removed as per redesign
-  // Custom column data will be handled differently later
+  customData?: ParticipantCustomData; 
 }
 
 // Represents the definition of a custom column
@@ -120,11 +121,8 @@ export interface CustomColumnDefinition {
   id: string; // Unique ID for the column
   name: string; // Display name of the column header
   dataType: 'text' | 'number' | 'checkbox' | 'dropdown' | 'date';
-  options?: string[]; // For dropdown type
+  options?: string[]; // For dropdown type, comma-separated string initially, then parsed to array
   defaultValue?: any;
   description?: string;
 }
-// Represents the custom data stored for a participant, keyed by columnId
-export type ParticipantCustomData = Record<string, any>;
-
 

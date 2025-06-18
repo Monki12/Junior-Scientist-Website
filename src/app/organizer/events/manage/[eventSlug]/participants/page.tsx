@@ -1,11 +1,11 @@
 
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, FormEvent } from 'react';
 import { useParams, useRouter, notFound } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { subEventsData } from '@/data/subEvents';
-import type { SubEvent, EventParticipant } from '@/types';
+import type { SubEvent, EventParticipant, CustomColumnDefinition, ParticipantCustomData } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -13,18 +13,30 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-// import { Checkbox } from '@/components/ui/checkbox'; // Checkbox removed as "Follow-up" column is removed
+import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Loader2, Users, Search, ShieldAlert, Filter, PlusCircle, BarChart2, PieChart, Users2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Users, Search, ShieldAlert, Filter, PlusCircle, BarChart2, PieChart, Users2, Trash2, Edit2 } from 'lucide-react';
 
 // Enhanced mock data
 const initialMockEventParticipants: EventParticipant[] = [
-  { id: 'stud1', name: 'Alice Smith', email: 'alice.smith@example.com', contactNumber: '555-0101', schoolName: 'Springfield High', registrationDate: new Date('2024-07-01T10:00:00Z').toISOString(), paymentStatus: 'paid' },
-  { id: 'stud2', name: 'Bob Johnson', email: 'bob.johnson@example.com', contactNumber: '555-0102', schoolName: 'Northwood Academy', registrationDate: new Date('2024-07-02T11:30:00Z').toISOString(), paymentStatus: 'pending' },
-  { id: 'stud3', name: 'Charlie Brown', email: 'charlie.brown@example.com', contactNumber: '555-0103', schoolName: 'Springfield High', registrationDate: new Date('2024-07-03T09:15:00Z').toISOString(), paymentStatus: 'paid' },
-  { id: 'stud4', name: 'Diana Prince', email: 'diana.prince@example.com', contactNumber: '555-0104', schoolName: 'Riverside Prep', registrationDate: new Date('2024-07-04T14:00:00Z').toISOString(), paymentStatus: 'waived' },
-  { id: 'stud5', name: 'Edward Nigma', email: 'edward.nigma@example.com', contactNumber: '555-0105', schoolName: 'Northwood Academy', registrationDate: new Date('2024-07-05T16:45:00Z').toISOString(), paymentStatus: 'failed' },
-  { id: 'stud6', name: 'Fiona Gallagher', email: 'fiona.gallagher@example.com', contactNumber: '555-0106', schoolName: 'Springfield High', registrationDate: new Date('2024-07-06T08:00:00Z').toISOString(), paymentStatus: 'paid' },
+  { id: 'stud1', name: 'Alice Smith', email: 'alice.smith@example.com', contactNumber: '555-0101', schoolName: 'Springfield High', registrationDate: new Date('2024-07-01T10:00:00Z').toISOString(), paymentStatus: 'paid', customData: {} },
+  { id: 'stud2', name: 'Bob Johnson', email: 'bob.johnson@example.com', contactNumber: '555-0102', schoolName: 'Northwood Academy', registrationDate: new Date('2024-07-02T11:30:00Z').toISOString(), paymentStatus: 'pending', customData: {} },
+  { id: 'stud3', name: 'Charlie Brown', email: 'charlie.brown@example.com', contactNumber: '555-0103', schoolName: 'Springfield High', registrationDate: new Date('2024-07-03T09:15:00Z').toISOString(), paymentStatus: 'paid', customData: {} },
+  { id: 'stud4', name: 'Diana Prince', email: 'diana.prince@example.com', contactNumber: '555-0104', schoolName: 'Riverside Prep', registrationDate: new Date('2024-07-04T14:00:00Z').toISOString(), paymentStatus: 'waived', customData: {} },
+  { id: 'stud5', name: 'Edward Nigma', email: 'edward.nigma@example.com', contactNumber: '555-0105', schoolName: 'Northwood Academy', registrationDate: new Date('2024-07-05T16:45:00Z').toISOString(), paymentStatus: 'failed', customData: {} },
+  { id: 'stud6', name: 'Fiona Gallagher', email: 'fiona.gallagher@example.com', contactNumber: '555-0106', schoolName: 'Springfield High', registrationDate: new Date('2024-07-06T08:00:00Z').toISOString(), paymentStatus: 'paid', customData: {} },
 ];
 
 
@@ -42,6 +54,18 @@ export default function ManageParticipantsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [schoolFilter, setSchoolFilter] = useState('all');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('all');
+
+  const [customColumnDefinitions, setCustomColumnDefinitions] = useState<CustomColumnDefinition[]>([]);
+  const [isAddColumnDialogOpen, setIsAddColumnDialogOpen] = useState(false);
+  const [newColumnForm, setNewColumnForm] = useState<{
+    name: string;
+    dataType: CustomColumnDefinition['dataType'];
+    options: string; // Comma-separated for dropdown
+    defaultValue: string;
+    description: string;
+  }>({ name: '', dataType: 'text', options: '', defaultValue: '', description: '' });
+  const [editingCell, setEditingCell] = useState<{ participantId: string; columnId: string } | null>(null);
+
 
   useEffect(() => {
     if (eventSlug) {
@@ -89,19 +113,14 @@ export default function ManageParticipantsPage() {
       return matchesSearch && matchesSchool && matchesPaymentStatus;
     });
   }, [participants, searchTerm, schoolFilter, paymentStatusFilter]);
-
-  const handleAddCustomColumn = () => {
-    toast({
-      title: "Feature Coming Soon",
-      description: "Ability to add custom columns will be available in a future update.",
-    });
-  };
   
   const schoolBreakdown = useMemo(() => {
     const breakdown: Record<string, number> = {};
     filteredParticipants.forEach(p => {
       if (p.schoolName) {
         breakdown[p.schoolName] = (breakdown[p.schoolName] || 0) + 1;
+      } else {
+        breakdown['N/A'] = (breakdown['N/A'] || 0) + 1;
       }
     });
     return breakdown;
@@ -114,6 +133,94 @@ export default function ManageParticipantsPage() {
     });
     return breakdown;
   }, [filteredParticipants]);
+
+  const handleAddColumnSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!newColumnForm.name || !newColumnForm.dataType) {
+      toast({ title: "Error", description: "Column Name and Data Type are required.", variant: "destructive" });
+      return;
+    }
+    const newColumnId = `custom_${Date.now()}`;
+    const newDefinition: CustomColumnDefinition = {
+      id: newColumnId,
+      name: newColumnForm.name,
+      dataType: newColumnForm.dataType,
+      options: newColumnForm.dataType === 'dropdown' ? newColumnForm.options.split(',').map(opt => opt.trim()).filter(Boolean) : undefined,
+      defaultValue: newColumnForm.defaultValue,
+      description: newColumnForm.description,
+    };
+    setCustomColumnDefinitions(prev => [...prev, newDefinition]);
+
+    // Initialize customData for all participants for this new column
+    setParticipants(prevParticipants => 
+      prevParticipants.map(p => ({
+        ...p,
+        customData: {
+          ...p.customData,
+          [newColumnId]: newColumnForm.defaultValue || getInitialValueForDataType(newColumnForm.dataType)
+        }
+      }))
+    );
+
+    setNewColumnForm({ name: '', dataType: 'text', options: '', defaultValue: '', description: '' }); // Reset form
+    setIsAddColumnDialogOpen(false);
+    toast({ title: "Success", description: `Column "${newDefinition.name}" added.` });
+  };
+
+  const getInitialValueForDataType = (dataType: CustomColumnDefinition['dataType']) => {
+    switch (dataType) {
+      case 'checkbox': return false;
+      case 'number': return 0;
+      default: return '';
+    }
+  };
+  
+  const handleCustomDataChange = (participantId: string, columnId: string, value: any) => {
+    setParticipants(prev => 
+      prev.map(p => 
+        p.id === participantId 
+        ? { ...p, customData: { ...p.customData, [columnId]: value } }
+        : p
+      )
+    );
+  };
+
+  const renderCustomCell = (participant: EventParticipant, column: CustomColumnDefinition) => {
+    const value = participant.customData?.[column.id] ?? column.defaultValue ?? getInitialValueForDataType(column.dataType);
+    const isEditing = editingCell?.participantId === participant.id && editingCell?.columnId === column.id;
+
+    if (isEditing) {
+       switch (column.dataType) {
+        case 'text':
+          return <Input type="text" value={value} onChange={(e) => handleCustomDataChange(participant.id, column.id, e.target.value)} onBlur={() => setEditingCell(null)} autoFocus className="h-8 text-xs"/>;
+        case 'number':
+          return <Input type="number" value={value} onChange={(e) => handleCustomDataChange(participant.id, column.id, parseFloat(e.target.value) || 0)} onBlur={() => setEditingCell(null)} autoFocus className="h-8 text-xs"/>;
+        case 'date':
+          return <Input type="date" value={value} onChange={(e) => handleCustomDataChange(participant.id, column.id, e.target.value)} onBlur={() => setEditingCell(null)} autoFocus className="h-8 text-xs"/>;
+        case 'checkbox': // Checkbox updates immediately, no separate editing state needed.
+           return <Checkbox checked={!!value} onCheckedChange={(checked) => handleCustomDataChange(participant.id, column.id, !!checked)} />;
+        case 'dropdown':
+          return (
+            <Select value={value} onValueChange={(val) => { handleCustomDataChange(participant.id, column.id, val); setEditingCell(null); }} >
+              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select..." /></SelectTrigger>
+              <SelectContent>
+                {column.options?.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          );
+        default:
+          return String(value);
+      }
+    }
+
+    // Non-editing display
+    switch (column.dataType) {
+        case 'checkbox':
+            return <Checkbox checked={!!value} onCheckedChange={(checked) => handleCustomDataChange(participant.id, column.id, !!checked)} aria-label={`Toggle ${column.name} for ${participant.name}`}/>;
+        default:
+            return <span onClick={() => column.dataType !== 'checkbox' && setEditingCell({ participantId: participant.id, columnId: column.id })} className="cursor-pointer hover:bg-muted/50 p-1 rounded min-h-[2rem] block">{String(value)}</span>;
+    }
+  };
 
 
   if (authLoading || loadingEvent || !userProfile || !event) {
@@ -157,13 +264,12 @@ export default function ManageParticipantsPage() {
         </Button>
       </div>
 
-      {/* Visualization Statistics Section */}
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><BarChart2 className="h-6 w-6 text-primary" />Statistics Overview</CardTitle>
           <CardDescription>Quick insights into your participant data. Updates with filters.</CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <Card className="bg-secondary/30">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1"><Users2 className="h-4 w-4"/>Total Participants</CardTitle>
@@ -174,9 +280,9 @@ export default function ManageParticipantsPage() {
           </Card>
           <Card className="bg-secondary/30">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1"><PieChart className="h-4 w-4"/>By School (Mock)</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1"><PieChart className="h-4 w-4"/>By School</CardTitle>
             </CardHeader>
-            <CardContent className="text-xs">
+            <CardContent className="text-xs max-h-24 overflow-y-auto">
               {Object.entries(schoolBreakdown).map(([school, count]) => (
                 <p key={school}>{school}: {count}</p>
               ))}
@@ -185,7 +291,7 @@ export default function ManageParticipantsPage() {
           </Card>
           <Card className="bg-secondary/30">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1"><PieChart className="h-4 w-4"/>Payment Status (Mock)</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1"><PieChart className="h-4 w-4"/>Payment Status</CardTitle>
             </CardHeader>
             <CardContent className="text-xs">
                {Object.entries(paymentStatusBreakdown).map(([status, count]) => (
@@ -194,17 +300,8 @@ export default function ManageParticipantsPage() {
               {Object.keys(paymentStatusBreakdown).length === 0 && <p className="text-muted-foreground">No payment data.</p>}
             </CardContent>
           </Card>
-           <Card className="bg-secondary/30">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Custom Column Stats</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-muted-foreground">Visualizations for custom columns will appear here once created.</p>
-            </CardContent>
-          </Card>
         </CardContent>
       </Card>
-
 
       <Card className="shadow-lg">
         <CardHeader>
@@ -274,11 +371,64 @@ export default function ManageParticipantsPage() {
                     <TableHead>School</TableHead>
                     <TableHead>Registered On</TableHead>
                     <TableHead>Payment</TableHead>
-                    {/* Removed Follow-up and Actions columns */}
+                    {customColumnDefinitions.map(col => (
+                      <TableHead key={col.id}>{col.name}</TableHead>
+                    ))}
                     <TableHead className="text-right">
-                       <Button variant="outline" size="sm" onClick={handleAddCustomColumn}>
-                         <PlusCircle className="mr-2 h-4 w-4" /> Add Column
-                       </Button>
+                       <AlertDialog open={isAddColumnDialogOpen} onOpenChange={setIsAddColumnDialogOpen}>
+                        <AlertDialogTrigger asChild>
+                           <Button variant="outline" size="sm">
+                             <PlusCircle className="mr-2 h-4 w-4" /> Add Column
+                           </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <form onSubmit={handleAddColumnSubmit}>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Add New Custom Column</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Define a new column to track additional participant information.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <div className="space-y-4 py-4">
+                              <div>
+                                <Label htmlFor="newColName">Column Name</Label>
+                                <Input id="newColName" value={newColumnForm.name} onChange={e => setNewColumnForm({...newColumnForm, name: e.target.value})} placeholder="E.g., Quiz Score" required />
+                              </div>
+                              <div>
+                                <Label htmlFor="newColDataType">Data Type</Label>
+                                <Select value={newColumnForm.dataType} onValueChange={val => setNewColumnForm({...newColumnForm, dataType: val as CustomColumnDefinition['dataType']})}>
+                                  <SelectTrigger id="newColDataType"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="text">Text</SelectItem>
+                                    <SelectItem value="number">Number</SelectItem>
+                                    <SelectItem value="checkbox">Checkbox</SelectItem>
+                                    <SelectItem value="dropdown">Dropdown</SelectItem>
+                                    <SelectItem value="date">Date</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              {newColumnForm.dataType === 'dropdown' && (
+                                <div>
+                                  <Label htmlFor="newColOptions">Options (comma-separated)</Label>
+                                  <Input id="newColOptions" value={newColumnForm.options} onChange={e => setNewColumnForm({...newColumnForm, options: e.target.value})} placeholder="E.g., Option A, Option B" />
+                                </div>
+                              )}
+                              <div>
+                                <Label htmlFor="newColDefaultValue">Default Value (optional)</Label>
+                                <Input id="newColDefaultValue" value={newColumnForm.defaultValue} onChange={e => setNewColumnForm({...newColumnForm, defaultValue: e.target.value})} />
+                              </div>
+                              <div>
+                                <Label htmlFor="newColDesc">Description (optional)</Label>
+                                <Textarea id="newColDesc" value={newColumnForm.description} onChange={e => setNewColumnForm({...newColumnForm, description: e.target.value})} placeholder="Purpose of this column..." />
+                              </div>
+                            </div>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction type="submit">Save Column</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </form>
+                        </AlertDialogContent>
+                       </AlertDialog>
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -299,7 +449,11 @@ export default function ManageParticipantsPage() {
                           {participant.paymentStatus}
                         </Badge>
                       </TableCell>
-                       {/* Empty cell for where "Add Column" button is in header */}
+                      {customColumnDefinitions.map(col => (
+                        <TableCell key={col.id}>
+                          {renderCustomCell(participant, col)}
+                        </TableCell>
+                      ))}
                        <TableCell></TableCell>
                     </TableRow>
                   ))}
