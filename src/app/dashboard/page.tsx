@@ -1,23 +1,26 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/hooks/use-auth';
 import { subEventsData } from '@/data/subEvents';
-import type { UserRole, SubEvent, Task, RegisteredEventInfo, UserProfileData } from '@/types';
+import type { UserRole, SubEvent, Task, RegisteredEventInfo, UserProfileData, EventParticipant } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from "@/components/ui/table";
 import { format, isToday, isPast, isThisWeek, startOfDay, parseISO, isValid } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 import {
-  Loader2, BarChartBig, Edit, Users, FileScan, Settings, BookUser, ListChecks, CalendarDays, UserCircle, Bell, GraduationCap, School, Download, Info, Briefcase, Newspaper, Award, Star, CheckCircle, ClipboardList, TrendingUp, Building, Activity, ShieldCheck, ExternalLink, Home, Search, CalendarCheck, Ticket, Users2, Phone, Mail, Milestone, MapPin, Clock, UsersRound, CheckSquare, BarChartHorizontalBig, Rss, AlertTriangle
+  Loader2, BarChartBig, Edit, Users, FileScan, Settings, BookUser, ListChecks, CalendarDays, UserCircle, Bell, GraduationCap, School, Download, Info, Briefcase, Newspaper, Award, Star, CheckCircle, ClipboardList, TrendingUp, Building, Activity, ShieldCheck, ExternalLink, Home, Search, CalendarCheck, Ticket, Users2, Phone, Mail, Milestone, MapPin, Clock, UsersRound, CheckSquare, BarChartHorizontalBig, Rss, AlertTriangle, Filter as FilterIcon
 } from 'lucide-react';
 
 interface RegisteredEventDisplay extends SubEvent {
@@ -49,16 +52,29 @@ const getStatusBadgeVariant = (status: Task['status']): { variant: "default" | "
 export default function DashboardPage() {
   const { authUser, userProfile, setUserProfile, loading } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
   const [localUserProfileTasks, setLocalUserProfileTasks] = useState<Task[]>([]);
+
+  // State for Overall Head's Global Participant View
+  const [globalParticipants, setGlobalParticipants] = useState<EventParticipant[]>([]);
+  const [globalSearchTerm, setGlobalSearchTerm] = useState('');
+  const [globalSchoolFilter, setGlobalSchoolFilter] = useState('all');
+  const [globalPaymentStatusFilter, setGlobalPaymentStatusFilter] = useState('all');
+  const [globalEventFilter, setGlobalEventFilter] = useState('all');
+
 
   useEffect(() => {
     if (!loading && !authUser) {
       router.push('/login?redirect=/dashboard');
     }
-    if (userProfile?.tasks) {
-      setLocalUserProfileTasks(userProfile.tasks);
+    if (userProfile) {
+      setLocalUserProfileTasks(userProfile.tasks || []);
+      if (userProfile.role === 'overall_head' && userProfile.allPlatformParticipants) {
+        setGlobalParticipants(userProfile.allPlatformParticipants);
+      }
     } else {
-      setLocalUserProfileTasks([]); // Ensure it's an empty array if no tasks
+      setLocalUserProfileTasks([]); 
+      setGlobalParticipants([]);
     }
   }, [authUser, userProfile, loading, router]);
 
@@ -79,6 +95,48 @@ export default function DashboardPage() {
     });
   };
 
+  // Filter tasks assigned to the current user for the "My Tasks" section
+  const myTasks = useMemo(() => {
+    if (userProfile?.displayName) {
+      return localUserProfileTasks.filter(task => task.assignedTo?.includes(userProfile.displayName!));
+    }
+    return [];
+  }, [localUserProfileTasks, userProfile?.displayName]);
+
+  const today = startOfDay(new Date());
+  const tasksDueToday = myTasks.filter(task => task.dueDate && isValid(parseISO(task.dueDate)) && isToday(parseISO(task.dueDate)) && task.status !== 'Completed').length;
+  const overdueTasks = myTasks.filter(task => task.dueDate && isValid(parseISO(task.dueDate)) && isPast(parseISO(task.dueDate)) && !isToday(parseISO(task.dueDate)) && task.status !== 'Completed').length;
+  const tasksThisWeek = myTasks.filter(task => task.dueDate && isValid(parseISO(task.dueDate)) && isThisWeek(parseISO(task.dueDate), { weekStartsOn: 1 }) && task.status !== 'Completed').length;
+
+
+  const uniqueGlobalSchoolNames = useMemo(() => {
+    const schools = new Set(globalParticipants.map(p => p.schoolName).filter(Boolean) as string[]);
+    return ['all', ...Array.from(schools)];
+  }, [globalParticipants]);
+
+  const globalPaymentStatuses: Array<EventParticipant['paymentStatus'] | 'all'> = ['all', 'paid', 'pending', 'waived', 'failed'];
+  
+  const allEventSlugsAndTitles = useMemo(() => {
+     return [{slug: 'all', title: 'All Events'}, ...subEventsData.map(event => ({slug: event.slug, title: event.title}))];
+  }, []);
+
+  const filteredGlobalParticipants = useMemo(() => {
+    return globalParticipants.filter(participant => {
+      const searchTermLower = globalSearchTerm.toLowerCase();
+      const matchesSearch = searchTermLower === '' ||
+        participant.name.toLowerCase().includes(searchTermLower) ||
+        participant.email.toLowerCase().includes(searchTermLower) ||
+        (participant.schoolName && participant.schoolName.toLowerCase().includes(searchTermLower)) ||
+        (participant.contactNumber && participant.contactNumber.toLowerCase().includes(searchTermLower));
+      
+      const matchesSchool = globalSchoolFilter === 'all' || participant.schoolName === globalSchoolFilter;
+      const matchesPaymentStatus = globalPaymentStatusFilter === 'all' || participant.paymentStatus === globalPaymentStatusFilter;
+      const matchesEvent = globalEventFilter === 'all' || (participant.registeredEventSlugs && participant.registeredEventSlugs.includes(globalEventFilter));
+
+      return matchesSearch && matchesSchool && matchesPaymentStatus && matchesEvent;
+    });
+  }, [globalParticipants, globalSearchTerm, globalSchoolFilter, globalPaymentStatusFilter, globalEventFilter]);
+
 
   if (loading || !authUser || !userProfile) {
     return (
@@ -91,7 +149,7 @@ export default function DashboardPage() {
   const role: UserRole = userProfile.role;
 
   // Student Dashboard
-  if (role === 'student' || (role === 'test' && (!userProfile.tasks || userProfile.tasks.filter(task => task.assignedTo?.includes(userProfile.displayName || '____NO_NAME____')).length === 0))) { // Test user with NO assigned tasks sees student dash
+  if (role === 'student' || (role === 'test' && myTasks.length === 0)) {
     const studentRegisteredFullEvents: RegisteredEventDisplay[] = userProfile.registeredEvents
       ?.map(registeredInfo => {
         const eventDetail = subEventsData.find(event => event.slug === registeredInfo.eventSlug);
@@ -247,18 +305,217 @@ export default function DashboardPage() {
       </div>
     );
   }
+
+  if (role === 'overall_head') {
+    // Overall Head Dashboard
+    return (
+      <div className="space-y-8 animate-fade-in-up">
+        <header className="flex flex-col md:flex-row justify-between items-start gap-4">
+          <div className="flex items-center gap-4">
+             <Avatar className="h-20 w-20 border-2 border-primary">
+              <AvatarImage src={userProfile.photoURL || undefined} alt={userProfile.displayName || 'User'} />
+              <AvatarFallback className="text-2xl bg-primary/10 text-primary">{(userProfile.displayName || userProfile.email || 'U')[0].toUpperCase()}</AvatarFallback>
+            </Avatar>
+            <div>
+              <h1 className="text-3xl md:text-4xl font-bold text-primary">{userProfile.displayName || "Overall Head Dashboard"}</h1>
+              <p className="text-muted-foreground mt-1">{userProfile.email}</p>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mt-1">
+                  <p className="flex items-center gap-1"><ShieldCheck className="h-4 w-4" /> Role: <span className="font-medium text-foreground capitalize">{userProfile.role.replace('_', ' ')}</span></p>
+                  {userProfile.department && <p className="flex items-center gap-1"><Building className="h-4 w-4" /> {userProfile.department}</p>}
+              </div>
+            </div>
+          </div>
+          <Button asChild className="bg-accent hover:bg-accent/90 text-accent-foreground mt-4 md:mt-0 rounded-lg shadow-soft">
+              <Link href="/organizer/events/create">Create New Event</Link>
+          </Button>
+        </header>
+
+        {/* My Tasks Section for Overall Head */}
+        <section id="my-tasks-overall-head">
+          <Card className="shadow-md-soft rounded-xl">
+            <CardHeader>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <div>
+                    <CardTitle className="flex items-center gap-2 text-xl text-primary"><ClipboardList className="h-6 w-6"/>My Tasks</CardTitle>
+                    <CardDescription>Overview of tasks assigned to you globally.</CardDescription>
+                </div>
+                <Button asChild variant="outline" size="sm">
+                    <Link href="/organizer/event-tasks">View All My Tasks</Link>
+                </Button>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm border-t pt-3">
+                <span>Due Today: <Badge variant={tasksDueToday > 0 ? "default" : "outline"} className={`${tasksDueToday > 0 ? 'bg-blue-500/10 text-blue-700 border-blue-500/30' : ''}` }>{tasksDueToday}</Badge></span>
+                <span>Overdue: <Badge variant={overdueTasks > 0 ? "destructive" : "outline"} className={overdueTasks > 0 ? "" : "text-muted-foreground"}>{overdueTasks}</Badge></span>
+                <span>This Week: <Badge variant={tasksThisWeek > 0 ? "secondary" : "outline"} className={`${tasksThisWeek > 0 ? 'bg-purple-500/10 text-purple-700 border-purple-500/30': ''}`}>{tasksThisWeek}</Badge></span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {myTasks.length > 0 ? (
+                 <div className="overflow-x-auto rounded-md border">
+                    <Table>
+                        <TableHeader>
+                        <TableRow className="bg-muted/20 hover:bg-muted/30">
+                            <TableHead className="w-[50px]"></TableHead>
+                            <TableHead>Task</TableHead>
+                            <TableHead className="w-[100px]">Event</TableHead>
+                            <TableHead className="w-[100px]">Due</TableHead>
+                            <TableHead className="w-[100px]">Priority</TableHead>
+                            <TableHead className="w-[120px]">Status</TableHead>
+                        </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                        {myTasks.slice(0, 7).map((task) => (
+                            <TableRow key={task.id} className={`hover:bg-muted/50 transition-colors duration-150 ${task.status === 'Completed' ? 'opacity-60' : ''}`}>
+                            <TableCell>
+                                <Checkbox
+                                checked={task.status === 'Completed'}
+                                onCheckedChange={() => handleTaskCompletionToggle(task.id)}
+                                aria-label={`Mark task ${task.title} as ${task.status === 'Completed' ? 'incomplete' : 'complete'}`}
+                                />
+                            </TableCell>
+                            <TableCell className="font-medium max-w-[200px] sm:max-w-xs md:max-w-sm truncate">
+                                <Link href="/organizer/event-tasks" title={task.title} className="hover:underline">{task.title}</Link>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                                <Badge variant="outline" className="text-xs">{task.eventSlug ? subEventsData.find(e => e.slug === task.eventSlug)?.title || task.eventSlug : 'General'}</Badge>
+                            </TableCell>
+                            <TableCell className={`text-xs ${task.dueDate && isValid(parseISO(task.dueDate)) && isPast(startOfDay(parseISO(task.dueDate))) && task.status !== 'Completed' ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
+                                {task.dueDate && isValid(parseISO(task.dueDate)) ? format(parseISO(task.dueDate), 'MMM dd') : 'N/A'}
+                            </TableCell>
+                            <TableCell>
+                                <Badge variant={getPriorityBadgeVariant(task.priority)} className="capitalize text-xs py-0.5 px-1.5">{task.priority}</Badge>
+                            </TableCell>
+                            <TableCell>
+                                <Badge variant={getStatusBadgeVariant(task.status).variant} className={`capitalize text-xs py-0.5 px-1.5 ${getStatusBadgeVariant(task.status).colorClass}`}>{task.status.replace('-', ' ')}</Badge>
+                            </TableCell>
+                            </TableRow>
+                        ))}
+                        </TableBody>
+                    </Table>
+                 </div>
+              ) : (
+                <div className="text-center py-6 text-muted-foreground">
+                  <CheckSquare className="h-10 w-10 mx-auto mb-2 text-green-500" />
+                  <p>Great job! You have no tasks assigned.</p>
+                  <p className="text-xs">Check back later or view all event tasks.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </section>
+        
+        <Separator />
+
+        {/* Global Participant Management Section */}
+        <section id="global-participants">
+            <Card className="shadow-md-soft rounded-xl">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-2xl text-primary"><Users2 className="h-7 w-7"/>All Platform Participants</CardTitle>
+                    <CardDescription>View and manage participants across all events.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                        <div className="relative">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input placeholder="Search name, email, school..." value={globalSearchTerm} onChange={e => setGlobalSearchTerm(e.target.value)} className="pl-9" />
+                        </div>
+                        <Select value={globalSchoolFilter} onValueChange={setGlobalSchoolFilter}>
+                            <SelectTrigger><SelectValue placeholder="Filter by school..." /></SelectTrigger>
+                            <SelectContent>
+                                {uniqueGlobalSchoolNames.map(school => <SelectItem key={school} value={school}>{school === 'all' ? 'All Schools' : school}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                        <Select value={globalPaymentStatusFilter} onValueChange={setGlobalPaymentStatusFilter}>
+                            <SelectTrigger><SelectValue placeholder="Filter by payment status..." /></SelectTrigger>
+                            <SelectContent>
+                                {globalPaymentStatuses.map(status => <SelectItem key={status} value={status}>{status === 'all' ? 'All Statuses' : status.charAt(0).toUpperCase() + status.slice(1)}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                        <Select value={globalEventFilter} onValueChange={setGlobalEventFilter}>
+                            <SelectTrigger><SelectValue placeholder="Filter by event..." /></SelectTrigger>
+                            <SelectContent>
+                                {allEventSlugsAndTitles.map(event => <SelectItem key={event.slug} value={event.slug}>{event.title}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                        {/* Placeholder for Add Dynamic Filter */}
+                        <Button variant="outline" disabled><FilterIcon className="mr-2 h-4 w-4"/>Add Dynamic Filter (Soon)</Button>
+                    </div>
+
+                    {/* Active Filters Display (basic) */}
+                    {(globalSearchTerm || globalSchoolFilter !== 'all' || globalPaymentStatusFilter !== 'all' || globalEventFilter !== 'all') && (
+                        <div className="text-xs text-muted-foreground">
+                            Active Filters: 
+                            {globalSearchTerm && <span className="ml-1">Search: "{globalSearchTerm}"</span>}
+                            {globalSchoolFilter !== 'all' && <span className="ml-1">School: {globalSchoolFilter}</span>}
+                            {globalPaymentStatusFilter !== 'all' && <span className="ml-1">Payment: {globalPaymentStatusFilter}</span>}
+                            {globalEventFilter !== 'all' && <span className="ml-1">Event: {subEventsData.find(e => e.slug === globalEventFilter)?.title || globalEventFilter}</span>}
+                        </div>
+                    )}
+
+                    {/* Placeholder for Global Stats */}
+                    <Card className="bg-muted/30">
+                        <CardContent className="py-4 text-center text-muted-foreground">
+                            <BarChartBig className="h-10 w-10 mx-auto mb-2 text-primary/30"/>
+                            Global Participant Statistics (Total: {filteredGlobalParticipants.length}) - Charts coming soon.
+                        </CardContent>
+                    </Card>
+
+                    {filteredGlobalParticipants.length > 0 ? (
+                        <div className="overflow-x-auto rounded-md border">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Name</TableHead>
+                                        <TableHead>Email</TableHead>
+                                        <TableHead>School</TableHead>
+                                        <TableHead>Payment</TableHead>
+                                        <TableHead>Events Registered In</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {filteredGlobalParticipants.map(p => (
+                                        <TableRow key={p.id}>
+                                            <TableCell className="font-medium">{p.name}</TableCell>
+                                            <TableCell>{p.email}</TableCell>
+                                            <TableCell>{p.schoolName || 'N/A'}</TableCell>
+                                            <TableCell><Badge variant={p.paymentStatus === 'paid' ? 'default' : p.paymentStatus === 'pending' ? 'secondary' : 'outline'} className="capitalize">{p.paymentStatus}</Badge></TableCell>
+                                            <TableCell>
+                                                {p.registeredEventSlugs && p.registeredEventSlugs.map(slug => {
+                                                    const eventTitle = subEventsData.find(e => e.slug === slug)?.title || slug;
+                                                    return (
+                                                        <Badge 
+                                                            key={slug} 
+                                                            variant="secondary" 
+                                                            className="mr-1 mb-1 cursor-pointer hover:bg-primary/20"
+                                                            onClick={() => toast({ title: `Drill-down to ${eventTitle}`, description: "Functionality coming soon!"})}
+                                                        >
+                                                            {eventTitle}
+                                                        </Badge>
+                                                    );
+                                                })}
+                                                {(!p.registeredEventSlugs || p.registeredEventSlugs.length === 0) && <span className="text-xs text-muted-foreground">None</span>}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    ) : (
+                        <div className="text-center py-10 text-muted-foreground">
+                            <Users className="h-12 w-12 mx-auto mb-3 text-primary/30" />
+                            <p>No participants match the current filters.</p>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+        </section>
+
+      </div>
+    );
+
+  }
   
-  // Filter tasks assigned to the current user for the "My Tasks" section
-  const myTasks = userProfile.displayName
-    ? localUserProfileTasks.filter(task => task.assignedTo?.includes(userProfile.displayName!))
-    : [];
-
-  const today = startOfDay(new Date());
-  const tasksDueToday = myTasks.filter(task => task.dueDate && isValid(parseISO(task.dueDate)) && isToday(parseISO(task.dueDate)) && task.status !== 'Completed').length;
-  const overdueTasks = myTasks.filter(task => task.dueDate && isValid(parseISO(task.dueDate)) && isPast(parseISO(task.dueDate)) && !isToday(parseISO(task.dueDate)) && task.status !== 'Completed').length;
-  const tasksThisWeek = myTasks.filter(task => task.dueDate && isValid(parseISO(task.dueDate)) && isThisWeek(parseISO(task.dueDate), { weekStartsOn: 1 }) && task.status !== 'Completed').length;
-
-
+  // Event Representative Dashboard
   if (role === 'event_representative') {
     const assignedEvent = userProfile.assignedEventSlug ? subEventsData.find(e => e.slug === userProfile.assignedEventSlug) : null;
 
@@ -274,8 +531,8 @@ export default function DashboardPage() {
               <h1 className="text-3xl md:text-4xl font-bold text-primary">{userProfile.displayName || "Event Representative Dashboard"}</h1>
               <p className="text-muted-foreground mt-1">{userProfile.email}</p>
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mt-1">
-                  <p className="flex items-center gap-1"><ShieldCheck className="h-4 w-4" /> Role: <span className="font-medium text-foreground capitalize">Event Representative</span></p>
-                  {userProfile.department && <p className="flex items-center gap-1"><Building className="h-4 w-4" /> {userProfile.department}</p>}
+                  <span className="flex items-center gap-1"><ShieldCheck className="h-4 w-4" /> Role: <Badge variant="secondary" className="capitalize text-xs">{userProfile.role.replace('_', ' ')}</Badge></span>
+                  {userProfile.department && <span className="flex items-center gap-1"><Building className="h-4 w-4" /> {userProfile.department}</span>}
               </div>
             </div>
           </div>
@@ -351,9 +608,9 @@ export default function DashboardPage() {
                     </Button>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm">
-                    <span>Due Today: <Badge variant={tasksDueToday > 0 ? "default" : "outline"}>{tasksDueToday}</Badge></span>
+                    <span>Due Today: <Badge variant={tasksDueToday > 0 ? "default" : "outline"} className={`${tasksDueToday > 0 ? 'bg-blue-500/10 text-blue-700 border-blue-500/30' : ''}`}>{tasksDueToday}</Badge></span>
                     <span>Overdue: <Badge variant={overdueTasks > 0 ? "destructive" : "outline"} className={overdueTasks > 0 ? "" : "text-muted-foreground"}>{overdueTasks}</Badge></span>
-                    <span>This Week: <Badge variant={tasksThisWeek > 0 ? "secondary" : "outline"}>{tasksThisWeek}</Badge></span>
+                    <span>This Week: <Badge variant={tasksThisWeek > 0 ? "secondary" : "outline"} className={`${tasksThisWeek > 0 ? 'bg-purple-500/10 text-purple-700 border-purple-500/30' : ''}`}>{tasksThisWeek}</Badge></span>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -382,7 +639,7 @@ export default function DashboardPage() {
                               <TableCell className="font-medium max-w-xs truncate hover:underline">
                                 <Link href="/organizer/event-tasks" title={task.title}>{task.title}</Link>
                               </TableCell>
-                              <TableCell className={`${task.dueDate && isValid(parseISO(task.dueDate)) && isPast(startOfDay(parseISO(task.dueDate))) && task.status !== 'Completed' ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
+                              <TableCell className={`text-xs ${task.dueDate && isValid(parseISO(task.dueDate)) && isPast(startOfDay(parseISO(task.dueDate))) && task.status !== 'Completed' ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
                                 {task.dueDate && isValid(parseISO(task.dueDate)) ? format(parseISO(task.dueDate), 'MMM dd') : 'N/A'}
                               </TableCell>
                               <TableCell>
@@ -435,6 +692,7 @@ export default function DashboardPage() {
     );
   }
   
+  // Default/Organizer/Admin/Test Dashboard
   let dashboardTitle = "User Dashboard";
   let quickActions = [];
   
@@ -452,18 +710,10 @@ export default function DashboardPage() {
         { href: '/organizer/event-tasks', label: 'All Event Tasks', icon: ListChecks },
       ];
       break;
-    case 'overall_head':
-      dashboardTitle = "Overall Head Dashboard";
-       quickActions = [
-        { href: '/admin/tasks', label: 'Global Task Mgmt', icon: Settings},
-        { href: '/organizer/events/manage', label: 'Manage All Events', icon: Briefcase }, 
-        { href: '/organizer/registrations', label: 'View Registrations', icon: Users }, 
-        { href: '/ocr-tool', label: 'Scan Forms (OCR)', icon: FileScan },
-        { href: '/organizer/event-tasks', label: 'All Event Tasks', icon: ListChecks },
-        { href: '/profile', label: 'My Profile', icon: UserCircle }, 
-        { href: '/notifications', label: 'Notifications', icon: Bell },
-      ];
-      break;
+    // case 'overall_head': -- Handled above
+    //   dashboardTitle = "Overall Head Dashboard";
+    //    quickActions = [ /* ... */ ];
+    //   break;
     case 'admin':
       dashboardTitle = "Admin Dashboard";
        quickActions = [
@@ -504,8 +754,8 @@ export default function DashboardPage() {
             <h1 className="text-3xl md:text-4xl font-bold text-primary">{userProfile.displayName || dashboardTitle}</h1>
             <p className="text-muted-foreground mt-1">{userProfile.email}</p>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mt-1">
-                <p className="flex items-center gap-1"><ShieldCheck className="h-4 w-4" /> Role: <span className="font-medium text-foreground capitalize">{userProfile.role.replace('_', ' ')}</span></p>
-                {userProfile.department && <p className="flex items-center gap-1"><Building className="h-4 w-4" /> {userProfile.department}</p>}
+                <span className="flex items-center gap-1"><ShieldCheck className="h-4 w-4" /> Role: <Badge variant="secondary" className="capitalize text-xs">{userProfile.role.replace('_', ' ')}</Badge></span>
+                {userProfile.department && <span className="flex items-center gap-1"><Building className="h-4 w-4" /> {userProfile.department}</span>}
             </div>
           </div>
         </div>
@@ -539,7 +789,7 @@ export default function DashboardPage() {
                 </CardContent>
             </Card>
         )}
-         {(myTasks.length > 0 || role === 'event_representative') && ( // Show pending tasks if user has tasks or is ER (ER might have 0 but section is relevant)
+         {(myTasks.length > 0 || role === 'event_representative') && ( 
             <Card className="shadow-soft rounded-xl">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium text-muted-foreground">Pending Tasks</CardTitle>
@@ -568,7 +818,7 @@ export default function DashboardPage() {
       )}
 
 
-      {(myTasks.length > 0 || role === 'event_representative') && ( // Show "My Tasks" if user has tasks or is ER
+      {myTasks.length > 0 && (
         <section id="my-tasks">
           <Card className="shadow-md-soft rounded-xl">
             <CardHeader>
@@ -595,13 +845,14 @@ export default function DashboardPage() {
                         <TableRow className="bg-muted/20 hover:bg-muted/30">
                             <TableHead className="w-[50px]"></TableHead>
                             <TableHead>Task</TableHead>
+                            <TableHead className="w-[100px]">Event</TableHead>
                             <TableHead className="w-[100px]">Due</TableHead>
                             <TableHead className="w-[100px]">Priority</TableHead>
                             <TableHead className="w-[120px]">Status</TableHead>
                         </TableRow>
                         </TableHeader>
                         <TableBody>
-                        {myTasks.slice(0, 7).map((task) => ( // Show max 7 tasks in this condensed view
+                        {myTasks.slice(0, 7).map((task) => ( 
                             <TableRow 
                                 key={task.id} 
                                 className={`hover:bg-muted/50 transition-colors duration-150 ${task.status === 'Completed' ? 'opacity-60' : ''}`}
@@ -615,6 +866,9 @@ export default function DashboardPage() {
                             </TableCell>
                             <TableCell className="font-medium max-w-[200px] sm:max-w-xs md:max-w-sm truncate">
                                 <Link href="/organizer/event-tasks" title={task.title} className="hover:underline">{task.title}</Link>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                                <Badge variant="outline" className="text-xs">{task.eventSlug ? subEventsData.find(e => e.slug === task.eventSlug)?.title || task.eventSlug : 'General'}</Badge>
                             </TableCell>
                             <TableCell 
                                 className={`text-xs ${task.dueDate && isValid(parseISO(task.dueDate)) && isPast(startOfDay(parseISO(task.dueDate))) && task.status !== 'Completed' ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}
@@ -683,3 +937,4 @@ export default function DashboardPage() {
 }
 
     
+

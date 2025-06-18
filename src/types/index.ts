@@ -15,7 +15,7 @@ export type TaskStatus = 'Not Started' | 'In Progress' | 'Pending Review' | 'Com
 export interface Task {
   id: string;
   title: string;
-  description?: string; // Optional as per new form
+  description?: string;
   assignedTo?: string[]; 
   assignedByName?: string;
   assignedByUid?: string;  
@@ -24,8 +24,8 @@ export interface Task {
   priority: TaskPriority;
   status: TaskStatus;
   points?: number;
-  attachments?: { name: string, url: string }[]; // Kept for future
-  subtasks?: { text: string, completed: boolean }[]; // Kept for future
+  attachments?: { name: string, url: string }[];
+  subtasks?: { text: string, completed: boolean }[];
   createdBy?: string; 
   createdAt: string;      
   updatedAt: string; 
@@ -58,6 +58,7 @@ export interface UserProfileData {
   tasks?: Task[]; 
   points?: number; 
   credibilityScore?: number; 
+  allPlatformParticipants?: EventParticipant[]; // For Overall Head
 }
 
 export interface Event { 
@@ -129,7 +130,7 @@ export interface CustomTaskColumnDefinition {
 
 
 export type ParticipantCustomData = Record<string, any> & {
-  levels?: Record<string, { // Keep levels for D-Day page if it's still separate
+  levels?: Record<string, { 
     present: boolean;
     venue?: string;
     qualified: 'yes' | 'no' | 'auto';
@@ -146,6 +147,7 @@ export interface EventParticipant {
   registrationDate: string; 
   paymentStatus: 'paid' | 'pending' | 'waived' | 'failed';
   customData?: ParticipantCustomData; 
+  registeredEventSlugs?: string[]; // Added for global participant view
 }
 
 export interface ActiveDynamicFilter {
@@ -163,3 +165,4 @@ export interface ActiveTaskFilter {
   value: string;
   isCustom?: boolean; 
 }
+

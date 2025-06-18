@@ -3,7 +3,7 @@
 
 import type { User as FirebaseUser, AuthError } from 'firebase/auth';
 import { createContext, useState, useEffect, ReactNode } from 'react';
-import type { SignUpFormData, LoginFormData, UserProfileData, UserRole, Task, RegisteredEventInfo } from '@/types';
+import type { SignUpFormData, LoginFormData, UserProfileData, UserRole, Task, RegisteredEventInfo, EventParticipant } from '@/types';
 // subEventsData can be imported if needed for event titles etc., but dashboard will fetch from its own data source for now.
 
 // More diversified mock tasks
@@ -58,6 +58,17 @@ const mockStudentRegisteredEvents: RegisteredEventInfo[] = [
     teamMembers: [{id: 'mem3', name: 'Alice Wonder'}]
   }
 ];
+
+const mockGlobalParticipants: EventParticipant[] = [
+  { id: 'stud-global-1', name: 'Global Alice Smith', email: 'alice.smith.global@example.com', contactNumber: '555-1234', schoolName: 'Springfield High', registrationDate: new Date('2024-07-01T10:00:00Z').toISOString(), paymentStatus: 'paid', registeredEventSlugs: ['model-united-nations', 'ex-quiz-it'], customData: { notes: 'Interested in volunteering too.'} },
+  { id: 'stud-global-2', name: 'Global Bob Johnson', email: 'bob.johnson.global@example.com', contactNumber: '555-5678', schoolName: 'Northwood Academy', registrationDate: new Date('2024-07-02T11:30:00Z').toISOString(), paymentStatus: 'pending', registeredEventSlugs: ['robo-challenge'], customData: {} },
+  { id: 'stud-global-3', name: 'Global Charlie Brown', email: 'charlie.brown.global@example.com', contactNumber: '555-9012', schoolName: 'Springfield High', registrationDate: new Date('2024-07-03T09:15:00Z').toISOString(), paymentStatus: 'paid', registeredEventSlugs: ['math-a-maze'], customData: {} },
+  { id: 'stud-global-4', name: 'Global Diana Prince', email: 'diana.prince.global@example.com', contactNumber: '555-3456', schoolName: 'Riverside Prep', registrationDate: new Date('2024-07-04T14:00:00Z').toISOString(), paymentStatus: 'waived', registeredEventSlugs: ['model-united-nations', 'junior-scientist-olympiad'], customData: { notes: 'VIP Guest.'} },
+  { id: 'stud-global-5', name: 'Global Edward Nigma', email: 'edward.nigma.global@example.com', contactNumber: '555-7890', schoolName: 'Northwood Academy', registrationDate: new Date('2024-07-05T16:45:00Z').toISOString(), paymentStatus: 'failed', registeredEventSlugs: ['ex-quiz-it', 'maze-to-mastery'], customData: {} },
+  { id: 'stud-global-6', name: 'Global Fiona Gallagher', email: 'fiona.gallagher.global@example.com', contactNumber: '555-2345', schoolName: 'Springfield High', registrationDate: new Date('2024-07-06T08:00:00Z').toISOString(), paymentStatus: 'paid', registeredEventSlugs: ['robo-challenge', 'math-a-maze', 'junior-scientist-olympiad'], customData: {} },
+  { id: 'stud-global-7', name: 'Student Test User', email: 'student.test@example.com', contactNumber: '555-0101', schoolName: 'Springfield High International', registrationDate: new Date('2024-07-07T08:00:00Z').toISOString(), paymentStatus: 'paid', registeredEventSlugs: ['model-united-nations', 'ex-quiz-it', 'robo-challenge'], customData: {} },
+];
+
 
 const mockUserProfiles: Record<UserRole, UserProfileData> = {
   student: {
@@ -117,6 +128,7 @@ const mockUserProfiles: Record<UserRole, UserProfileData> = {
     ],
     points: 300,
     credibilityScore: 85,
+    allPlatformParticipants: mockGlobalParticipants,
   },
   admin: {
     uid: 'mock-admin-uid',
@@ -280,3 +292,4 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
+
