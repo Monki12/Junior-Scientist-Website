@@ -20,13 +20,14 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from "@/components/ui/table";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Calendar } from '@/components/ui/calendar';
 
 import { format, isToday, isPast, isThisWeek, startOfDay, parseISO, isValid } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import {
-  Loader2, BarChartBig, Edit, Users, FileScan, Settings, BookUser, ListChecks, CalendarDays, UserCircle, Bell, GraduationCap, School, Download, Info, Briefcase, Newspaper, Award, Star, CheckCircle, ClipboardList, TrendingUp, Building, Activity, ShieldCheck, ExternalLink, Home, Search, CalendarCheck, Ticket, Users2, Phone, Mail, Milestone, MapPin, Clock, UsersRound, CheckSquare, BarChartHorizontalBig, Rss, AlertTriangle, Filter as FilterIcon, PlusCircle, GanttChartSquare, Rows, Tag, XIcon, Pencil, Trash2, CalendarRange, LayoutDashboard
+  Loader2, BarChartBig, Edit, Users, FileScan, Settings, BookUser, ListChecks, CalendarDays, UserCircle, Bell, GraduationCap, School, Download, Info, Briefcase, Newspaper, Award, Star, CheckCircle, ClipboardList, TrendingUp, Building, Activity, ShieldCheck, ExternalLink, Home, Search, CalendarCheck, Ticket, Users2, Phone, Mail, Milestone, MapPin, Clock, UsersRound, CheckSquare, BarChartHorizontalBig, Rss, AlertTriangle, Filter as FilterIcon, PlusCircle, GanttChartSquare, Rows, Tag, XIcon, Pencil, Trash2, CalendarRange, LayoutDashboard, CalendarIcon
 } from 'lucide-react';
 
 interface RegisteredEventDisplay extends SubEvent {
@@ -34,6 +35,27 @@ interface RegisteredEventDisplay extends SubEvent {
   teamMembers?: { id: string, name: string, role?: string }[];
   admitCardStatus?: 'published' | 'pending' | 'unavailable';
 }
+
+const defaultEventFormState: Omit<SubEvent, 'id' | 'slug' | 'mainImage'> & { mainImageSrc: string; mainImageAlt: string; mainImageAiHint: string; event_representatives_str: string; organizers_str: string } = {
+  title: '',
+  superpowerCategory: 'The Thinker',
+  shortDescription: '',
+  detailedDescription: '',
+  mainImageSrc: '',
+  mainImageAlt: '',
+  mainImageAiHint: '',
+  registrationLink: '',
+  deadline: undefined,
+  eventDate: undefined,
+  isTeamEvent: false,
+  status: 'Planning',
+  venue: '',
+  organizers: [],
+  event_representatives: [],
+  registeredParticipantCount: 0,
+  event_representatives_str: '',
+  organizers_str: '',
+};
 
 
 // Helper function to determine badge variant for task priority
@@ -56,9 +78,9 @@ const getStatusBadgeVariant = (status: Task['status']): { variant: "default" | "
 
 const getEventStatusBadgeVariant = (status: EventStatus | undefined): "default" | "secondary" | "outline" | "destructive" => {
     switch (status) {
-        case 'Active': return 'default'; // Primary/Active color
+        case 'Active': return 'default'; 
         case 'Planning': return 'secondary';
-        case 'Completed': return 'outline'; // Muted green or similar
+        case 'Completed': return 'outline'; 
         case 'Cancelled': return 'destructive';
         default: return 'outline';
     }
@@ -89,12 +111,14 @@ export default function DashboardPage() {
   const [newGlobalFilterValue, setNewGlobalFilterValue] = useState('');
 
   // State for Overall Head's Event Management View
-  const [allPlatformEvents, setAllPlatformEvents] = useState<SubEvent[]>(subEventsData); // Initialize with all mock events
+  const [allPlatformEvents, setAllPlatformEvents] = useState<SubEvent[]>(subEventsData); 
   const [eventSearchTerm, setEventSearchTerm] = useState('');
   const [eventStatusFilter, setEventStatusFilter] = useState<EventStatus | 'all'>('all');
-  const [isCreateEventDialogOpen, setIsCreateEventDialogOpen] = useState(false);
-  const [isEditEventDialogOpen, setIsEditEventDialogOpen] = useState(false);
-  const [editingEvent, setEditingEvent] = useState<SubEvent | null>(null);
+  
+  const [isEventFormDialogOpen, setIsEventFormDialogOpen] = useState(false);
+  const [currentEventForm, setCurrentEventForm] = useState(defaultEventFormState);
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
+
   const [isDeleteEventConfirmOpen, setIsDeleteEventConfirmOpen] = useState(false);
   const [eventToDelete, setEventToDelete] = useState<SubEvent | null>(null);
 
@@ -303,7 +327,7 @@ export default function DashboardPage() {
         case 'number':
           return <Input type="number" value={Number(value)} onChange={(e) => handleGlobalCustomDataChange(participant.id, column.id, parseFloat(e.target.value) || 0)} onBlur={() => setEditingGlobalCustomCell(null)} autoFocus className="h-8 text-xs"/>;
         case 'date':
-          return <Input type="date" value={String(value)} onChange={(e) => handleGlobalCustomDataChange(participant.id, column.id, e.target.value)} onBlur={() => setEditingGlobalCustomCell(null)} autoFocus className="h-8 text-xs"/>;
+          return <Input type="date" value={value && isValid(parseISO(String(value))) ? format(parseISO(String(value)), 'yyyy-MM-dd') : ''} onChange={(e) => handleGlobalCustomDataChange(participant.id, column.id, e.target.value)} onBlur={() => setEditingGlobalCustomCell(null)} autoFocus className="h-8 text-xs"/>;
         case 'checkbox':
            return <Checkbox checked={!!value} onCheckedChange={(checked) => {handleGlobalCustomDataChange(participant.id, column.id, !!checked); setEditingGlobalCustomCell(null);}} />;
         case 'dropdown':
@@ -342,16 +366,98 @@ export default function DashboardPage() {
       return matchesSearch && matchesStatus;
     });
   }, [allPlatformEvents, eventSearchTerm, eventStatusFilter]);
+  
+  const superpowerCategories = ['The Thinker', 'The Brainiac', 'The Strategist', 'The Innovator'];
 
-  const handleOpenCreateEventDialog = () => {
-    setEditingEvent(null);
-    setIsCreateEventDialogOpen(true);
+
+  const handleEventFormChange = (field: keyof typeof defaultEventFormState, value: any) => {
+    setCurrentEventForm(prev => ({ ...prev, [field]: value }));
   };
-  const handleOpenEditEventDialog = (event: SubEvent) => {
-    setEditingEvent(event);
-    setIsEditEventDialogOpen(true); // Use separate state for edit if needed, or reuse create
+  
+  const handleEventFormDateChange = (field: 'eventDate' | 'deadline', date: Date | undefined) => {
+    setCurrentEventForm(prev => ({ ...prev, [field]: date ? date.toISOString() : undefined }));
   };
-  const handleOpenDeleteEventDialog = (event: SubEvent) => {
+
+
+  const handleEventFormSubmit = (e: FormEvent) => {
+     e.preventDefault();
+     if (!currentEventForm.title) {
+        toast({ title: "Error", description: "Event Title is required.", variant: "destructive" });
+        return;
+     }
+
+    const eventData: Omit<SubEvent, 'id' | 'slug'> = {
+        title: currentEventForm.title,
+        superpowerCategory: currentEventForm.superpowerCategory,
+        shortDescription: currentEventForm.shortDescription,
+        detailedDescription: currentEventForm.detailedDescription,
+        mainImage: { 
+            src: currentEventForm.mainImageSrc || 'https://placehold.co/600x400.png', 
+            alt: currentEventForm.mainImageAlt || currentEventForm.title,
+            dataAiHint: currentEventForm.mainImageAiHint || 'event placeholder'
+        },
+        registrationLink: currentEventForm.registrationLink,
+        deadline: currentEventForm.deadline,
+        eventDate: currentEventForm.eventDate,
+        isTeamEvent: currentEventForm.isTeamEvent,
+        status: currentEventForm.status,
+        venue: currentEventForm.venue,
+        organizers: currentEventForm.organizers_str.split(',').map(s => s.trim()).filter(Boolean),
+        event_representatives: currentEventForm.event_representatives_str.split(',').map(s => s.trim()).filter(Boolean),
+        registeredParticipantCount: currentEventForm.registeredParticipantCount || 0,
+    };
+
+    if (editingEventId) {
+        const updatedEvent = { 
+            ...allPlatformEvents.find(e => e.id === editingEventId)!,
+            ...eventData,
+            slug: eventData.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, ''), // Re-generate slug on title change
+        };
+        setAllPlatformEvents(prev => prev.map(event => event.id === editingEventId ? updatedEvent : event));
+        toast({ title: "Event Updated", description: `Event "${eventData.title}" has been updated.`});
+    } else {
+        const newEvent: SubEvent = {
+            id: `event-${Date.now()}`,
+            slug: eventData.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, ''),
+            ...eventData,
+        };
+        setAllPlatformEvents(prev => [newEvent, ...prev]);
+        toast({ title: "Event Created", description: `Event "${newEvent.title}" has been added.`});
+    }
+    setIsEventFormDialogOpen(false);
+    setEditingEventId(null);
+    setCurrentEventForm(defaultEventFormState);
+  };
+
+
+  const openCreateEventDialog = () => {
+    setEditingEventId(null);
+    setCurrentEventForm(defaultEventFormState);
+    setIsEventFormDialogOpen(true);
+  };
+  const openEditEventDialog = (event: SubEvent) => {
+    setEditingEventId(event.id);
+    setCurrentEventForm({
+        title: event.title,
+        superpowerCategory: event.superpowerCategory,
+        shortDescription: event.shortDescription,
+        detailedDescription: event.detailedDescription,
+        mainImageSrc: event.mainImage.src,
+        mainImageAlt: event.mainImage.alt,
+        mainImageAiHint: event.mainImage.dataAiHint,
+        registrationLink: event.registrationLink,
+        deadline: event.deadline,
+        eventDate: event.eventDate,
+        isTeamEvent: event.isTeamEvent || false,
+        status: event.status || 'Planning',
+        venue: event.venue || '',
+        organizers_str: (event.organizers || []).join(', '),
+        event_representatives_str: (event.event_representatives || []).join(', '),
+        registeredParticipantCount: event.registeredParticipantCount || 0,
+    });
+    setIsEventFormDialogOpen(true);
+  };
+  const openDeleteEventDialog = (event: SubEvent) => {
     setEventToDelete(event);
     setIsDeleteEventConfirmOpen(true);
   };
@@ -545,6 +651,12 @@ export default function DashboardPage() {
         ...activeGlobalStaticFiltersForDisplay.map(f => ({ ...f, isDynamic: false, id: f!.label.toLowerCase()})),
         ...activeGlobalDynamicFilters.map(df => ({ label: df.columnName, value: df.value, id: df.id, isDynamic: true }))
     ];
+    
+    const allActiveEventFiltersForDisplay = [
+        eventSearchTerm && { label: 'Search', value: eventSearchTerm },
+        eventStatusFilter !== 'all' && { label: 'Status', value: eventStatusFilter },
+    ].filter(Boolean);
+
 
     return (
       <div className="space-y-8 animate-fade-in-up">
@@ -563,9 +675,9 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
-          <Button asChild className="bg-accent hover:bg-accent/90 text-accent-foreground mt-4 md:mt-0 rounded-lg shadow-soft">
-              <Link href="/organizer/events/create">Create New Event</Link>
-          </Button>
+           <Button className="bg-accent hover:bg-accent/90 text-accent-foreground mt-4 md:mt-0 rounded-lg shadow-soft" onClick={openCreateEventDialog}>
+              <PlusCircle className="mr-2 h-4 w-4"/> Create New Event
+           </Button>
         </header>
 
         {myTasks.length > 0 && (
@@ -651,11 +763,11 @@ export default function DashboardPage() {
             <CardHeader>
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                 <CardTitle className="flex items-center gap-2 text-2xl text-primary"><CalendarRange className="h-7 w-7"/>Manage All Platform Events</CardTitle>
-                <Button className="bg-accent hover:bg-accent/90 text-accent-foreground" onClick={handleOpenCreateEventDialog}>
+                <Button className="bg-accent hover:bg-accent/90 text-accent-foreground" onClick={openCreateEventDialog}>
                     <PlusCircle className="mr-2 h-4 w-4"/> Add New Event
                 </Button>
               </div>
-              <CardDescription>Oversee, edit, or create new events on the platform.</CardDescription>
+              <CardDescription>Oversee, edit, or create new events on the platform. Showing {filteredEventsForOverallHead.length} of {allPlatformEvents.length} events.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
@@ -677,9 +789,21 @@ export default function DashboardPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="text-muted-foreground text-sm items-center flex h-10">Date Range Filter (Coming Soon)</div>
-                <div className="text-muted-foreground text-sm items-center flex h-10">Dynamic Event Filter (Coming Soon)</div>
+                <Button variant="outline" disabled className="text-muted-foreground">Date Range Filter (Soon)</Button>
+                <Button variant="outline" disabled className="text-muted-foreground">Dynamic Event Filter (Soon)</Button>
               </div>
+
+              {allActiveEventFiltersForDisplay.length > 0 && (
+                 <div className="text-xs text-muted-foreground mt-2 mb-2">
+                     <span className="font-medium">Active Event Filters:</span>
+                     {allActiveEventFiltersForDisplay.map((filter) => (
+                         <Badge key={filter!.label} variant="secondary" className="ml-1 text-xs py-0.5 px-1.5 rounded">
+                         {filter!.label}: &quot;{filter!.value}&quot;
+                         </Badge>
+                     ))}
+                 </div>
+              )}
+
               {filteredEventsForOverallHead.length > 0 ? (
                 <div className="overflow-x-auto rounded-md border">
                   <Table>
@@ -714,10 +838,10 @@ export default function DashboardPage() {
                              {event.organizers && event.organizers.length > 0 ? event.organizers.join(', ') : <span className="text-muted-foreground italic">None</span>}
                            </TableCell>
                           <TableCell className="text-right space-x-1">
-                            <Button variant="ghost" size="icon" className="hover:bg-muted/50 h-8 w-8" onClick={() => handleOpenEditEventDialog(event)}>
+                            <Button variant="ghost" size="icon" className="hover:bg-muted/50 h-8 w-8" onClick={() => openEditEventDialog(event)}>
                               <Pencil className="h-4 w-4" /> <span className="sr-only">Edit Event</span>
                             </Button>
-                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/80 hover:bg-destructive/10 h-8 w-8" onClick={() => handleOpenDeleteEventDialog(event)}>
+                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/80 hover:bg-destructive/10 h-8 w-8" onClick={() => openDeleteEventDialog(event)}>
                               <Trash2 className="h-4 w-4" /> <span className="sr-only">Delete Event</span>
                             </Button>
                           </TableCell>
@@ -730,6 +854,11 @@ export default function DashboardPage() {
                 <div className="text-center py-10 text-muted-foreground">
                   <CalendarDays className="h-12 w-12 mx-auto mb-3 text-primary/30" />
                   <p>No events match the current filters.</p>
+                   { (eventSearchTerm || eventStatusFilter !== 'all') &&
+                    <Button variant="link" onClick={() => { setEventSearchTerm(''); setEventStatusFilter('all');}} className="mt-2">
+                    Clear Event Filters
+                    </Button>
+                }
                 </div>
               )}
             </CardContent>
@@ -743,7 +872,7 @@ export default function DashboardPage() {
             <Card className="shadow-md-soft rounded-xl">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-2xl text-primary"><Users2 className="h-7 w-7"/>All Platform Participants</CardTitle>
-                    <CardDescription>View and manage participants across all events. Found: {filteredGlobalParticipants.length}</CardDescription>
+                    <CardDescription>View and manage participants across all events. Found: {filteredGlobalParticipants.length} of {globalParticipants.length}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 items-end">
@@ -775,7 +904,7 @@ export default function DashboardPage() {
                             <Select value={globalEventFilter} onValueChange={setGlobalEventFilter}>
                                 <SelectTrigger id="global-event-filter"><SelectValue placeholder="Filter by event..." /></SelectTrigger>
                                 <SelectContent>
-                                    {allEventSlugsAndTitles.map(event => <SelectItem key={event.slug} value={event.slug}>{event.title}</SelectItem>)}
+                                    {allEventSlugsAndTitles.map(eventItem => <SelectItem key={eventItem.slug} value={eventItem.slug}>{eventItem.title}</SelectItem>)}
                                 </SelectContent>
                             </Select>
                         </div>
@@ -826,7 +955,7 @@ export default function DashboardPage() {
 
                     {allActiveGlobalFiltersForDisplay.length > 0 && (
                         <div className="text-xs text-muted-foreground mt-2 mb-2">
-                            <span className="font-medium">Active Filters:</span>
+                            <span className="font-medium">Active Global Participant Filters:</span>
                             {allActiveGlobalFiltersForDisplay.map((filter: any) => (
                                 <Badge key={filter.id || filter.label} variant="secondary" className="ml-1 flex items-center gap-1 pr-1 text-xs py-0.5 px-1.5 rounded hover:bg-muted/80">
                                 {filter.label}: &quot;{filter.value}&quot;
@@ -952,35 +1081,148 @@ export default function DashboardPage() {
                         <div className="text-center py-10 text-muted-foreground">
                             <Users className="h-12 w-12 mx-auto mb-3 text-primary/30" />
                             <p>No participants match the current filters.</p>
+                             { (globalSearchTerm || globalSchoolFilter !== 'all' || globalPaymentStatusFilter !== 'all' || globalEventFilter !== 'all' || activeGlobalDynamicFilters.length > 0) &&
+                                <Button variant="link" onClick={() => { setGlobalSearchTerm(''); setGlobalSchoolFilter('all'); setGlobalPaymentStatusFilter('all'); setGlobalEventFilter('all'); setActiveGlobalDynamicFilters([]);}} className="mt-2">
+                                Clear All Global Participant Filters
+                                </Button>
+                            }
                         </div>
                     )}
                 </CardContent>
             </Card>
         </section>
 
-        {/* Dialog for Create/Edit Event (Placeholder) */}
-        <Dialog open={isCreateEventDialogOpen || isEditEventDialogOpen} onOpenChange={editingEvent ? setIsEditEventDialogOpen : setIsCreateEventDialogOpen}>
-            <DialogContent>
+        {/* Dialog for Create/Edit Event */}
+        <Dialog open={isEventFormDialogOpen} onOpenChange={(isOpen) => {
+            setIsEventFormDialogOpen(isOpen);
+            if (!isOpen) {
+                setEditingEventId(null);
+                setCurrentEventForm(defaultEventFormState);
+            }
+        }}>
+            <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>{editingEvent ? `Edit Event: ${editingEvent.title}` : "Create New Event"}</DialogTitle>
+                    <DialogTitle>{editingEventId ? `Edit Event: ${allPlatformEvents.find(e=>e.id === editingEventId)?.title}` : "Create New Event"}</DialogTitle>
                     <DialogDescription>
-                        Event creation and editing form will appear here. (Mock for now)
+                       Fill in the details for the event. Click save when you&apos;re done.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="py-4">
-                    <p className="text-muted-foreground">Form fields for event name, date, venue, status, assigning ERs/Organizers will be here.</p>
-                </div>
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => editingEvent ? setIsEditEventDialogOpen(false) : setIsCreateEventDialogOpen(false)}>Cancel</Button>
-                    <Button onClick={() => {
-                        toast({title: "Mock Save", description: "Event data would be saved."});
-                        editingEvent ? setIsEditEventDialogOpen(false) : setIsCreateEventDialogOpen(false);
-                    }}>Save Event</Button>
-                </DialogFooter>
+                <form onSubmit={handleEventFormSubmit} className="grid gap-4 py-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <Label htmlFor="eventTitle">Event Title</Label>
+                            <Input id="eventTitle" value={currentEventForm.title} onChange={e => handleEventFormChange('title', e.target.value)} placeholder="E.g., Tech Conference 2024" required />
+                        </div>
+                        <div>
+                            <Label htmlFor="eventSuperpowerCategory">Superpower Category</Label>
+                            <Select value={currentEventForm.superpowerCategory} onValueChange={val => handleEventFormChange('superpowerCategory', val)}>
+                                <SelectTrigger id="eventSuperpowerCategory"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    {superpowerCategories.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    <div>
+                        <Label htmlFor="eventShortDescription">Short Description</Label>
+                        <Textarea id="eventShortDescription" value={currentEventForm.shortDescription} onChange={e => handleEventFormChange('shortDescription', e.target.value)} placeholder="A brief overview of the event (1-2 sentences)." />
+                    </div>
+                    <div>
+                        <Label htmlFor="eventDetailedDescription">Detailed Description</Label>
+                        <Textarea id="eventDetailedDescription" value={currentEventForm.detailedDescription} onChange={e => handleEventFormChange('detailedDescription', e.target.value)} placeholder="Full details about the event, rules, schedule, etc." rows={5}/>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <Label htmlFor="eventMainImageSrc">Main Image URL</Label>
+                            <Input id="eventMainImageSrc" value={currentEventForm.mainImageSrc} onChange={e => handleEventFormChange('mainImageSrc', e.target.value)} placeholder="https://placehold.co/600x400.png" />
+                        </div>
+                        <div>
+                            <Label htmlFor="eventMainImageAlt">Image Alt Text</Label>
+                            <Input id="eventMainImageAlt" value={currentEventForm.mainImageAlt} onChange={e => handleEventFormChange('mainImageAlt', e.target.value)} placeholder="Description of image" />
+                        </div>
+                        <div>
+                            <Label htmlFor="eventMainImageAiHint">Image AI Hint</Label>
+                            <Input id="eventMainImageAiHint" value={currentEventForm.mainImageAiHint} onChange={e => handleEventFormChange('mainImageAiHint', e.target.value)} placeholder="Keywords for AI (e.g., debate conference)" />
+                        </div>
+                    </div>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <Label htmlFor="eventDate">Event Date</Label>
+                             <Popover>
+                                <PopoverTrigger asChild>
+                                <Button id="eventDate" variant="outline" className={`w-full justify-start text-left font-normal ${!currentEventForm.eventDate && "text-muted-foreground"}`}>
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {currentEventForm.eventDate && isValid(parseISO(currentEventForm.eventDate)) ? format(parseISO(currentEventForm.eventDate), "PPP") : <span>Pick a date</span>}
+                                </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0">
+                                <Calendar mode="single" selected={currentEventForm.eventDate ? parseISO(currentEventForm.eventDate) : undefined} onSelect={date => handleEventFormDateChange('eventDate', date)} initialFocus />
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+                        <div>
+                            <Label htmlFor="eventDeadline">Registration Deadline</Label>
+                             <Popover>
+                                <PopoverTrigger asChild>
+                                <Button id="eventDeadline" variant="outline" className={`w-full justify-start text-left font-normal ${!currentEventForm.deadline && "text-muted-foreground"}`}>
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {currentEventForm.deadline && isValid(parseISO(currentEventForm.deadline)) ? format(parseISO(currentEventForm.deadline), "PPP") : <span>Pick a date</span>}
+                                </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0">
+                                <Calendar mode="single" selected={currentEventForm.deadline ? parseISO(currentEventForm.deadline) : undefined} onSelect={date => handleEventFormDateChange('deadline', date)} initialFocus />
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+                    </div>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <Label htmlFor="eventVenue">Venue</Label>
+                            <Input id="eventVenue" value={currentEventForm.venue} onChange={e => handleEventFormChange('venue', e.target.value)} placeholder="E.g., Main Auditorium" />
+                        </div>
+                        <div>
+                            <Label htmlFor="eventStatus">Status</Label>
+                            <Select value={currentEventForm.status} onValueChange={val => handleEventFormChange('status', val as EventStatus)}>
+                                <SelectTrigger id="eventStatus"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Planning">Planning</SelectItem>
+                                    <SelectItem value="Active">Active</SelectItem>
+                                    <SelectItem value="Completed">Completed</SelectItem>
+                                    <SelectItem value="Cancelled">Cancelled</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                        <Checkbox id="eventIsTeamEvent" checked={currentEventForm.isTeamEvent} onCheckedChange={checked => handleEventFormChange('isTeamEvent', !!checked)} />
+                        <Label htmlFor="eventIsTeamEvent" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                            Is this a Team Event?
+                        </Label>
+                    </div>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <Label htmlFor="eventOrganizers">Organizers (comma-separated names)</Label>
+                            <Input id="eventOrganizers" value={currentEventForm.organizers_str} onChange={e => handleEventFormChange('organizers_str', e.target.value)} placeholder="Alice, Bob, Carol" />
+                        </div>
+                        <div>
+                            <Label htmlFor="eventRepresentatives">Event Representatives (comma-separated names)</Label>
+                            <Input id="eventRepresentatives" value={currentEventForm.event_representatives_str} onChange={e => handleEventFormChange('event_representatives_str', e.target.value)} placeholder="Dave, Eve" />
+                        </div>
+                    </div>
+                     <div>
+                        <Label htmlFor="eventRegLink">Registration Link (optional)</Label>
+                        <Input id="eventRegLink" value={currentEventForm.registrationLink} onChange={e => handleEventFormChange('registrationLink', e.target.value)} placeholder="/signup?event=your-event-slug" />
+                    </div>
+
+                    <DialogFooter>
+                        <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
+                        <Button type="submit">{editingEventId ? "Save Changes" : "Create Event"}</Button>
+                    </DialogFooter>
+                </form>
             </DialogContent>
         </Dialog>
 
-        {/* AlertDialog for Delete Event Confirmation (Placeholder) */}
+        {/* AlertDialog for Delete Event Confirmation */}
         <AlertDialog open={isDeleteEventConfirmOpen} onOpenChange={setIsDeleteEventConfirmOpen}>
             <AlertDialogContent>
                 <AlertDialogHeader>
@@ -1415,5 +1657,7 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
 
     
