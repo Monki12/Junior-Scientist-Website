@@ -47,16 +47,16 @@ export interface RegisteredEventInfo {
 export interface UserProfileData {
   uid: string;
   email: string | null;
-  displayName: string | null; // This will typically be the fullName for students
+  displayName: string | null; 
   role: UserRole;
   photoURL?: string | null;
   // Student specific fields
   fullName?: string;
   schoolName?: string;
-  schoolId?: string; // If matched from verified list
-  schoolVerifiedByOrganizer?: boolean; // Status of school verification
-  standard?: string; // e.g., "Grade 10"
-  division?: string; // Optional
+  schoolId?: string; 
+  schoolVerifiedByOrganizer?: boolean; 
+  standard?: string; 
+  division?: string; 
   // Organizational fields
   department?: string;
   assignedEventSlug?: string;
@@ -72,7 +72,7 @@ export interface UserProfileData {
   updatedAt?: string;
 }
 
-export interface Event {
+export interface Event { // This is an older type, SubEvent is primarily used now
   id: string;
   title: string;
   description: string;
@@ -113,7 +113,7 @@ export interface SignUpFormData {
   password: string;
   confirmPassword?: string;
   schoolName: string;
-  standard: string;
+  standard: string; // e.g., "4", "10", "12"
   division?: string;
 }
 
@@ -122,7 +122,7 @@ export interface LoginFormData {
   password: string;
 }
 
-export interface StudentData {
+export interface StudentData { // For OCR
   name: string;
   school: string;
   grade: string;
@@ -180,20 +180,19 @@ export interface ActiveDynamicFilter {
 
 export interface ActiveTaskFilter {
   id: string;
-  columnId: string; // keyof Task or custom column id
+  columnId: string; 
   columnName: string;
   value: string;
   isCustom?: boolean;
 }
 
-// New interface for School Data
 export interface SchoolData {
   id: string;
   name: string;
   city?: string;
   state?: string;
   country?: string;
-  isVerified: boolean; // Should be true for all entries in the master list
-  addedBy?: string; // UID of admin/organizer who added it
+  isVerified: boolean; 
+  addedBy?: string; 
   createdAt?: string;
 }

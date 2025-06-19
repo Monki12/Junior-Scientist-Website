@@ -12,11 +12,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import type { SignUpFormData } from '@/types';
-import { UserPlus, Loader2, LogIn, School as SchoolIconLucide } from 'lucide-react'; // Renamed School to SchoolIconLucide
+import { UserPlus, Loader2, LogIn, School as SchoolIconLucide } from 'lucide-react';
 import type { AuthError } from 'firebase/auth';
 import { mockSchoolsData } from '@/data/mockSchools';
 
-const gradeLevels = Array.from({ length: 12 }, (_, i) => `${i + 1}`); // Store as string "1" through "12"
+const gradeLevels = Array.from({ length: 9 }, (_, i) => `${i + 4}`); // Grades 4 through 12
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -29,7 +29,7 @@ export default function SignUpPage() {
     password: '',
     confirmPassword: '',
     schoolName: '',
-    standard: '', // Will store "4" through "12"
+    standard: '',
     division: '',
   });
 
@@ -62,39 +62,36 @@ export default function SignUpPage() {
 
     setIsLoading(true);
     try {
-      // Pass only SignUpFormData which matches the expected type for signUp
       const result = await signUp(formData);
       
       if (result && typeof result === 'object' && 'code' in result && (result as AuthError).code) {
         const authError = result as AuthError;
+        let errorMessage = authError.message || 'An unknown error occurred during sign up.';
+        let errorTitle = 'Sign Up Failed';
+
         if (authError.code === 'auth/email-already-in-use') {
-          toast({
-            title: 'Email Already Exists',
-            description: 'This email address is already registered. Please try logging in or use a different email.',
-            variant: 'destructive',
-          });
-        } else if (authError.code === 'validation/invalid-grade') { // Custom code from context
-           toast({
-            title: 'Invalid Grade',
-            description: authError.message || 'Standard must be between Grade 4 and Grade 12.', // Use message from error if available
-            variant: 'destructive',
-          });
+          errorTitle = 'Email Already Exists';
+          errorMessage = 'This email address is already registered. Please try logging in or use a different email.';
+        } else if (authError.code === 'validation/invalid-grade') {
+           errorTitle = 'Invalid Grade';
+           errorMessage = authError.message; // Use message from error for specific validation
         }
-         else {
-          toast({
-            title: 'Sign Up Failed',
-            description: authError.message || 'An unknown error occurred.',
-            variant: 'destructive',
-          });
-        }
-      } else {
+        
         toast({
-          title: 'Sign Up Successful!',
-          description: 'Welcome! Redirecting to your dashboard...',
+          title: errorTitle,
+          description: errorMessage,
+          variant: 'destructive',
         });
-        router.push('/dashboard');
+
+      } else { // Assuming success if no error object with 'code' is returned
+        toast({
+          title: 'Account created successfully!',
+          description: 'Please sign in to continue.',
+        });
+        router.push('/login'); // Redirect to login page
       }
     } catch (error: any) {
+      // This catch block might be redundant if signUp always returns specific error objects or FirebaseUser
       toast({
         title: 'Sign Up Error',
         description: error.message || 'An unexpected error occurred during sign up.',
@@ -110,9 +107,9 @@ export default function SignUpPage() {
       <Card className="w-full max-w-lg shadow-xl">
         <CardHeader className="text-center">
           <UserPlus className="mx-auto h-12 w-12 text-primary mb-4" />
-          <CardTitle className="text-3xl font-headline text-primary">Student Sign Up</CardTitle>
+          <CardTitle className="text-3xl font-headline text-primary">Create Your Student Account</CardTitle>
           <CardDescription>
-            Create your student account to explore and participate in events.
+            Join EventFlow to explore and participate in exciting events.
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -128,7 +125,7 @@ export default function SignUpPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="password">Password <span className="text-destructive">*</span></Label>
-                <Input id="password" type="password" placeholder="••••••••" value={formData.password} onChange={handleChange} required disabled={isLoading} />
+                <Input id="password" type="password" placeholder="•••••••• (min. 6 characters)" value={formData.password} onChange={handleChange} required disabled={isLoading} />
               </div>
               <div>
                 <Label htmlFor="confirmPassword">Confirm Password <span className="text-destructive">*</span></Label>
@@ -165,6 +162,7 @@ export default function SignUpPage() {
                   value={formData.standard}
                   onValueChange={(value) => handleSelectChange('standard', value)}
                   disabled={isLoading}
+                  required
                 >
                   <SelectTrigger id="standard">
                     <SelectValue placeholder="Select your grade" />
@@ -193,7 +191,7 @@ export default function SignUpPage() {
           </p>
           <Button variant="outline" asChild className="w-full">
             <Link href="/login">
-              <LogIn className="mr-2 h-4 w-4" /> Log In
+              <LogIn className="mr-2 h-4 w-4" /> Log In Now
             </Link>
           </Button>
         </CardFooter>
