@@ -9,14 +9,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useAuth } from '@/hooks/use-auth'; // To potentially update context after login if needed, but not for signup op itself
+import { useAuth } from '@/hooks/use-auth'; // To update context if needed after successful operations by onAuthStateChanged
 import { useToast } from '@/hooks/use-toast';
 import type { SignUpFormData, UserProfileData } from '@/types';
 import { UserPlus, Loader2, LogIn, School as SchoolIconLucide } from 'lucide-react';
 
-import { auth, db } from '@/lib/firebase'; // Direct Firebase imports
-import { createUserWithEmailAndPassword, type AuthError } from 'firebase/auth'; // Direct Firebase Auth import
-import { doc, setDoc } from 'firebase/firestore'; // Direct Firestore imports
+// Firebase direct imports
+import { auth, db } from '@/lib/firebase';
+import { createUserWithEmailAndPassword, type AuthError } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
 import { mockSchoolsData } from '@/data/mockSchools';
 
 const gradeLevels = Array.from({ length: 9 }, (_, i) => `${i + 4}`); // Grades 4 through 12
@@ -25,6 +26,8 @@ export default function SignUpPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  // const { setUserProfile } = useAuth(); // Not directly setting profile from here; onAuthStateChanged will handle it.
+
   const [formData, setFormData] = useState<SignUpFormData>({
     fullName: '',
     email: '',
@@ -57,7 +60,7 @@ export default function SignUpPage() {
       console.log("--- SIGN UP PROCESS ENDED (Password Mismatch) ---");
       return;
     }
-    if (!formData.email || !formData.password || !formData.fullName || !formData.schoolName || !formData.standard) {
+     if (!formData.email || !formData.password || !formData.fullName || !formData.schoolName || !formData.standard) {
       toast({
         title: 'Missing Fields',
         description: 'Full Name, Email, Password, School, and Standard are required.',
@@ -70,7 +73,7 @@ export default function SignUpPage() {
     setIsLoading(true);
 
     try {
-        // --- Step 1: Client-Side Grade Validation (Crucial before any Firebase calls) ---
+        // --- Step 1: Client-Side Grade Validation ---
         const numericStandard = parseInt(formData.standard);
         if (isNaN(numericStandard) || numericStandard < 4 || numericStandard > 12) {
             toast({
@@ -111,25 +114,24 @@ export default function SignUpPage() {
             schoolVerifiedByOrganizer: schoolVerifiedByOrganizer,
             standard: formData.standard,
             division: formData.division || undefined,
-            role: 'student',
+            role: 'student', // Explicitly set role
             photoURL: user.photoURL, // Store photoURL from Auth if available
-            registeredEvents: [],
-            tasks: [],
-            createdAt: new Date().toISOString(),
+            registeredEvents: [], // Initialize with empty array
+            tasks: [], // Initialize with empty array
+            createdAt: new Date().toISOString(), // Use ISO string for consistency
             updatedAt: new Date().toISOString(),
         };
 
-        // --- Step 4: Save Student Profile to Cloud Firestore ---
         console.log("Attempting to save profile to Firestore for UID:", uid);
         console.log("Data to be saved:", studentProfileData);
 
+        // --- Step 4: Save Student Profile to Cloud Firestore ---
         const userDocRef = doc(db, 'users', uid);
         await setDoc(userDocRef, studentProfileData);
 
         console.log("Firestore document for UID", uid, "created successfully!");
         console.log("Response from setDoc (implicitly void for success, but promise resolved): Promise fulfilled.");
 
-        // --- Success: Both Auth & Firestore operations completed ---
         toast({
             title: 'Account created successfully!',
             description: 'Please sign in to continue.',
@@ -161,8 +163,7 @@ export default function SignUpPage() {
                     errorTitle = 'Weak Password';
                     errorMessage = 'The password is too weak (minimum 6 characters).';
                     break;
-                // Firestore specific errors
-                case 'permission-denied':
+                case 'permission-denied': // Firestore specific
                     errorTitle = 'Permission Error';
                     errorMessage = 'Failed to save profile data due to security rules. Please check Firestore rules in console.';
                     console.error("DEBUG: Firebase Security Rules likely denied the Firestore write!");
@@ -245,6 +246,7 @@ export default function SignUpPage() {
                   value={formData.standard}
                   onValueChange={(value) => handleSelectChange('standard', value)}
                   disabled={isLoading}
+                  required
                 >
                   <SelectTrigger id="standard">
                     <SelectValue placeholder="Select your grade" />
@@ -281,4 +283,3 @@ export default function SignUpPage() {
     </div>
   );
 }
-    
