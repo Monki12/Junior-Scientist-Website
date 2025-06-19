@@ -4,7 +4,8 @@
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, type User as FirebaseUser, type AuthError, onAuthStateChanged } from 'firebase/auth';
 import { createContext, useState, useEffect, ReactNode } from 'react';
 import type { SignUpFormData, LoginFormData, UserProfileData, UserRole, Task, RegisteredEventInfo, EventParticipant } from '@/types';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase'; // Ensure db is imported
+import { doc, getDoc } from 'firebase/firestore'; // For fetching profile
 import { mockSchoolsData } from '@/data/mockSchools';
 
 // Mock data remains for profile information after authentication or for direct mock role setting
@@ -79,7 +80,7 @@ const mockUserProfiles: Record<UserRole, UserProfileData> = {
     uid: 'mock-overall-head-uid', email: 'overall.test@example.com', displayName: 'Test Overall Head Carol', role: 'overall_head', photoURL: 'https://placehold.co/100x100.png?text=OHC', department: 'Coordination',
     tasks: [
          createTaskObject(mockTasksData[6], 'task-oh-1', ['Test Overall Head Carol'], 'Admin Dave'),
-         { ...createTaskObject(mockTasksData[0], 'task-oh-2', ['Test Organizer Alice'], 'Test Overall Head Carol'), id: 'task-oh-mun-oversee', title: 'Oversee MUN Handbook Creation', assignedTo: ['Test Overall Head Carol'] }
+         { ...createTaskObject(mockTasksData[0], 'task-oh-mun-oversee', ['Test Organizer Alice'], 'Test Overall Head Carol'), id: 'task-oh-mun-oversee', title: 'Oversee MUN Handbook Creation', assignedTo: ['Test Overall Head Carol'] }
     ].filter(task => task.assignedTo?.includes('Test Overall Head Carol')), points: 300, credibilityScore: 85, allPlatformParticipants: mockGlobalParticipants, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
   },
   admin: {
@@ -103,7 +104,8 @@ interface AuthContextType {
   authUser: FirebaseUser | null;
   userProfile: UserProfileData | null;
   loading: boolean;
-  signUp: (data: SignUpFormData) => Promise<FirebaseUser | AuthError | { code: string; message: string }>;
+  // signUp now primarily handles Auth user creation; profile creation is on signup page
+  signUp: (data: Pick<SignUpFormData, 'email' | 'password'>) => Promise<FirebaseUser | AuthError>;
   logIn: (data: LoginFormData | UserRole) => Promise<FirebaseUser | AuthError | { message: string }>;
   logOut: () => Promise<void>;
   setMockUserRole: (role: UserRole | null) => void;
@@ -122,48 +124,59 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(true);
       if (firebaseUser) {
         setAuthUser(firebaseUser);
-        // Attempt to load profile from localStorage or default mocks
-        const storedRole = typeof window !== "undefined" ? localStorage.getItem('mockUserRole') as UserRole | null : null;
+        console.log("[AuthContext] onAuthStateChanged: Firebase user detected:", firebaseUser.uid, firebaseUser.email);
         
-        // Check if there's an existing profile that matches the UID (from previous signUp or login)
-        // THIS CHECK IS IMPORTANT: If setUserProfile was called (e.g. by signUp page), don't overwrite it here.
-        if (userProfile && userProfile.uid === firebaseUser.uid) {
-          // Profile already set (e.g., by signUp or previous login in this session), do nothing to overwrite
-        } else if (storedRole && mockUserProfiles[storedRole] && mockUserProfiles[storedRole].uid === firebaseUser.uid) {
-           // This case handles re-hydration if user had a mock role set previously for this authUser
-          setUserProfile(mockUserProfiles[storedRole]);
-        } else {
-          // If it's a new Firebase auth session, or no matching localStorage/mock profile for THIS uid
-          // try to find a general mock profile by email for org users, or default to student
-          const matchingMockProfileByEmail = Object.values(mockUserProfiles).find(p => p.email === firebaseUser.email);
-          if (matchingMockProfileByEmail && matchingMockProfileByEmail.role !== 'student') {
-            setUserProfile(matchingMockProfileByEmail);
-            if (typeof window !== "undefined") localStorage.setItem('mockUserRole', matchingMockProfileByEmail.role);
+        // Attempt to load profile from Firestore
+        try {
+          const userDocRef = doc(db, "users", firebaseUser.uid);
+          console.log("[AuthContext] Attempting to fetch profile from Firestore for UID:", firebaseUser.uid);
+          const userDocSnap = await getDoc(userDocRef);
+
+          if (userDocSnap.exists()) {
+            const fetchedProfile = userDocSnap.data() as UserProfileData;
+            console.log("[AuthContext] Firestore profile FOUND for UID:", firebaseUser.uid, fetchedProfile);
+            setUserProfile(fetchedProfile);
+            if (typeof window !== "undefined") localStorage.setItem('mockUserRole', fetchedProfile.role); // Keep mockRole in sync
           } else {
-            // Default to a basic student profile if no other profile is found.
-            // This means if a user logs in directly and isn't in mocks, they get a basic student profile.
-            // If they just signed up, the signup page itself should have set a more detailed profile via setUserProfile.
-            const currentTimestamp = new Date().toISOString();
-            const basicStudentProfile: UserProfileData = {
-              uid: firebaseUser.uid,
-              email: firebaseUser.email,
-              displayName: firebaseUser.displayName || firebaseUser.email,
-              role: 'student',
-              photoURL: firebaseUser.photoURL,
-              fullName: firebaseUser.displayName || firebaseUser.email,
-              schoolName: 'Unknown (Update Profile)',
-              schoolVerifiedByOrganizer: false,
-              standard: 'N/A',
-              registeredEvents: [],
-              tasks: [],
-              createdAt: currentTimestamp,
-              updatedAt: currentTimestamp,
-            };
-            setUserProfile(basicStudentProfile);
-            if (typeof window !== "undefined") localStorage.setItem('mockUserRole', 'student');
+            console.warn("[AuthContext] Firestore profile NOT FOUND for UID:", firebaseUser.uid, ". This might be okay if user just signed up and profile is being created, or if it's a mock user not in DB.");
+            // If Firestore profile doesn't exist, check for a mock user profile
+            // This path is less likely if sign-up ensures Firestore profile creation
+            const storedRole = typeof window !== "undefined" ? localStorage.getItem('mockUserRole') as UserRole | null : null;
+            if (storedRole && mockUserProfiles[storedRole] && mockUserProfiles[storedRole].email === firebaseUser.email) {
+                console.log("[AuthContext] Using mock profile for role:", storedRole);
+                setUserProfile(mockUserProfiles[storedRole]);
+            } else {
+                // Fallback: if no Firestore profile and no matching mock, set a very basic profile.
+                // This situation should be rare if signup is robust.
+                console.log("[AuthContext] No specific profile found, setting basic default for UID:", firebaseUser.uid);
+                const basicProfile: UserProfileData = {
+                    uid: firebaseUser.uid,
+                    email: firebaseUser.email,
+                    displayName: firebaseUser.displayName || firebaseUser.email,
+                    role: 'student', // Default to student if no other info
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                };
+                setUserProfile(basicProfile);
+                if (typeof window !== "undefined") localStorage.setItem('mockUserRole', 'student');
+            }
           }
+        } catch (error) {
+            console.error("[AuthContext] Error fetching user profile from Firestore:", error);
+            // Fallback if Firestore fetch fails
+             const basicProfile: UserProfileData = {
+                uid: firebaseUser.uid,
+                email: firebaseUser.email,
+                displayName: firebaseUser.displayName || firebaseUser.email,
+                role: 'student',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            };
+            setUserProfile(basicProfile);
+            if (typeof window !== "undefined") localStorage.setItem('mockUserRole', 'student');
         }
       } else {
+        console.log("[AuthContext] onAuthStateChanged: No Firebase user.");
         setAuthUser(null);
         setUserProfile(null);
         if (typeof window !== "undefined") localStorage.removeItem('mockUserRole');
@@ -171,14 +184,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
     });
     return () => unsubscribe();
-  }, []); // Removed userProfile from dependency array to avoid re-setting on profile updates
+  }, []);
 
 
   const setMockUserRole = (role: UserRole | null, triggerLoading: boolean = true) => {
     if (triggerLoading) setLoading(true);
     if (role && mockUserProfiles[role]) {
       const profile = mockUserProfiles[role];
-      // Simulate a FirebaseUser object for mock scenarios
       const mockFbUser: FirebaseUser = {
         uid: profile.uid, email: profile.email, displayName: profile.displayName, photoURL: profile.photoURL,
         emailVerified: true, isAnonymous: false, metadata: {}, providerData: [], providerId: 'mock',
@@ -198,42 +210,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (triggerLoading) setLoading(false);
   };
 
-  const signUp = async (data: SignUpFormData): Promise<FirebaseUser | AuthError | { code: string; message: string }> => {
+  // Simplified signUp for AuthContext; profile creation is now handled by the signup page.
+  const signUp = async (data: Pick<SignUpFormData, 'email' | 'password'>): Promise<FirebaseUser | AuthError> => {
     setLoading(true);
     try {
-      // --- Grade Validation (Client-Side before Auth call) ---
-      const numericStandard = parseInt(data.standard, 10);
-      if (isNaN(numericStandard) || numericStandard < 4 || numericStandard > 12) {
-        setLoading(false);
-        // This custom error will be caught by the signup page's handleSubmit
-        return { code: 'validation/invalid-grade', message: 'Standard must be between Grade 4 and Grade 12.' };
-      }
-
-      // --- Step 1: Create user in Firebase Authentication ---
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
-      const firebaseUser = userCredential.user;
-      
-      // The signup page will now handle profile preparation and calling setUserProfile.
-      // This function primarily ensures Firebase Auth user creation and basic validation.
-      
-      // IMPORTANT: Do NOT call setUserProfile here anymore as per new flow.
-      // The signup page will call setUserProfile after this function returns the firebaseUser.
-
+      // authUser and userProfile will be set by onAuthStateChanged after this.
+      // The signup page is responsible for creating the Firestore document.
       setLoading(false);
-      return firebaseUser;
-
+      return userCredential.user;
     } catch (error) {
-      // This catch block handles errors from createUserWithEmailAndPassword directly.
-      const authError = error as AuthError;
-      console.error("--- SIGN UP PROCESS ERROR (Firebase Auth) ---");
-      console.error("Error type:", authError.name);
-      console.error("Error code:", authError.code);
-      console.error("Error message:", authError.message);
-      console.error("Full error object:", authError);
       setLoading(false);
-      return authError; // Return the Firebase AuthError
+      return error as AuthError;
     }
-    // No finally block needed here for setLoading as it's handled in try/catch
   };
 
   const logIn = async (data: LoginFormData | UserRole): Promise<FirebaseUser | AuthError | { message: string }> => {
@@ -241,21 +230,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (typeof data === 'object' && 'email' in data && 'password' in data) {
       try {
         const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
-        const firebaseUser = userCredential.user;
-        // AuthUser will be set by onAuthStateChanged.
-        // Profile (mocked) will also be set by onAuthStateChanged or if already present.
-        // Forcing a profile set here can conflict with onAuthStateChanged.
-        // Just ensure the local storage role hint is set if we find a mock.
-        const matchingMockProfile = Object.values(mockUserProfiles).find(p => p.email === firebaseUser.email);
+        // User profile will be fetched by onAuthStateChanged.
+        // For immediate mock role hints if applicable:
+        const matchingMockProfile = Object.values(mockUserProfiles).find(p => p.email === data.email);
         if (matchingMockProfile) {
             if (typeof window !== "undefined") localStorage.setItem('mockUserRole', matchingMockProfile.role);
-            setUserProfile(matchingMockProfile); // Explicitly set for immediate UI update
         } else {
-            if (typeof window !== "undefined") localStorage.setItem('mockUserRole', 'student'); // Default if no specific mock
-            // onAuthStateChanged will handle creating a basic student profile if none exists
+             if (typeof window !== "undefined") localStorage.removeItem('mockUserRole'); // Or default to student
         }
         setLoading(false);
-        return firebaseUser;
+        return userCredential.user;
       } catch (error) {
         console.error("Firebase SignIn Error:", error);
         setAuthUser(null);
@@ -284,9 +268,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logOut = async () => {
     setLoading(true);
     await auth.signOut(); 
-    setAuthUser(null);
-    setUserProfile(null);
-    if (typeof window !== "undefined") localStorage.removeItem('mockUserRole');
+    // States (authUser, userProfile, localStorage) will be cleared by onAuthStateChanged.
     setLoading(false);
   };
 

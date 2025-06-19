@@ -9,10 +9,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuth } from '@/hooks/use-auth'; // To potentially update context after login if needed, but not for signup op itself
 import { useToast } from '@/hooks/use-toast';
 import type { SignUpFormData, UserProfileData } from '@/types';
 import { UserPlus, Loader2, LogIn, School as SchoolIconLucide } from 'lucide-react';
+
 import { auth, db } from '@/lib/firebase'; // Direct Firebase imports
 import { createUserWithEmailAndPassword, type AuthError } from 'firebase/auth'; // Direct Firebase Auth import
 import { doc, setDoc } from 'firebase/firestore'; // Direct Firestore imports
@@ -22,8 +23,6 @@ const gradeLevels = Array.from({ length: 9 }, (_, i) => `${i + 4}`); // Grades 4
 
 export default function SignUpPage() {
   const router = useRouter();
-  // useAuth might still be needed for other context (e.g., loading state, or if setUserProfile is called)
-  const { setUserProfile } = useAuth(); 
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<SignUpFormData>({
@@ -71,26 +70,27 @@ export default function SignUpPage() {
     setIsLoading(true);
 
     try {
-        // --- Step 1: Create user in Firebase Authentication ---
+        // --- Step 1: Client-Side Grade Validation (Crucial before any Firebase calls) ---
+        const numericStandard = parseInt(formData.standard);
+        if (isNaN(numericStandard) || numericStandard < 4 || numericStandard > 12) {
+            toast({
+                title: 'Invalid Grade',
+                description: 'Standard must be between Grade 4 and Grade 12.',
+                variant: 'destructive',
+            });
+            setIsLoading(false);
+            console.log("--- SIGN UP PROCESS ENDED (Invalid Grade) ---");
+            return;
+        }
+
+        // --- Step 2: Create user in Firebase Authentication ---
+        console.log("Attempting Firebase Auth user creation for:", formData.email);
         const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
         const user = userCredential.user;
         const uid = user.uid;
         console.log("Firebase Auth user created:", user.email, "UID:", uid);
 
-        // --- Step 2: Prepare Student Profile Data for Firestore ---
-        const numericStandard = parseInt(formData.standard);
-        if (isNaN(numericStandard) || numericStandard < 4 || numericStandard > 12) {
-            toast({ title: 'Invalid Grade', description: 'Standard must be between Grade 4 and Grade 12.', variant: 'destructive' });
-            setIsLoading(false);
-            console.log("--- SIGN UP PROCESS ENDED (Invalid Grade) ---");
-            // It might be good to delete the auth user if validation fails here,
-            // but that requires admin privileges or a Cloud Function.
-            // For client-side, we'll just stop.
-            await user.delete().catch(delErr => console.error("Failed to delete auth user after grade validation failure:", delErr));
-            console.warn("Auth user created but profile validation failed (grade). User deleted if possible.");
-            return;
-        }
-        
+        // --- Step 3: Prepare Student Profile Data for Firestore ---
         let schoolId: string | undefined = undefined;
         let schoolVerifiedByOrganizer = false;
         const schoolNameLower = formData.schoolName.toLowerCase();
@@ -101,44 +101,40 @@ export default function SignUpPage() {
           schoolVerifiedByOrganizer = true;
         }
 
-        const currentTimestamp = new Date().toISOString();
         const studentProfileData: UserProfileData = {
             uid: uid,
-            email: user.email,
+            email: user.email, // Use email from authenticated user
             fullName: formData.fullName,
-            displayName: formData.fullName,
+            displayName: formData.fullName, // Set displayName initially to fullName
             schoolName: formData.schoolName,
             schoolId: schoolId,
             schoolVerifiedByOrganizer: schoolVerifiedByOrganizer,
             standard: formData.standard,
             division: formData.division || undefined,
             role: 'student',
-            photoURL: user.photoURL,
+            photoURL: user.photoURL, // Store photoURL from Auth if available
             registeredEvents: [],
             tasks: [],
-            createdAt: currentTimestamp,
-            updatedAt: currentTimestamp,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
         };
 
+        // --- Step 4: Save Student Profile to Cloud Firestore ---
         console.log("Attempting to save profile to Firestore for UID:", uid);
         console.log("Data to be saved:", studentProfileData);
 
-        // --- Step 3: Save Student Profile to Cloud Firestore ---
         const userDocRef = doc(db, 'users', uid);
         await setDoc(userDocRef, studentProfileData);
 
         console.log("Firestore document for UID", uid, "created successfully!");
         console.log("Response from setDoc (implicitly void for success, but promise resolved): Promise fulfilled.");
 
-        // Update context if needed (optional, as onAuthStateChanged should also pick it up)
-        // setUserProfile(studentProfileData); 
-        // If you set it here, onAuthStateChanged might overwrite if not careful.
-        // Best to let onAuthStateChanged handle profile fetching after login.
-
+        // --- Success: Both Auth & Firestore operations completed ---
         toast({
-          title: 'Account created successfully!',
-          description: 'Please sign in to continue.',
+            title: 'Account created successfully!',
+            description: 'Please sign in to continue.',
         });
+
         router.push('/login'); // Redirect to login page
 
     } catch (error: any) {
@@ -165,11 +161,11 @@ export default function SignUpPage() {
                     errorTitle = 'Weak Password';
                     errorMessage = 'The password is too weak (minimum 6 characters).';
                     break;
-                // Firestore specific errors might not have 'auth/' prefix
+                // Firestore specific errors
                 case 'permission-denied':
                     errorTitle = 'Permission Error';
                     errorMessage = 'Failed to save profile data due to security rules. Please check Firestore rules in console.';
-                    console.error("Firebase Security Rules likely denied the Firestore write!");
+                    console.error("DEBUG: Firebase Security Rules likely denied the Firestore write!");
                     break;
                 default:
                     errorMessage = error.message || 'An unknown error occurred.';
@@ -285,6 +281,4 @@ export default function SignUpPage() {
     </div>
   );
 }
-    
-
     
