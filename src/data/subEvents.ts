@@ -3,7 +3,7 @@ import type { SubEvent, EventStatus } from '@/types';
 
 export const subEventsData: SubEvent[] = [
   {
-    id: 'event_001', // Using more generic IDs now
+    id: 'event_001',
     slug: 'model-united-nations',
     title: 'Model United Nations (MUN)',
     superpowerCategory: 'The Thinker',
@@ -18,13 +18,13 @@ export const subEventsData: SubEvent[] = [
     registrationLink: '/signup?event=mun', 
     deadline: '2024-11-15T23:59:59Z',
     eventDate: '2024-12-01T09:00:00Z',
-    isTeamBased: false,
+    isTeamBased: false, // Individual event
     minTeamMembers: 1,
     maxTeamMembers: 1,
-    organizerUids: ['mock-organizer-uid', 'mock-overall-head-uid'], // Example UIDs
+    organizerUids: ['mock-organizer-uid', 'mock-overall-head-uid'],
     status: 'Planning' as EventStatus,
     venue: 'Main Auditorium Hall A',
-    registeredParticipantCount: 120, // This would ideally be dynamic
+    registeredParticipantCount: 120,
     isFeatured: true,
   },
   {
@@ -38,7 +38,7 @@ export const subEventsData: SubEvent[] = [
     registrationLink: '/signup?event=ex-quiz-it',
     deadline: '2024-11-18T23:59:59Z',
     eventDate: '2024-12-05T10:00:00Z',
-    isTeamBased: true,
+    isTeamBased: true, // Team event
     minTeamMembers: 2,
     maxTeamMembers: 4,
     organizerUids: ['mock-representative-uid'],
@@ -58,7 +58,7 @@ export const subEventsData: SubEvent[] = [
     registrationLink: '/signup?event=olympiad',
     deadline: '2024-11-20T23:59:59Z',
     eventDate: '2024-12-10T09:30:00Z',
-    isTeamBased: false,
+    isTeamBased: false, // Individual
     minTeamMembers: 1,
     maxTeamMembers: 1,
     organizerUids: ['mock-organizer-uid'],
@@ -78,8 +78,8 @@ export const subEventsData: SubEvent[] = [
     registrationLink: '/signup?event=math-a-maze',
     deadline: '2024-11-22T23:59:59Z',
     eventDate: '2024-12-12T11:00:00Z',
-    isTeamBased: true,
-    minTeamMembers: 1, // Can be individual or team
+    isTeamBased: true, // Can be individual or team, flexible
+    minTeamMembers: 1, 
     maxTeamMembers: 3,
     organizerUids: ['mock-organizer-uid', 'mock-representative-uid'],
     status: 'Active' as EventStatus,

@@ -7,7 +7,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/hooks/use-auth';
 import { subEventsData } from '@/data/subEvents';
-import type { UserRole, SubEvent, Task, RegisteredEventInfo, UserProfileData, EventParticipant, CustomColumnDefinition, ActiveDynamicFilter, ParticipantCustomData, EventStatus, EventRegistration, EventTeam } from '@/types'; // Added EventRegistration, EventTeam
+import type { UserRole, SubEvent, Task, UserProfileData, EventParticipant, CustomColumnDefinition, ActiveDynamicFilter, EventStatus, EventRegistration, EventTeam } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -23,8 +23,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Calendar } from '@/components/ui/calendar';
-import { db } from '@/lib/firebase'; // Import db
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore'; // Firestore imports
+import { db } from '@/lib/firebase';
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 
 
 import { format, isToday, isPast, isThisWeek, startOfDay, parseISO, isValid } from 'date-fns';
@@ -33,11 +33,12 @@ import {
   Loader2, BarChartBig, Edit, Users, FileScan, Settings, BookUser, ListChecks, CalendarDays, UserCircle, Bell, GraduationCap, School, Download, Info, Briefcase, Newspaper, Award, Star, CheckCircle, ClipboardList, TrendingUp, Building, Activity, ShieldCheck, ExternalLink, Home, Search, CalendarCheck, Ticket, Users2, Phone, Mail, Milestone, MapPin, Clock, UsersRound, CheckSquare, BarChartHorizontalBig, Rss, AlertTriangle, Filter as FilterIcon, PlusCircle, GanttChartSquare, Rows, Tag, XIcon, Pencil, Trash2, CalendarRange, LayoutDashboard, CalendarIcon
 } from 'lucide-react';
 
-interface StudentRegisteredEventDisplay extends SubEvent { // SubEvent has most details
+interface StudentRegisteredEventDisplay extends SubEvent {
   registrationId: string;
   teamName?: string;
   teamId?: string;
-  teamMembers?: { id: string, name: string, role?: string }[]; // For display
+  teamMembers?: string[]; // Changed to string[] for UIDs
+  teamMembersNames?: Record<string, string>; // For fetched names
   admitCardUrl?: string | null;
   registrationStatus?: EventRegistration['registrationStatus'];
 }
@@ -55,13 +56,14 @@ const defaultEventFormState: Omit<SubEvent, 'id' | 'slug' | 'mainImage'> & { mai
   deadline: undefined,
   eventDate: undefined,
   isTeamBased: false,
+  minTeamMembers: 1,
+  maxTeamMembers: 1,
   status: 'Planning',
   venue: '',
-  organizerUids: [], // Changed from organizers
-  // event_representatives: [], // This might be part of organizerUids or a separate role management
+  organizerUids: [],
   registeredParticipantCount: 0,
-  event_representatives_str: '', // For form input
-  organizers_str: '', // For form input (organizerUids)
+  event_representatives_str: '',
+  organizers_str: '',
 };
 
 
@@ -98,6 +100,7 @@ export default function DashboardPage() {
   
   const [localUserProfileTasks, setLocalUserProfileTasks] = useState<Task[]>([]);
   const [studentRegisteredFullEvents, setStudentRegisteredFullEvents] = useState<StudentRegisteredEventDisplay[]>([]);
+  const [loadingStudentEvents, setLoadingStudentEvents] = useState(false);
 
 
   const [globalParticipants, setGlobalParticipants] = useState<EventParticipant[]>([]);
@@ -134,7 +137,7 @@ export default function DashboardPage() {
     }
     if (userProfile) {
       const personallyAssignedTasks = userProfile.tasks?.filter(task => 
-        task.assignedTo?.includes(userProfile.displayName!)
+        task.assignedTo?.includes(userProfile.displayName!) // Assuming displayName is a valid string for matching
       ) || [];
       setLocalUserProfileTasks(personallyAssignedTasks);
 
@@ -142,57 +145,72 @@ export default function DashboardPage() {
         setGlobalParticipants(userProfile.allPlatformParticipants);
       }
 
-      // Fetch student's registered events if they are a student
       if ((userProfile.role === 'student' || userProfile.role === 'test') && authUser) {
+        setLoadingStudentEvents(true);
         const fetchStudentRegistrations = async () => {
           try {
             const registrationsRef = collection(db, 'event_registrations');
             const q = query(registrationsRef, where('userId', '==', authUser.uid));
             const querySnapshot = await getDocs(q);
             
-            const fetchedRegistrations: StudentRegisteredEventDisplay[] = [];
-            for (const regDoc of querySnapshot.docs) {
+            const fetchedRegistrationsPromises = querySnapshot.docs.map(async (regDoc) => {
               const regData = regDoc.data() as EventRegistration;
               const eventDetail = subEventsData.find(event => event.id === regData.eventId);
               if (eventDetail) {
-                let teamNameDisplay: string | undefined = undefined;
+                let teamDetails: EventTeam | undefined;
+                let teamMembersNames: Record<string, string> = {};
+
                 if (regData.isTeamRegistration && regData.teamId) {
                    try {
                     const teamDocRef = doc(db, 'event_teams', regData.teamId);
                     const teamDocSnap = await getDoc(teamDocRef);
                     if(teamDocSnap.exists()){
-                        teamNameDisplay = (teamDocSnap.data() as EventTeam).teamName;
+                        teamDetails = teamDocSnap.data() as EventTeam;
+                        // Fetch member names (can be slow, consider optimization for many members)
+                        for (const memberUid of teamDetails.memberUids) {
+                            const userDoc = await getDoc(doc(db, 'users', memberUid));
+                            if (userDoc.exists()) {
+                                teamMembersNames[memberUid] = (userDoc.data() as UserProfileData).fullName || memberUid;
+                            } else {
+                                teamMembersNames[memberUid] = memberUid; // Fallback to UID
+                            }
+                        }
                     }
                    } catch (teamError) {
                        console.error("Error fetching team details for student dashboard:", teamError);
                    }
                 }
-                fetchedRegistrations.push({
+                return {
                   ...eventDetail,
                   registrationId: regDoc.id,
-                  teamId: regData.teamId || undefined,
-                  teamName: teamNameDisplay,
+                  teamId: teamDetails?.id,
+                  teamName: teamDetails?.teamName,
+                  teamMembers: teamDetails?.memberUids,
+                  teamMembersNames: teamMembersNames,
                   admitCardUrl: regData.admitCardUrl,
                   registrationStatus: regData.registrationStatus,
-                });
+                } as StudentRegisteredEventDisplay;
               }
-            }
-            setStudentRegisteredFullEvents(fetchedRegistrations);
+              return null;
+            });
+            const resolvedRegistrations = (await Promise.all(fetchedRegistrationsPromises)).filter(Boolean) as StudentRegisteredEventDisplay[];
+            setStudentRegisteredFullEvents(resolvedRegistrations);
           } catch (error) {
             console.error("Error fetching student registrations:", error);
             toast({ title: "Error", description: "Could not fetch your registered events.", variant: "destructive" });
+          } finally {
+            setLoadingStudentEvents(false);
           }
         };
         fetchStudentRegistrations();
       }
-
-
     } else {
       setLocalUserProfileTasks([]); 
       setGlobalParticipants([]);
       setStudentRegisteredFullEvents([]);
     }
-  }, [authUser, userProfile, loading, router, toast]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authUser, userProfile, loading, router]); // toast was removed as it's stable
 
 
   const handleTaskCompletionToggle = (taskId: string) => {
@@ -439,7 +457,7 @@ export default function DashboardPage() {
         return;
      }
 
-    const eventDataToSave: Omit<SubEvent, 'id' | 'slug'> = { // Ensure this matches SubEvent structure
+    const eventDataToSave: Omit<SubEvent, 'id' | 'slug'> = {
         title: currentEventForm.title,
         superpowerCategory: currentEventForm.superpowerCategory,
         shortDescription: currentEventForm.shortDescription,
@@ -452,31 +470,30 @@ export default function DashboardPage() {
         registrationLink: currentEventForm.registrationLink,
         deadline: currentEventForm.deadline,
         eventDate: currentEventForm.eventDate,
-        isTeamBased: currentEventForm.isTeamEvent,
+        isTeamBased: currentEventForm.isTeamBased,
+        minTeamMembers: currentEventForm.minTeamMembers,
+        maxTeamMembers: currentEventForm.maxTeamMembers,
         status: currentEventForm.status,
         venue: currentEventForm.venue,
         organizerUids: currentEventForm.organizers_str.split(',').map(s => s.trim()).filter(Boolean),
-        // event_representatives not directly on SubEvent, handle separately or as part of organizerUids role
         registeredParticipantCount: currentEventForm.registeredParticipantCount || 0,
     };
 
     if (editingEventId) {
         const updatedEvent = { 
-            ...allPlatformEvents.find(e => e.id === editingEventId)!, // Base existing event
-            ...eventDataToSave, // Override with new data
+            ...allPlatformEvents.find(e => e.id === editingEventId)!,
+            ...eventDataToSave,
             slug: eventDataToSave.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, ''), 
         };
         setAllPlatformEvents(prev => prev.map(event => event.id === editingEventId ? updatedEvent : event));
-        // TODO: Firestore update call for event 'editingEventId' with 'updatedEvent' data
         toast({ title: "Event Updated", description: `Event "${eventDataToSave.title}" has been updated.`});
     } else {
         const newEvent: SubEvent = {
-            id: `event-${Date.now()}`, // Client-side generated ID
+            id: `event-${Date.now()}`,
             slug: eventDataToSave.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, ''),
             ...eventDataToSave,
         };
         setAllPlatformEvents(prev => [newEvent, ...prev]);
-        // TODO: Firestore add call for 'newEvent' data
         toast({ title: "Event Created", description: `Event "${newEvent.title}" has been added.`});
     }
     setIsEventFormDialogOpen(false);
@@ -503,10 +520,12 @@ export default function DashboardPage() {
         registrationLink: event.registrationLink,
         deadline: event.deadline,
         eventDate: event.eventDate,
-        isTeamEvent: event.isTeamEvent || false,
+        isTeamBased: event.isTeamBased || false,
+        minTeamMembers: event.minTeamMembers || 1,
+        maxTeamMembers: event.maxTeamMembers || 1,
         status: event.status || 'Planning',
         venue: event.venue || '',
-        organizers_str: (event.organizerUids || []).join(', '), // Changed from organizers
+        organizers_str: (event.organizerUids || []).join(', '),
         event_representatives_str: '', // This might be part of organizerUids with specific role
         registeredParticipantCount: event.registeredParticipantCount || 0,
     });
@@ -519,7 +538,6 @@ export default function DashboardPage() {
   const confirmDeleteEvent = () => {
     if (eventToDelete) {
       setAllPlatformEvents(prev => prev.filter(e => e.id !== eventToDelete.id));
-      // TODO: Firestore delete call for eventToDelete.id
       toast({ title: `Mock: Event "${eventToDelete.title}" deleted.`});
       setIsDeleteEventConfirmOpen(false);
       setEventToDelete(null);
@@ -574,7 +592,9 @@ export default function DashboardPage() {
         <section id="my-events">
           <h2 className="text-2xl font-semibold text-primary mb-1">My Registered Events</h2>
           <p className="text-muted-foreground mb-6">Events you are currently participating in.</p>
-          {studentRegisteredFullEvents.length > 0 ? (
+          {loadingStudentEvents ? (
+            <div className="flex justify-center items-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary"/> <span className="ml-2">Loading your events...</span></div>
+          ) : studentRegisteredFullEvents.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {studentRegisteredFullEvents.map(event => (
                 <Card key={event.registrationId} className="overflow-hidden shadow-soft hover:shadow-md-soft transition-shadow rounded-xl flex flex-col">
@@ -601,6 +621,11 @@ export default function DashboardPage() {
                       {event.isTeamBased && event.teamName && (
                         <div className="mt-2">
                           <p className="text-xs text-accent font-semibold flex items-center gap-1"><Users className="h-4 w-4"/>Team: {event.teamName}</p>
+                          {event.teamMembersNames && Object.keys(event.teamMembersNames).length > 0 && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                                Members: {Object.values(event.teamMembersNames).join(', ') || 'No members listed'}
+                            </div>
+                          )}
                            <Button variant="link" size="sm" className="text-xs h-auto p-0 mt-1 text-destructive/80 hover:text-destructive" onClick={(e) => {e.preventDefault(); alert("Leave Team functionality coming soon!")}}>Leave Team</Button>
                         </div>
                       )}
@@ -629,9 +654,11 @@ export default function DashboardPage() {
         <section id="admit-cards">
           <h2 className="text-2xl font-semibold text-primary mb-1">Admit Cards</h2>
           <p className="text-muted-foreground mb-6">Download your admit cards for upcoming events.</p>
-          {studentRegisteredFullEvents.length > 0 ? (
+           {loadingStudentEvents ? (
+             <div className="flex justify-center items-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary"/></div>
+           ) : studentRegisteredFullEvents.length > 0 ? (
              <div className="space-y-4">
-                {studentRegisteredFullEvents.filter(e => e.registrationStatus === 'approved').map(event => ( // Only show for approved
+                {studentRegisteredFullEvents.filter(e => e.registrationStatus === 'approved').map(event => (
                     <Card key={`admit-${event.id}`} className="shadow-soft rounded-xl">
                         <CardContent className="p-4 flex flex-col sm:flex-row justify-between items-center gap-3">
                             <div>
@@ -680,7 +707,7 @@ export default function DashboardPage() {
                 <CardContent className="text-center py-10 text-muted-foreground">
                     <Users2 className="h-12 w-12 mx-auto mb-3 text-primary/50" />
                     <p>Team management features (inviting members, viewing full team details) are coming soon!</p>
-                    <p className="text-sm">You can currently create a team when registering for a team event.</p>
+                    <p className="text-sm">You can currently create a team or join one when registering for a team event.</p>
                 </CardContent>
             </Card>
         </section>
@@ -688,7 +715,7 @@ export default function DashboardPage() {
     );
   }
 
-  // Overall Head Dashboard remains largely the same, but `organizers_str` in event form now maps to `organizerUids`
+  // Overall Head Dashboard
   if (role === 'overall_head') {
     const activeGlobalStaticFiltersForDisplay = [
         globalSearchTerm && { label: 'Search', value: globalSearchTerm },
@@ -884,11 +911,10 @@ export default function DashboardPage() {
                           </TableCell>
                           <TableCell>{event.registeredParticipantCount || 0}</TableCell>
                           <TableCell className="text-xs max-w-[150px] truncate">
-                            {/* TODO: Display actual ERs based on roles/assignments */}
                             {(event.organizerUids?.includes('mock-representative-uid') ? 'Test Event Rep Bob' : '') || <span className="text-muted-foreground italic">None</span>}
                           </TableCell>
                            <TableCell className="text-xs max-w-[150px] truncate">
-                             {event.organizerUids && event.organizerUids.length > 0 ? event.organizerUids.map(uid => mockUserProfiles[userProfile?.role || 'student']?.displayName || uid).join(', ') : <span className="text-muted-foreground italic">None</span>}
+                             {event.organizerUids && event.organizerUids.length > 0 ? event.organizerUids.map(uid => mockUserProfiles[userProfile?.role as UserRole || 'student']?.displayName || uid).join(', ') : <span className="text-muted-foreground italic">None</span>}
                            </TableCell>
                           <TableCell className="text-right space-x-1">
                             <Button variant="ghost" size="icon" className="hover:bg-muted/50 h-8 w-8" onClick={() => openEditEventDialog(event)}>
@@ -1200,10 +1226,10 @@ export default function DashboardPage() {
                     </div>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <Label htmlFor="eventDate">Event Date</Label>
+                            <Label htmlFor="eventDateForm">Event Date</Label>
                              <Popover>
                                 <PopoverTrigger asChild>
-                                <Button id="eventDate" variant="outline" className={`w-full justify-start text-left font-normal ${!currentEventForm.eventDate && "text-muted-foreground"}`}>
+                                <Button id="eventDateForm" variant="outline" className={`w-full justify-start text-left font-normal ${!currentEventForm.eventDate && "text-muted-foreground"}`}>
                                     <CalendarIcon className="mr-2 h-4 w-4" />
                                     {currentEventForm.eventDate && isValid(parseISO(currentEventForm.eventDate)) ? format(parseISO(currentEventForm.eventDate), "PPP") : <span>Pick a date</span>}
                                 </Button>
@@ -1214,10 +1240,10 @@ export default function DashboardPage() {
                             </Popover>
                         </div>
                         <div>
-                            <Label htmlFor="eventDeadline">Registration Deadline</Label>
+                            <Label htmlFor="eventDeadlineForm">Registration Deadline</Label>
                              <Popover>
                                 <PopoverTrigger asChild>
-                                <Button id="eventDeadline" variant="outline" className={`w-full justify-start text-left font-normal ${!currentEventForm.deadline && "text-muted-foreground"}`}>
+                                <Button id="eventDeadlineForm" variant="outline" className={`w-full justify-start text-left font-normal ${!currentEventForm.deadline && "text-muted-foreground"}`}>
                                     <CalendarIcon className="mr-2 h-4 w-4" />
                                     {currentEventForm.deadline && isValid(parseISO(currentEventForm.deadline)) ? format(parseISO(currentEventForm.deadline), "PPP") : <span>Pick a date</span>}
                                 </Button>
@@ -1234,9 +1260,9 @@ export default function DashboardPage() {
                             <Input id="eventVenue" value={currentEventForm.venue} onChange={e => handleEventFormChange('venue', e.target.value)} placeholder="E.g., Main Auditorium" />
                         </div>
                         <div>
-                            <Label htmlFor="eventStatus">Status</Label>
+                            <Label htmlFor="eventStatusForm">Status</Label>
                             <Select value={currentEventForm.status} onValueChange={val => handleEventFormChange('status', val as EventStatus)}>
-                                <SelectTrigger id="eventStatus"><SelectValue /></SelectTrigger>
+                                <SelectTrigger id="eventStatusForm"><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="Planning">Planning</SelectItem>
                                     <SelectItem value="Active">Active</SelectItem>
@@ -1249,11 +1275,23 @@ export default function DashboardPage() {
                         </div>
                     </div>
                     <div className="flex items-center space-x-2">
-                        <Checkbox id="eventIsTeamEvent" checked={currentEventForm.isTeamEvent} onCheckedChange={checked => handleEventFormChange('isTeamEvent', !!checked)} />
-                        <Label htmlFor="eventIsTeamEvent" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                        <Checkbox id="eventIsTeamBased" checked={currentEventForm.isTeamBased} onCheckedChange={checked => handleEventFormChange('isTeamBased', !!checked)} />
+                        <Label htmlFor="eventIsTeamBased" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                             Is this a Team Event?
                         </Label>
                     </div>
+                    {currentEventForm.isTeamBased && (
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <Label htmlFor="minTeamMembers">Min Team Members</Label>
+                                <Input id="minTeamMembers" type="number" value={currentEventForm.minTeamMembers || 1} onChange={e => handleEventFormChange('minTeamMembers', parseInt(e.target.value) || 1)} />
+                            </div>
+                            <div>
+                                <Label htmlFor="maxTeamMembers">Max Team Members</Label>
+                                <Input id="maxTeamMembers" type="number" value={currentEventForm.maxTeamMembers || 1} onChange={e => handleEventFormChange('maxTeamMembers', parseInt(e.target.value) || 1)} />
+                            </div>
+                        </div>
+                    )}
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <Label htmlFor="eventOrganizers">Organizer UIDs (comma-separated)</Label>
@@ -1495,7 +1533,7 @@ export default function DashboardPage() {
       dashboardTitle = "Admin Dashboard";
        quickActions = [
         { href: '/admin/tasks', label: 'Global Task Mgmt', icon: Settings},
-        { href: '/organizer/events/manage', label: 'Manage All Events', icon: Briefcase },
+        { href: '/organizer/events/manage', label: 'Manage All Events', icon: Briefcase }, // This link might need updating if direct event management is centralized
         { href: '/admin/users', label: 'Manage Users', icon: Users}, 
         { href: '/ocr-tool', label: 'Scan Forms (OCR)', icon: FileScan },
         { href: '/organizer/event-tasks', label: 'All Event Tasks', icon: ListChecks },
@@ -1535,8 +1573,7 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
-        {(role === 'organizer' || role === 'overall_head' || role === 'admin') && (
-           // Keep the old create event button for now, or remove if OH dashboard handles all creation.
+        {(role === 'organizer' || role === 'overall_head' || role === 'admin') && userProfile.role !== 'overall_head' && ( // OH has its own Create Event Button
           <Button asChild className="bg-accent hover:bg-accent/90 text-accent-foreground mt-4 md:mt-0 rounded-lg shadow-soft">
             <Link href="/organizer/events/create">Create New Event (Legacy)</Link>
           </Button>

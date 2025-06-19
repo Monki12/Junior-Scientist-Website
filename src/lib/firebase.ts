@@ -2,7 +2,7 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
-import { getStorage, type FirebaseStorage } from 'firebase/storage'; // Added FirebaseStorage import
+import { getStorage, type FirebaseStorage } from 'firebase/storage';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -17,7 +17,7 @@ const firebaseConfig = {
 let app: FirebaseApp;
 let auth: Auth;
 let db: Firestore;
-let storage: FirebaseStorage; // Added storage variable
+let storage: FirebaseStorage;
 
 if (
   !firebaseConfig.apiKey ||
@@ -25,6 +25,8 @@ if (
   !firebaseConfig.projectId
 ) {
   console.error("[firebase.ts] CRITICAL ERROR: Firebase configuration is missing. Ensure environment variables are set and NEXT_PUBLIC_ prefixed.");
+  // Provide default empty objects to prevent runtime errors if config is missing,
+  // though the app will not function correctly.
   app = {} as FirebaseApp;
   auth = {} as Auth;
   db = {} as Firestore;
@@ -56,13 +58,13 @@ if (
   }
 
   try {
-    storage = getStorage(app); // Initialize Firebase Storage
+    storage = getStorage(app);
   } catch (e: any) {
     console.error("[firebase.ts] CRITICAL ERROR during getStorage(app):", e.message, e);
     storage = {} as FirebaseStorage;
   }
 }
 
-export { app, auth, db, storage }; // Export storage
+export { app, auth, db, storage };
 
     
