@@ -10,14 +10,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import type { SignUpFormData, UserProfileData } from '@/types';
+import type { SignUpFormData, UserProfileData } from '@/types'; // UserProfileData might not be strictly needed here if constructing manually
 import { UserPlus, Loader2, LogIn, School as SchoolIconLucide } from 'lucide-react';
 
 import { auth, db } from '@/lib/firebase';
 import { createUserWithEmailAndPassword, type AuthError } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore'; // Import serverTimestamp
 import { mockSchoolsData } from '@/data/mockSchools';
-// Removed useAuth import as we are handling auth and db ops directly here
 
 const gradeLevels = Array.from({ length: 9 }, (_, i) => `${i + 4}`); // Grades 4 through 12
 
@@ -63,7 +62,6 @@ export default function SignUpPage() {
     setIsLoading(true);
 
     try {
-      // --- Step 1: Client-Side Grade Validation ---
       const numericStandard = parseInt(formData.standard);
       if (isNaN(numericStandard) || numericStandard < 4 || numericStandard > 12) {
         toast({ title: 'Invalid Grade', description: 'Standard must be between Grade 4 and Grade 12.', variant: 'destructive' });
@@ -72,17 +70,16 @@ export default function SignUpPage() {
         return;
       }
 
-      // --- Step 2: Create user in Firebase Authentication ---
       console.log("Attempting Firebase Auth user creation for:", formData.email);
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
       const user = userCredential.user;
       const uid = user.uid;
       console.log("Firebase Auth user created:", user.email, "UID:", uid);
 
-      // --- Step 3: Determine schoolId and schoolVerifiedByOrganizer ---
       let determinedSchoolId: string | null = null;
       let determinedSchoolVerified = false;
       const formSchoolNameLower = formData.schoolName.trim().toLowerCase();
+
       const matchedSchool = mockSchoolsData.find(
         (school) => school.name.trim().toLowerCase() === formSchoolNameLower
       );
@@ -95,31 +92,29 @@ export default function SignUpPage() {
         console.log("School not found in mock data, will be marked for review:", formData.schoolName);
       }
       
-      // --- Step 4: Prepare Student Profile Data for Firestore (matching security rules for create) ---
-      const profileDataForFirestore: Omit<UserProfileData, 'uid' | 'photoURL' | 'department' | 'assignedEventSlug' | 'assignedEventSlugs' | 'phoneNumbers' | 'registeredEvents' | 'tasks' | 'points' | 'credibilityScore' | 'allPlatformParticipants'> = {
-        fullName: formData.fullName,
-        email: formData.email,
-        schoolName: formData.schoolName, // Store the name student entered
-        standard: formData.standard,
-        division: formData.division || null,
-        role: 'student', // Enforced by security rules
-        schoolId: determinedSchoolId,
-        schoolVerifiedByOrganizer: determinedSchoolVerified,
-        createdAt: serverTimestamp(), // Use serverTimestamp for Firestore
-        updatedAt: serverTimestamp(), // Use serverTimestamp for Firestore
+      // Construct the object with exactly the 10 fields allowed by the security rule
+      const profileDataForFirestore = {
+          fullName: formData.fullName,
+          email: formData.email,
+          schoolName: formData.schoolName, // Store the name student entered
+          standard: formData.standard,
+          division: formData.division || null,
+          schoolId: determinedSchoolId, 
+          schoolVerifiedByOrganizer: determinedSchoolVerified,
+          role: 'student', // Explicitly set role
+          createdAt: serverTimestamp(), // Use serverTimestamp for Firestore
+          updatedAt: serverTimestamp(), // Use serverTimestamp for Firestore
       };
 
       console.log("Attempting to save profile to Firestore for UID:", uid);
-      console.log("Data to be saved (matching create rule):", profileDataForFirestore);
+      console.log("Data to be saved (must match security rules exactly):", profileDataForFirestore);
 
-      // --- Step 5: Save Student Profile to Cloud Firestore ---
       const userDocRef = doc(db, 'users', uid);
       await setDoc(userDocRef, profileDataForFirestore);
 
       console.log("Firestore document for UID", uid, "created successfully!");
       console.log("Response from setDoc (implicitly void for success, but promise resolved): Promise fulfilled.");
 
-      // --- Success: Both Auth & Firestore operations completed ---
       toast({
         title: 'Account created successfully!',
         description: 'Please sign in to continue.',
@@ -127,42 +122,43 @@ export default function SignUpPage() {
       router.push('/login');
 
     } catch (error: any) {
-      console.error("--- SIGN UP PROCESS ERROR ---");
-      console.error("Error type:", error.name);
-      console.error("Error code:", error.code);
-      console.error("Error message:", error.message);
-      console.error("Full error object:", error);
+        console.error("--- SIGN UP PROCESS ERROR ---");
+        console.error("Error type:", error.name); 
+        console.error("Error code:", error.code); 
+        console.error("Error message:", error.message);
+        console.error("Full error object:", error);
 
-      let errorTitle = 'Sign Up Failed';
-      let errorMessage = 'An unexpected error occurred during registration.';
+        let errorTitle = 'Sign Up Failed';
+        let errorMessage = 'An unexpected error occurred during registration.';
 
-      if (error.code) {
-        switch (error.code) {
-          case 'auth/email-already-in-use':
-            errorTitle = 'Email Already Exists';
-            errorMessage = 'This email address is already registered. Please try logging in or use a different email.';
-            break;
-          case 'auth/invalid-email':
-            errorTitle = 'Invalid Email';
-            errorMessage = 'The email address is not valid.';
-            break;
-          case 'auth/weak-password':
-            errorTitle = 'Weak Password';
-            errorMessage = 'The password is too weak (minimum 6 characters).';
-            break;
-          case 'permission-denied': // Firestore permission error
-            errorTitle = 'Permission Error';
-            errorMessage = 'Failed to save profile data. Please check Firestore rules or ensure data format matches rules.';
-            console.error("DEBUG: Firebase Security Rules likely denied the Firestore write!");
-            break;
-          default:
-            errorMessage = error.message || 'An unknown error occurred.';
+        if (error.code) {
+            switch (error.code) {
+            case 'auth/email-already-in-use':
+                errorTitle = 'Email Already Exists';
+                errorMessage = 'This email address is already registered. Please try logging in or use a different email.';
+                break;
+            case 'auth/invalid-email':
+                errorTitle = 'Invalid Email';
+                errorMessage = 'The email address is not valid.';
+                break;
+            case 'auth/weak-password':
+                errorTitle = 'Weak Password';
+                errorMessage = 'The password is too weak (minimum 6 characters).';
+                break;
+            // Firestore specific errors often have 'permission-denied' code
+            case 'permission-denied':
+                errorTitle = 'Permission Denied';
+                errorMessage = 'Failed to save profile data. This is likely due to Firestore security rules.';
+                console.error("DEBUG: Firestore Security Rules likely denied the write! Check rule conditions against the data logged above.");
+                break;
+            default:
+                errorMessage = error.message || 'An unknown error occurred.';
+            }
+        } else if (error.message) {
+            errorMessage = error.message;
         }
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
 
-      toast({ title: errorTitle, description: errorMessage, variant: 'destructive' });
+        toast({ title: errorTitle, description: errorMessage, variant: 'destructive' });
     } finally {
       setIsLoading(false);
       console.log("--- SIGN UP PROCESS ENDED ---");
@@ -271,5 +267,3 @@ export default function SignUpPage() {
     </div>
   );
 }
-
-    
