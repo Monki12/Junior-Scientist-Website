@@ -3,7 +3,7 @@
 
 import { useState, FormEvent } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation'; // Added useSearchParams
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import type { UserRole, LoginFormData } from '@/types';
-import { Loader2, User, Shield, LogIn, KeyRound, UserPlus } from 'lucide-react'; // Added KeyRound, UserPlus
+import { Loader2, User, Shield, LogIn, KeyRound, UserPlus } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 
 const mockRolesToTest: UserRole[] = ['student', 'organizer', 'event_representative', 'overall_head', 'admin', 'test'];
@@ -21,6 +21,7 @@ export default function LoginPage() {
   const [isFirebaseLoading, setIsFirebaseLoading] = useState(false);
   const { logIn, setMockUserRole, loading: authLoading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams(); // For redirect
   const { toast } = useToast();
 
   const [formData, setFormData] = useState<LoginFormData>({
@@ -40,16 +41,16 @@ export default function LoginPage() {
     }
     setIsFirebaseLoading(true);
     try {
-      const result = await logIn(formData); // Call logIn with email/password
-      // Check if 'code' exists (AuthError) or 'message' exists (custom error from context)
+      const result = await logIn(formData);
       if (result && typeof result === 'object' && ('code' in result || 'message' in result)) {
          const errorMessage = (result as any).message || 'Login failed. Please check your credentials.';
         toast({ title: "Login Failed", description: errorMessage, variant: "destructive" });
       } else {
-        toast({ title: "Login Successful!", description: "Redirecting to dashboard..." });
-        router.push('/dashboard');
+        toast({ title: "Login Successful!", description: "Redirecting..." });
+        const redirectUrl = searchParams.get('redirect') || '/dashboard';
+        router.push(redirectUrl);
       }
-    } catch (error: any) { // Catch any unexpected errors during the process
+    } catch (error: any) {
       toast({ title: "Login Error", description: error.message || "An unexpected error occurred.", variant: "destructive" });
     } finally {
       setIsFirebaseLoading(false);
@@ -58,11 +59,13 @@ export default function LoginPage() {
 
   const handleMockLogin = async (role: UserRole) => {
     setIsLoading(true);
-    setMockUserRole(role); 
+    setMockUserRole(role);
+    // logIn(role) will also work if preferred to set via mock path in logIn
     setTimeout(() => {
       setIsLoading(false);
       toast({ title: `Mock Login: ${role}`, description: "Successfully logged in with mock role. Redirecting..."});
-      router.push('/dashboard'); 
+      const redirectUrl = searchParams.get('redirect') || '/dashboard';
+      router.push(redirectUrl);
     }, 300);
   };
 
@@ -79,8 +82,8 @@ export default function LoginPage() {
       <Card className="w-full max-w-lg shadow-xl">
         <CardHeader className="text-center">
           <KeyRound className="mx-auto h-12 w-12 text-primary mb-4" />
-          <CardTitle className="text-3xl font-headline text-primary">Welcome Back!</CardTitle>
-          <CardDescription>Log in to your EventFlow account or use mock roles for testing.</CardDescription>
+          <CardTitle className="text-3xl font-headline text-primary">Welcome to EventFlow!</CardTitle>
+          <CardDescription>Log in to access your student dashboard or use mock roles for testing.</CardDescription>
         </CardHeader>
         
         <form onSubmit={handleDirectFirebaseLogin}>
@@ -106,7 +109,7 @@ export default function LoginPage() {
                 <span className="w-full border-t" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">Or continue with mock roles</span>
+                <span className="bg-card px-2 text-muted-foreground">Or use mock roles for testing</span>
             </div>
             </div>
         </div>
@@ -120,7 +123,7 @@ export default function LoginPage() {
               disabled={isLoading || isFirebaseLoading}
               variant="outline"
             >
-              {isLoading && !isFirebaseLoading ? ( // Show loader only if this button caused it
+              {isLoading && !isFirebaseLoading ? ( 
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 role === 'student' || role === 'test' ? <User className="mr-2 h-4 w-4" /> : <Shield className="mr-2 h-4 w-4" />
@@ -133,7 +136,7 @@ export default function LoginPage() {
            <p className="text-sm text-muted-foreground">
             Don&apos;t have an account?
             <Link href="/signup" className="font-semibold text-primary hover:underline ml-1">
-              <UserPlus className="inline mr-1 h-4 w-4" />Sign Up
+              <UserPlus className="inline mr-1 h-4 w-4" />Create Student Account
             </Link>
           </p>
         </CardFooter>

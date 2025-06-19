@@ -115,7 +115,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const storedRole = typeof window !== "undefined" ? localStorage.getItem('mockUserRole') as UserRole | null : null;
     if (storedRole && mockUserProfiles[storedRole]) { 
-      setMockUserRole(storedRole, false); // Don't set loading to true here initially
+      setMockUserRole(storedRole, false);
     } else {
       setAuthUser(null);
       setUserProfile(null);
@@ -123,7 +123,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           localStorage.removeItem('mockUserRole'); 
       }
     }
-    setLoading(false);
+    setLoading(false); 
   }, []);
 
   const setMockUserRole = (role: UserRole | null, triggerLoading: boolean = true) => {
@@ -136,7 +136,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         refreshToken: 'mock-refresh-token', tenantId: null, delete: async () => {}, getIdToken: async () => 'mock-id-token',
         getIdTokenResult: async () => ({ token: 'mock-id-token', claims: {}, expirationTime: '', issuedAtTime: '', signInProvider: null, signInSecondFactor: null}),
         reload: async () => {}, toJSON: () => ({}),
-      } as FirebaseUser;
+      } as FirebaseUser; // Type assertion needed for mock
 
       setAuthUser(mockFbUser);
       setUserProfile(profile);
@@ -150,20 +150,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signUp = async (data: SignUpFormData): Promise<FirebaseUser | AuthError> => {
-    console.warn("AuthContext: Attempting direct Firebase sign-up.");
     setLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
       const firebaseUser = userCredential.user;
       
       setAuthUser(firebaseUser);
+      // New users default to 'student' role
       const newProfile: UserProfileData = {
         uid: firebaseUser.uid, email: firebaseUser.email,
         displayName: data.name || firebaseUser.displayName || firebaseUser.email,
-        role: 'student', photoURL: firebaseUser.photoURL, registeredEvents: [], tasks: [],
+        role: 'student', 
+        photoURL: firebaseUser.photoURL, registeredEvents: [], tasks: [],
       };
       setUserProfile(newProfile);
-      if (typeof window !== "undefined") localStorage.setItem('mockUserRole', 'student');
+      if (typeof window !== "undefined") localStorage.setItem('mockUserRole', 'student'); // Persist student role
       setLoading(false);
       return firebaseUser;
     } catch (error) {
@@ -175,25 +176,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logIn = async (data: LoginFormData | UserRole): Promise<FirebaseUser | AuthError | { message: string }> => {
     setLoading(true);
-    // Prioritize direct Firebase login if LoginFormData is provided
     if (typeof data === 'object' && 'email' in data && 'password' in data) {
-      console.warn("AuthContext: Attempting direct Firebase sign-in.");
       try {
         const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
         const firebaseUser = userCredential.user;
         setAuthUser(firebaseUser);
 
-        // Attempt to load mock profile if email matches, otherwise set a basic profile
         const matchingMockProfile = Object.values(mockUserProfiles).find(p => p.email === firebaseUser.email);
         if (matchingMockProfile) {
           setUserProfile(matchingMockProfile);
           if (typeof window !== "undefined") localStorage.setItem('mockUserRole', matchingMockProfile.role);
         } else {
-          // If no mock profile matches, create a basic one or leave it to be fetched/created later
+          // If no mock profile, default to student role for direct Firebase login
           const basicProfile: UserProfileData = {
             uid: firebaseUser.uid, email: firebaseUser.email,
             displayName: firebaseUser.displayName || firebaseUser.email,
-            role: 'student', // Default to student if no existing profile
+            role: 'student',
             photoURL: firebaseUser.photoURL,
             registeredEvents: [], tasks: [],
           };
@@ -211,10 +209,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return error as AuthError;
       }
     } else if (typeof data === 'string' && mockUserProfiles[data as UserRole]) {
-      // Fallback to mock role setting if a UserRole string is passed
-      console.warn("AuthContext: Setting mock user role via logIn function.");
-      setMockUserRole(data as UserRole); // setMockUserRole handles loading state internally if triggerLoading is true (default)
-      // setLoading(false) will be called by setMockUserRole
+      setMockUserRole(data as UserRole); // setMockUserRole handles loading
       const profile = mockUserProfiles[data as UserRole];
       return { 
           uid: profile.uid, email: profile.email, displayName: profile.displayName, photoURL: profile.photoURL,
@@ -222,17 +217,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           refreshToken: 'mock-refresh-token', tenantId: null, delete: async () => {}, getIdToken: async () => 'mock-id-token',
           getIdTokenResult: async () => ({ token: 'mock-id-token', claims: {}, expirationTime: '', issuedAtTime: '', signInProvider: null, signInSecondFactor: null}),
           reload: async () => {}, toJSON: () => ({}),
-      } as FirebaseUser; // Return a FirebaseUser-like object for consistency if needed by caller
+      } as FirebaseUser;
     } else {
       setLoading(false);
-      return { message: "Invalid login data. Provide email/password or a valid UserRole." };
+      return { message: "Invalid login data provided." };
     }
   };
 
   const logOut = async () => {
-    console.warn("Mock Auth: logOut called.");
     setLoading(true);
-    // Potentially add await auth.signOut(); here if mixing real Firebase sessions
+    // await auth.signOut(); // Uncomment if using real Firebase sessions and want to sign out
     setAuthUser(null);
     setUserProfile(null);
     if (typeof window !== "undefined") localStorage.removeItem('mockUserRole');

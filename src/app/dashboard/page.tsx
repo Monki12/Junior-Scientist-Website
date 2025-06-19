@@ -86,11 +86,9 @@ const getEventStatusBadgeVariant = (status: EventStatus | undefined): "default" 
     }
 };
 
-// Explicitly type props for the page component, even if not directly used in a Client Component
-// This is a speculative change to address potential Next.js internal prop handling.
 export default function DashboardPage({
-  params, // Route parameters (e.g., for dynamic routes like /dashboard/[id])
-  searchParams, // URL query parameters
+  params, 
+  searchParams, 
 }: {
   params: { [key: string]: string | string[] | undefined };
   searchParams: { [key: string]: string | string[] | undefined };
@@ -99,10 +97,6 @@ export default function DashboardPage({
   const router = useRouter();
   const { toast } = useToast();
   
-  // Client components usually use hooks for params, so these props are not used directly.
-  // const routeParams = useParams(); 
-  // const queryParams = useSearchParams();
-
   const [localUserProfileTasks, setLocalUserProfileTasks] = useState<Task[]>([]);
 
   // State for Overall Head's Global Participant View
@@ -496,7 +490,7 @@ export default function DashboardPage({
   const role: UserRole = userProfile.role;
 
   // Student Dashboard
-  if (role === 'student' || (role === 'test' && myTasks.length === 0 && !userProfile.assignedEventSlugs?.length)) { // Test user as student if no specific tasks/assignments
+  if (role === 'student' || (role === 'test' && myTasks.length === 0 && !userProfile.assignedEventSlugs?.length)) { 
     const studentRegisteredFullEvents: RegisteredEventDisplay[] = userProfile.registeredEvents
       ?.map(registeredInfo => {
         const eventDetail = subEventsData.find(event => event.slug === registeredInfo.eventSlug);
@@ -525,13 +519,13 @@ export default function DashboardPage({
               <p className="text-sm text-muted-foreground flex items-center justify-center sm:justify-start gap-1.5"><Mail className="h-4 w-4"/>{userProfile.email}</p>
               <p className="text-sm text-muted-foreground flex items-center justify-center sm:justify-start gap-1.5"><ShieldCheck className="h-4 w-4"/>UID: {userProfile.uid}</p>
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mt-1 justify-center sm:justify-start">
-                {userProfile.school && ( <p className="flex items-center gap-1.5"><School className="h-4 w-4" /> {userProfile.school}</p>)}
-                {userProfile.grade && ( <p className="flex items-center gap-1.5"><GraduationCap className="h-4 w-4" /> {userProfile.grade}</p>)}
+                {userProfile.school && ( <span className="flex items-center gap-1.5"><School className="h-4 w-4" /> {userProfile.school}</span>)}
+                {userProfile.grade && ( <span className="flex items-center gap-1.5"><GraduationCap className="h-4 w-4" /> {userProfile.grade}</span>)}
               </div>
               {userProfile.phoneNumbers && userProfile.phoneNumbers.length > 0 && (
                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mt-1 justify-center sm:justify-start">
                     {userProfile.phoneNumbers.map(num => (
-                         <p key={num} className="flex items-center gap-1.5"><Phone className="h-4 w-4" /> {num}</p>
+                         <span key={num} className="flex items-center gap-1.5"><Phone className="h-4 w-4" /> {num}</span>
                     ))}
                  </div>
               )}
@@ -684,8 +678,8 @@ export default function DashboardPage({
               <h1 className="text-3xl md:text-4xl font-bold text-primary">{userProfile.displayName || "Overall Head Dashboard"}</h1>
               <p className="text-muted-foreground mt-1">{userProfile.email}</p>
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mt-1">
-                  <p className="flex items-center gap-1"><ShieldCheck className="h-4 w-4" /> Role: <span className="font-medium text-foreground capitalize">{userProfile.role.replace('_', ' ')}</span></p>
-                  {userProfile.department && <p className="flex items-center gap-1"><Building className="h-4 w-4" /> {userProfile.department}</p>}
+                  <span className="flex items-center gap-1"><ShieldCheck className="h-4 w-4" /> Role: <span className="font-medium text-foreground capitalize">{userProfile.role.replace('_', ' ')}</span></span>
+                  {userProfile.department && <span className="flex items-center gap-1"><Building className="h-4 w-4" /> {userProfile.department}</span>}
               </div>
             </div>
           </div>
@@ -1085,7 +1079,7 @@ export default function DashboardPage({
                                                 }) : <span className="text-xs text-muted-foreground">None</span>}
                                             </TableCell>
                                             {globalCustomColumnDefinitions.map(colDef => <TableCell key={colDef.id}>{renderGlobalParticipantCustomCell(p, colDef)}</TableCell>)}
-                                            <TableCell></TableCell>
+                                            <TableCell></TableCell> {/* Empty cell for alignment with "Add Column" header */}
                                         </TableRow>
                                     ))}
                                 </TableBody>
@@ -1299,13 +1293,13 @@ export default function DashboardPage({
                         <div className="p-6 flex-grow">
                             <CardTitle className="text-2xl font-bold text-primary mb-1">{assignedEvent.title}</CardTitle>
                             <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mb-3">
-                                {assignedEvent.eventDate && <p className="flex items-center"><CalendarDays className="mr-1.5 h-4 w-4" /> Date: {new Date(assignedEvent.eventDate).toLocaleDateString()}</p>}
-                                <p className="flex items-center"><Clock className="mr-1.5 h-4 w-4" /> Time: (Mock) 10:00 AM</p>
-                                <p className="flex items-center"><MapPin className="mr-1.5 h-4 w-4" /> Venue: {assignedEvent.venue || '(Mock) Main Auditorium'}</p>
+                                {assignedEvent.eventDate && <span className="flex items-center"><CalendarDays className="mr-1.5 h-4 w-4" /> Date: {new Date(assignedEvent.eventDate).toLocaleDateString()}</span>}
+                                <span className="flex items-center"><Clock className="mr-1.5 h-4 w-4" /> Time: (Mock) 10:00 AM</span>
+                                <span className="flex items-center"><MapPin className="mr-1.5 h-4 w-4" /> Venue: {assignedEvent.venue || '(Mock) Main Auditorium'}</span>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mb-4">
-                                <p className="flex items-center"><UsersRound className="mr-1.5 h-4 w-4 text-accent" /> Registered: <span className="font-semibold ml-1">{assignedEvent.registeredParticipantCount || 0}</span></p>
-                                <p className="flex items-center"><ListChecks className="mr-1.5 h-4 w-4 text-accent" /> Pending Tasks: <span className="font-semibold ml-1">{myTasks.filter(t => t.status !== 'Completed').length}</span></p>
+                                <span className="flex items-center"><UsersRound className="mr-1.5 h-4 w-4 text-accent" /> Registered: <span className="font-semibold ml-1">{assignedEvent.registeredParticipantCount || 0}</span></span>
+                                <span className="flex items-center"><ListChecks className="mr-1.5 h-4 w-4 text-accent" /> Pending Tasks: <span className="font-semibold ml-1">{myTasks.filter(t => t.status !== 'Completed').length}</span></span>
                                 <div className="flex items-center col-span-full text-sm"><Info className="mr-1.5 h-4 w-4 text-accent" /> Status: <Badge variant={getEventStatusBadgeVariant(assignedEvent.status)} className="ml-1 capitalize">{assignedEvent.status || 'Planning'}</Badge></div>
                             </div>
                             <div className="flex flex-wrap gap-2 mt-4">
@@ -1434,7 +1428,7 @@ export default function DashboardPage({
   
   // Default/Organizer/Admin/Test Dashboard
   let dashboardTitle = "User Dashboard";
-  let quickActions = [];
+  let quickActions: Array<{ href: string; label: string; icon: React.ElementType; disabled?: boolean;}> = [];
   
   const assignedOrganizerEvents = role === 'organizer' && userProfile.assignedEventSlugs
     ? userProfile.assignedEventSlugs.map(slug => subEventsData.find(e => e.slug === slug)?.title).filter(Boolean)
@@ -1455,7 +1449,7 @@ export default function DashboardPage({
        quickActions = [
         { href: '/admin/tasks', label: 'Global Task Mgmt', icon: Settings},
         { href: '/organizer/events/manage', label: 'Manage All Events', icon: Briefcase }, 
-        { href: '/organizer/registrations', label: 'View Registrations', icon: Users }, 
+        { href: '/organizer/registrations', label: 'View Registrations', icon: Users, disabled: true }, 
         { href: '/admin/users', label: 'Manage Users', icon: Users}, 
         { href: '/ocr-tool', label: 'Scan Forms (OCR)', icon: FileScan },
         { href: '/organizer/event-tasks', label: 'All Event Tasks', icon: ListChecks },
@@ -1497,7 +1491,7 @@ export default function DashboardPage({
         </div>
         {(role === 'organizer' || role === 'overall_head' || role === 'admin') && (
           <Button asChild className="bg-accent hover:bg-accent/90 text-accent-foreground mt-4 md:mt-0 rounded-lg shadow-soft">
-            <Link href="/organizer/events/create">Create New Event</Link>
+            <Link href="/organizer/events/create">Create New Event (Legacy)</Link>
           </Button>
         )}
       </header>
@@ -1642,7 +1636,7 @@ export default function DashboardPage({
           </CardHeader>
           <CardContent className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             {quickActions.map(action => (
-              <Button variant="outline" asChild key={action.href} disabled={(action as any).disabled} className="rounded-md">
+              <Button variant="outline" asChild key={action.href} disabled={action.disabled} className="rounded-md">
                 <Link href={action.href} className="flex items-center justify-center gap-2 text-sm">
                   <action.icon className="h-4 w-4" /> {action.label}
                 </Link>
@@ -1671,4 +1665,3 @@ export default function DashboardPage({
     </div>
   );
 }
-

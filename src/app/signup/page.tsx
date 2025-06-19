@@ -50,18 +50,18 @@ export default function SignUpPage() {
 
     setIsLoading(true);
     try {
+      // AuthContext.signUp will default new users to 'student' role
       const result = await signUp(formData);
-      // Check if 'code' exists, indicating an AuthError from Firebase
-      if ('code' in result) {
+      if (typeof result === 'object' && 'code' in result) { // AuthError
         toast({
           title: 'Sign Up Failed',
           description: result.message || 'An unknown error occurred.',
           variant: 'destructive',
         });
-      } else {
+      } else { // FirebaseUser
         toast({
           title: 'Sign Up Successful!',
-          description: 'You have been successfully signed up. Redirecting to dashboard...',
+          description: 'Welcome! Redirecting to your dashboard...',
         });
         router.push('/dashboard');
       }
@@ -77,19 +77,19 @@ export default function SignUpPage() {
   };
 
   return (
-    <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center animate-fade-in-up">
+    <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center animate-fade-in-up py-12">
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="text-center">
           <UserPlus className="mx-auto h-12 w-12 text-primary mb-4" />
-          <CardTitle className="text-3xl font-headline text-primary">Create an Account</CardTitle>
+          <CardTitle className="text-3xl font-headline text-primary">Student Sign Up</CardTitle>
           <CardDescription>
-            Join EventFlow to explore and manage events.
+            Create your student account to explore and participate in events.
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             <div>
-              <Label htmlFor="name">Display Name (Optional)</Label>
+              <Label htmlFor="name">Full Name (Optional)</Label>
               <Input id="name" type="text" placeholder="Your Name" value={formData.name} onChange={handleChange} disabled={isLoading} />
             </div>
             <div>
@@ -106,17 +106,17 @@ export default function SignUpPage() {
             </div>
             <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isLoading}>
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
-              Sign Up
+              Create Student Account
             </Button>
           </CardContent>
         </form>
-        <CardFooter className="flex flex-col items-center space-y-2">
+        <CardFooter className="flex flex-col items-center space-y-2 pt-6">
           <p className="text-sm text-muted-foreground">
-            Already have an account or want to use mock roles?
+            Already have an account?
           </p>
           <Button variant="outline" asChild className="w-full">
             <Link href="/login">
-              <LogIn className="mr-2 h-4 w-4" /> Go to Mock Login
+              <LogIn className="mr-2 h-4 w-4" /> Log In
             </Link>
           </Button>
         </CardFooter>

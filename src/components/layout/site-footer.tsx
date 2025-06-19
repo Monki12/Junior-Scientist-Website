@@ -1,12 +1,12 @@
 
-import { Atom } from 'lucide-react';
+import { Atom, Shield } from 'lucide-react';
 import Link from 'next/link';
 
 export default function SiteFooter() {
   return (
     <footer className="border-t border-border/40 bg-muted/50 text-muted-foreground">
       <div className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start md:items-center">
           <div className="flex flex-col items-center md:items-start text-center md:text-left">
             <Link href="/" className="flex items-center gap-2 text-lg font-bold text-primary mb-2 font-headline hover:opacity-90">
               <Atom className="h-6 w-6" />
@@ -23,14 +23,18 @@ export default function SiteFooter() {
             </p>
           </div>
           
-          <div className="flex flex-col items-center md:items-end text-center md:text-right text-xs">
+          <div className="flex flex-col items-center md:items-end text-center md:text-right text-xs space-y-1">
             <p className="font-semibold text-foreground mb-1">Quick Links</p>
             <Link href="/events" className="hover:text-primary transition-colors">Browse Events</Link>
             <Link href="/#contact-us" className="hover:text-primary transition-colors">Contact Us</Link>
-            <Link href="/login" className="hover:text-primary transition-colors">Login</Link>
+            <Link href="/login" className="hover:text-primary transition-colors">Student Login</Link>
+            <Link href="/auth/org-login" className="flex items-center gap-1 hover:text-primary transition-colors">
+                <Shield className="h-3 w-3" /> Organizational Login
+            </Link>
           </div>
         </div>
       </div>
     </footer>
   );
 }
+
