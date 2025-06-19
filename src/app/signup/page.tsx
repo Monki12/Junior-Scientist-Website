@@ -71,7 +71,7 @@ export default function SignUpPage() {
 
     try {
         // --- Step 1: Client-Side Grade Validation ---
-        const numericStandard = parseInt(formData.standard);
+        const numericStandard = parseInt(formData.standard, 10);
         if (isNaN(numericStandard) || numericStandard < 4 || numericStandard > 12) {
             toast({
                 title: 'Invalid Grade',
@@ -103,20 +103,19 @@ export default function SignUpPage() {
 
         const studentProfileData: UserProfileData = {
             uid: uid,
-            email: user.email,
+            email: formData.email,
             fullName: formData.fullName,
-            displayName: formData.fullName,
+            displayName: formData.fullName, // Default displayName to fullName
             schoolName: formData.schoolName,
             schoolId: schoolId,
             schoolVerifiedByOrganizer: schoolVerifiedByOrganizer,
             standard: formData.standard,
             division: formData.division || undefined,
             role: 'student',
-            photoURL: user.photoURL,
-            registeredEvents: [],
-            tasks: [],
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
+            registeredEvents: [],
+            tasks: [],
         };
 
         console.log("Attempting to save profile to Firestore for UID:", uid);
@@ -129,6 +128,8 @@ export default function SignUpPage() {
         console.log("Firestore document for UID", uid, "created successfully!");
         console.log("Response from setDoc (implicitly void for success, but promise resolved): Promise fulfilled.");
 
+
+        // --- Success: Both Auth & Firestore operations completed ---
         toast({
             title: 'Account created successfully!',
             description: 'Please sign in to continue.',
@@ -286,4 +287,3 @@ export default function SignUpPage() {
     </div>
   );
 }
-
