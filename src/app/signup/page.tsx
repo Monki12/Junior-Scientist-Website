@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -10,12 +9,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import type { SignUpFormData, UserProfileData } from '@/types';
+import type { SignUpFormData, UserProfileData } from '@/types'; // Ensure UserProfileData is correctly typed to include schoolId, schoolVerifiedByOrganizer
 import { UserPlus, Loader2, LogIn, School as SchoolIconLucide } from 'lucide-react';
 
-import { auth, db } from '@/lib/firebase'; // Ensure 'db' (Firestore instance) is imported!
+import { auth, db } from '@/lib/firebase';
 import { createUserWithEmailAndPassword, type AuthError } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore'; // Import doc and setDoc
+import { doc, setDoc } from 'firebase/firestore';
 import { mockSchoolsData } from '@/data/mockSchools';
 import { useAuth } from '@/hooks/use-auth';
 
@@ -61,7 +60,7 @@ export default function SignUpPage() {
       console.log("--- SIGN UP PROCESS ENDED (Password Mismatch) ---");
       return;
     }
-     if (!formData.email || !formData.password || !formData.fullName || !formData.schoolName || !formData.standard) {
+      if (!formData.email || !formData.password || !formData.fullName || !formData.schoolName || !formData.standard) {
       toast({
         title: 'Missing Fields',
         description: 'Full Name, Email, Password, School, and Standard are required.',
@@ -111,7 +110,7 @@ export default function SignUpPage() {
         }
 
         // --- Step 4: Prepare Student Profile Data STRICTLY for Firestore (matching security rules) ---
-        const profileDataForFirestore = {
+        const profileDataForFirestore: UserProfileData = { // Added UserProfileData type for clarity
             // uid is the doc ID, not usually stored as a field within the document itself when using doc(db, 'users', uid)
             fullName: formData.fullName,
             email: formData.email,
@@ -121,8 +120,10 @@ export default function SignUpPage() {
             role: 'student', // Enforced by security rules
             createdAt: new Date(), // Firestore will convert this to a Timestamp
             updatedAt: new Date(), // Firestore will convert this to a Timestamp
-            // schoolId and schoolVerifiedByOrganizer are OMITTED here
-            // because the provided Firestore 'create' rule does not currently allow them.
+
+            // --- CRITICAL FIX: INCLUDE THESE FIELDS TO MATCH FIRESTORE SECURITY RULES ---
+            schoolId: determinedSchoolId, // Use the determined ID, which can be null
+            schoolVerifiedByOrganizer: determinedSchoolVerified, // Use the determined boolean value
         };
 
         console.log("Attempting to save profile to Firestore for UID:", uid);
@@ -148,8 +149,8 @@ export default function SignUpPage() {
             updatedAt: profileDataForFirestore.updatedAt.toISOString(),
             schoolId: determinedSchoolId, // Include client-determined value
             schoolVerifiedByOrganizer: determinedSchoolVerified, // Include client-determined value
-            registeredEvents: [],
-            tasks: [],
+            registeredEvents: [], // Assuming these start empty
+            tasks: [], // Assuming these start empty
         };
         authContext.setUserProfile(completeProfileForContext); // Update client-side auth context
         if (typeof window !== "undefined") localStorage.setItem('mockUserRole', 'student');
@@ -187,7 +188,7 @@ export default function SignUpPage() {
                     errorTitle = 'Weak Password';
                     errorMessage = 'The password is too weak (minimum 6 characters).';
                     break;
-                case 'permission-denied': 
+                case 'permission-denied':
                     errorTitle = 'Permission Error';
                     errorMessage = 'Failed to save profile data due to security rules. Please check Firestore rules in console.';
                     console.error("DEBUG: Firebase Security Rules likely denied the Firestore write!");
@@ -198,11 +199,11 @@ export default function SignUpPage() {
         } else if (error.message) {
             errorMessage = error.message;
         }
-        
+
         toast({
-          title: errorTitle,
-          description: errorMessage,
-          variant: 'destructive',
+            title: errorTitle,
+            description: errorMessage,
+            variant: 'destructive',
         });
     } finally {
       setIsLoading(false);
@@ -302,7 +303,7 @@ export default function SignUpPage() {
               <LogIn className="mr-2 h-4 w-4" /> Log In Now
             </Link>
           </Button>
-           <p className="text-xs text-muted-foreground mt-4 text-center">
+            <p className="text-xs text-muted-foreground mt-4 text-center">
             Organizational staff (Admins, Organizers, etc.) should log in via the
             <Link href="/auth/org-login" className="font-semibold text-primary hover:underline ml-1">
                 Organizational Login page.
