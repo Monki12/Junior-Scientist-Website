@@ -47,17 +47,15 @@ export interface RegisteredEventInfo {
 export interface UserProfileData {
   uid: string;
   email: string | null;
-  displayName: string | null;
+  displayName: string | null; // This will typically be the fullName for students
   role: UserRole;
   photoURL?: string | null;
   // Student specific fields
-  fullName?: string; // Added
-  school?: string; // Kept for backward compatibility / simple display
-  schoolName?: string; // Explicit school name from form
+  fullName?: string;
+  schoolName?: string;
   schoolId?: string; // If matched from verified list
   schoolVerifiedByOrganizer?: boolean; // Status of school verification
-  grade?: string; // Kept for backward compatibility / simple display
-  standard?: string; // e.g. "Grade 10"
+  standard?: string; // e.g., "Grade 10"
   division?: string; // Optional
   // Organizational fields
   department?: string;
@@ -70,6 +68,8 @@ export interface UserProfileData {
   points?: number;
   credibilityScore?: number;
   allPlatformParticipants?: EventParticipant[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Event {
@@ -108,13 +108,13 @@ export interface SubEvent {
 }
 
 export interface SignUpFormData {
-  fullName?: string; // Added
+  fullName: string;
   email: string;
   password: string;
   confirmPassword?: string;
-  schoolName?: string; // Added
-  standard?: string; // Added
-  division?: string; // Added
+  schoolName: string;
+  standard: string;
+  division?: string;
 }
 
 export interface LoginFormData {

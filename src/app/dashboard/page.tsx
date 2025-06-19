@@ -87,8 +87,8 @@ const getEventStatusBadgeVariant = (status: EventStatus | undefined): "default" 
 };
 
 export default function DashboardPage({
-  params, 
-  searchParams, 
+  params: pageParams, // Renamed to avoid conflict with useParams hook if used later
+  searchParams: pageSearchParams, // Renamed
 }: {
   params: { [key: string]: string | string[] | undefined };
   searchParams: { [key: string]: string | string[] | undefined };
@@ -490,7 +490,7 @@ export default function DashboardPage({
   const role: UserRole = userProfile.role;
 
   // Student Dashboard
-  if (role === 'student' || (role === 'test' && myTasks.length === 0 && !userProfile.assignedEventSlugs?.length)) { 
+  if (role === 'student' || (role === 'test' && !userProfile.tasks?.length && !userProfile.assignedEventSlugs?.length && !userProfile.allPlatformParticipants?.length)) { 
     const studentRegisteredFullEvents: RegisteredEventDisplay[] = userProfile.registeredEvents
       ?.map(registeredInfo => {
         const eventDetail = subEventsData.find(event => event.slug === registeredInfo.eventSlug);
@@ -515,12 +515,12 @@ export default function DashboardPage({
               <AvatarFallback className="bg-primary/10 text-primary">{(userProfile.displayName || userProfile.email || 'S')[0].toUpperCase()}</AvatarFallback>
             </Avatar>
             <div className="space-y-1 text-center sm:text-left">
-              <h1 className="text-2xl md:text-3xl font-bold text-primary">{userProfile.displayName || 'Student Dashboard'}</h1>
+              <h1 className="text-2xl md:text-3xl font-bold text-primary">{userProfile.fullName || userProfile.displayName || 'Student Dashboard'}</h1>
               <p className="text-sm text-muted-foreground flex items-center justify-center sm:justify-start gap-1.5"><Mail className="h-4 w-4"/>{userProfile.email}</p>
               <p className="text-sm text-muted-foreground flex items-center justify-center sm:justify-start gap-1.5"><ShieldCheck className="h-4 w-4"/>UID: {userProfile.uid}</p>
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mt-1 justify-center sm:justify-start">
-                {userProfile.school && ( <span className="flex items-center gap-1.5"><School className="h-4 w-4" /> {userProfile.school}</span>)}
-                {userProfile.grade && ( <span className="flex items-center gap-1.5"><GraduationCap className="h-4 w-4" /> {userProfile.grade}</span>)}
+                {userProfile.schoolName && ( <span className="flex items-center gap-1.5"><School className="h-4 w-4" /> {userProfile.schoolName} {userProfile.schoolVerifiedByOrganizer === false && <Badge variant="outline" className="text-xs text-yellow-600 border-yellow-400">Pending Review</Badge>} </span>)}
+                {userProfile.standard && ( <span className="flex items-center gap-1.5"><GraduationCap className="h-4 w-4" /> Grade {userProfile.standard} {userProfile.division && `(${userProfile.division})`}</span>)}
               </div>
               {userProfile.phoneNumbers && userProfile.phoneNumbers.length > 0 && (
                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mt-1 justify-center sm:justify-start">
@@ -1079,7 +1079,7 @@ export default function DashboardPage({
                                                 }) : <span className="text-xs text-muted-foreground">None</span>}
                                             </TableCell>
                                             {globalCustomColumnDefinitions.map(colDef => <TableCell key={colDef.id}>{renderGlobalParticipantCustomCell(p, colDef)}</TableCell>)}
-                                            <TableCell></TableCell> {/* Empty cell for alignment with "Add Column" header */}
+                                            <TableCell>{/* Empty cell for alignment with "Add Column" header */}</TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
@@ -1448,8 +1448,7 @@ export default function DashboardPage({
       dashboardTitle = "Admin Dashboard";
        quickActions = [
         { href: '/admin/tasks', label: 'Global Task Mgmt', icon: Settings},
-        { href: '/organizer/events/manage', label: 'Manage All Events', icon: Briefcase }, 
-        { href: '/organizer/registrations', label: 'View Registrations', icon: Users, disabled: true }, 
+        { href: '/organizer/events/manage', label: 'Manage All Events', icon: Briefcase }, //This might change to the overall head's event mngmt view
         { href: '/admin/users', label: 'Manage Users', icon: Users}, 
         { href: '/ocr-tool', label: 'Scan Forms (OCR)', icon: FileScan },
         { href: '/organizer/event-tasks', label: 'All Event Tasks', icon: ListChecks },

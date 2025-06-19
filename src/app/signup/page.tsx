@@ -8,15 +8,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Added Select
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import type { SignUpFormData } from '@/types';
-import { UserPlus, Loader2, LogIn, School } from 'lucide-react'; // Added School icon
+import { UserPlus, Loader2, LogIn, School as SchoolIconLucide } from 'lucide-react'; // Renamed School to SchoolIconLucide
 import type { AuthError } from 'firebase/auth';
-import { mockSchoolsData } from '@/data/mockSchools'; // Import mock schools
+import { mockSchoolsData } from '@/data/mockSchools';
 
-const gradeLevels = Array.from({ length: 12 }, (_, i) => `Grade ${i + 1}`);
+const gradeLevels = Array.from({ length: 12 }, (_, i) => `${i + 1}`); // Store as string "1" through "12"
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -29,7 +29,7 @@ export default function SignUpPage() {
     password: '',
     confirmPassword: '',
     schoolName: '',
-    standard: '',
+    standard: '', // Will store "4" through "12"
     division: '',
   });
 
@@ -62,8 +62,10 @@ export default function SignUpPage() {
 
     setIsLoading(true);
     try {
-      const result = await signUp(formData); // Pass all form data
-      if (typeof result === 'object' && 'code' in result && (result as AuthError).code) {
+      // Pass only SignUpFormData which matches the expected type for signUp
+      const result = await signUp(formData);
+      
+      if (result && typeof result === 'object' && 'code' in result && (result as AuthError).code) {
         const authError = result as AuthError;
         if (authError.code === 'auth/email-already-in-use') {
           toast({
@@ -71,7 +73,14 @@ export default function SignUpPage() {
             description: 'This email address is already registered. Please try logging in or use a different email.',
             variant: 'destructive',
           });
-        } else {
+        } else if (authError.code === 'validation/invalid-grade') { // Custom code from context
+           toast({
+            title: 'Invalid Grade',
+            description: authError.message || 'Standard must be between Grade 4 and Grade 12.', // Use message from error if available
+            variant: 'destructive',
+          });
+        }
+         else {
           toast({
             title: 'Sign Up Failed',
             description: authError.message || 'An unknown error occurred.',
@@ -98,7 +107,7 @@ export default function SignUpPage() {
 
   return (
     <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center animate-fade-in-up py-12">
-      <Card className="w-full max-w-lg shadow-xl"> {/* Increased max-w-md to max-w-lg */}
+      <Card className="w-full max-w-lg shadow-xl">
         <CardHeader className="text-center">
           <UserPlus className="mx-auto h-12 w-12 text-primary mb-4" />
           <CardTitle className="text-3xl font-headline text-primary">Student Sign Up</CardTitle>
@@ -129,7 +138,7 @@ export default function SignUpPage() {
             <div>
               <Label htmlFor="schoolName">School Name <span className="text-destructive">*</span></Label>
               <div className="relative">
-                <School className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <SchoolIconLucide className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="schoolName"
                   type="text"
@@ -151,7 +160,7 @@ export default function SignUpPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="standard">Standard (Grade) <span className="text-destructive">*</span></Label>
+                <Label htmlFor="standard">Standard (Grade 4-12) <span className="text-destructive">*</span></Label>
                 <Select
                   value={formData.standard}
                   onValueChange={(value) => handleSelectChange('standard', value)}
@@ -162,14 +171,14 @@ export default function SignUpPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {gradeLevels.map(grade => (
-                      <SelectItem key={grade} value={grade}>{grade}</SelectItem>
+                      <SelectItem key={grade} value={grade}>{`Grade ${grade}`}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
                 <Label htmlFor="division">Division (Optional)</Label>
-                <Input id="division" type="text" placeholder="e.g., A, B, Blue" value={formData.division} onChange={handleChange} disabled={isLoading} />
+                <Input id="division" type="text" placeholder="e.g., A, B, Blue" value={formData.division || ''} onChange={handleChange} disabled={isLoading} />
               </div>
             </div>
             <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isLoading}>

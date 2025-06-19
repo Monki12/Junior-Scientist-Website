@@ -5,7 +5,7 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword, type User a
 import { createContext, useState, useEffect, ReactNode } from 'react';
 import type { SignUpFormData, LoginFormData, UserProfileData, UserRole, Task, RegisteredEventInfo, EventParticipant } from '@/types';
 import { auth } from '@/lib/firebase';
-import { mockSchoolsData } from '@/data/mockSchools'; // Import mock schools
+import { mockSchoolsData } from '@/data/mockSchools';
 
 // Mock data remains for profile information after authentication or for direct mock role setting
 const mockTasksData: Omit<Task, 'id' | 'assignedTo' | 'createdBy' | 'createdAt' | 'updatedAt' | 'customTaskData' >[] = [
@@ -55,8 +55,8 @@ const mockGlobalParticipants: EventParticipant[] = [
 const mockUserProfiles: Record<UserRole, UserProfileData> = {
   student: {
     uid: 'mock-student-uid-12345', email: 'student.test@example.com', displayName: 'Alex Johnson', role: 'student', photoURL: 'https://placehold.co/120x120.png?text=AJ',
-    fullName: 'Alex Johnson', schoolName: 'Springfield High International', schoolId: 'school_001', schoolVerifiedByOrganizer: true, standard: 'Grade 10', division: 'A',
-    phoneNumbers: ['+1-555-0101', '+1-555-0102'], registeredEvents: mockStudentRegisteredEvents, tasks: [],
+    fullName: 'Alex Johnson', schoolName: 'Springfield High International', schoolId: 'school_001', schoolVerifiedByOrganizer: true, standard: '10', division: 'A',
+    phoneNumbers: ['+1-555-0101', '+1-555-0102'], registeredEvents: mockStudentRegisteredEvents, tasks: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
   },
   organizer: {
     uid: 'mock-organizer-uid', email: 'organizer.test@example.com', displayName: 'Test Organizer Alice', role: 'organizer', photoURL: 'https://placehold.co/100x100.png?text=TOA', department: 'Logistics', assignedEventSlugs: ['model-united-nations', 'robo-challenge', 'junior-scientist-olympiad', 'math-a-maze'],
@@ -66,36 +66,36 @@ const mockUserProfiles: Record<UserRole, UserProfileData> = {
         createTaskObject(mockTasksData[4], 'task-org-3', ['Test Organizer Alice', 'David (Organizer)'], 'Test Organizer Alice'),
         createTaskObject(mockTasksData[8], 'task-org-4', ['Test Organizer Alice'], 'Overall Head Carol'),
         createTaskObject(mockTasksData[9], 'task-org-5', ['Test Organizer Alice'], 'Event Rep Bob'),
-    ].filter(task => task.assignedTo?.includes('Test Organizer Alice')), points: 150, credibilityScore: 75,
+    ].filter(task => task.assignedTo?.includes('Test Organizer Alice')), points: 150, credibilityScore: 75, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
   },
   event_representative: {
     uid: 'mock-representative-uid', email: 'representative.test@example.com', displayName: 'Test Event Rep Bob', role: 'event_representative', photoURL: 'https://placehold.co/100x100.png?text=ERB', department: 'Event Management', assignedEventSlug: 'ex-quiz-it',
     tasks: [
         createTaskObject(mockTasksData[1], 'task-er-1', ['Test Event Rep Bob'], 'Overall Head Carol'),
         { ...createTaskObject(mockTasksData[2], 'task-er-2', ['Test Organizer Alice'], 'Test Event Rep Bob'), title: 'Follow up on Auditorium Booking for Ex-Quiz-It', eventSlug: 'ex-quiz-it', priority: 'Medium', assignedTo:['Test Event Rep Bob'] }
-    ].filter(task => task.assignedTo?.includes('Test Event Rep Bob')), points: 200, credibilityScore: 80,
+    ].filter(task => task.assignedTo?.includes('Test Event Rep Bob')), points: 200, credibilityScore: 80, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
   },
   overall_head: {
     uid: 'mock-overall-head-uid', email: 'overall.test@example.com', displayName: 'Test Overall Head Carol', role: 'overall_head', photoURL: 'https://placehold.co/100x100.png?text=OHC', department: 'Coordination',
     tasks: [
          createTaskObject(mockTasksData[6], 'task-oh-1', ['Test Overall Head Carol'], 'Admin Dave'),
          { ...createTaskObject(mockTasksData[0], 'task-oh-2', ['Test Organizer Alice'], 'Test Overall Head Carol'), id: 'task-oh-mun-oversee', title: 'Oversee MUN Handbook Creation', assignedTo: ['Test Overall Head Carol'] }
-    ].filter(task => task.assignedTo?.includes('Test Overall Head Carol')), points: 300, credibilityScore: 85, allPlatformParticipants: mockGlobalParticipants,
+    ].filter(task => task.assignedTo?.includes('Test Overall Head Carol')), points: 300, credibilityScore: 85, allPlatformParticipants: mockGlobalParticipants, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
   },
   admin: {
     uid: 'mock-admin-uid', email: 'admin.test@example.com', displayName: 'Test Admin Dave', role: 'admin', photoURL: 'https://placehold.co/100x100.png?text=TAD', department: 'Administration',
     tasks: [
         createTaskObject(mockTasksData[5], 'task-adm-1', ['Test Admin Dave'], 'System'),
         createTaskObject(mockTasksData[7], 'task-adm-2', ['Test Admin Dave'], 'System')
-    ].filter(task => task.assignedTo?.includes('Test Admin Dave')), points: 500, credibilityScore: 95,
+    ].filter(task => task.assignedTo?.includes('Test Admin Dave')), points: 500, credibilityScore: 95, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
   },
   test: {
     uid: 'mock-test-uid-67890', email: 'generic.test@example.com', displayName: 'Sam Williams (Test)', role: 'test', photoURL: 'https://placehold.co/120x120.png?text=SW',
-    fullName: 'Sam Williams', schoolName: 'Testington Academy Global', schoolId: 'school_003', schoolVerifiedByOrganizer: true, standard: 'Grade 12', division: 'B',
+    fullName: 'Sam Williams', schoolName: 'Testington Academy Global', schoolId: 'school_003', schoolVerifiedByOrganizer: true, standard: '12', division: 'B',
     phoneNumbers: ['+1-555-0201'],
     registeredEvents: [ { eventSlug: 'robo-challenge', teamName: 'RoboKnights', eventDate: '2024-11-28', admitCardStatus: 'pending' }, { eventSlug: 'math-a-maze', eventDate: '2024-11-22', admitCardStatus: 'unavailable'} ], department: 'QA',
     tasks: [ { ...createTaskObject(mockTasksData[1], 'task-test-1', ['Sam Williams (Test)'], 'Overall Head Carol'), title: 'Verify Quiz Task Functionality', eventSlug: 'ex-quiz-it', priority: 'Low' }
-    ].filter(task => task.assignedTo?.includes('Sam Williams (Test)')), points: 50, credibilityScore: 60,
+    ].filter(task => task.assignedTo?.includes('Sam Williams (Test)')), points: 50, credibilityScore: 60, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
   }
 };
 
@@ -103,7 +103,7 @@ interface AuthContextType {
   authUser: FirebaseUser | null;
   userProfile: UserProfileData | null;
   loading: boolean;
-  signUp: (data: SignUpFormData) => Promise<FirebaseUser | AuthError>;
+  signUp: (data: SignUpFormData) => Promise<FirebaseUser | AuthError | { code: string; message: string }>;
   logIn: (data: LoginFormData | UserRole) => Promise<FirebaseUser | AuthError | { message: string }>;
   logOut: () => Promise<void>;
   setMockUserRole: (role: UserRole | null) => void;
@@ -120,7 +120,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const storedRole = typeof window !== "undefined" ? localStorage.getItem('mockUserRole') as UserRole | null : null;
     if (storedRole && mockUserProfiles[storedRole]) {
-      setMockUserRole(storedRole, false);
+      setMockUserRole(storedRole, false); // false to avoid double loading
     } else {
       setAuthUser(null);
       setUserProfile(null);
@@ -141,7 +141,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         refreshToken: 'mock-refresh-token', tenantId: null, delete: async () => {}, getIdToken: async () => 'mock-id-token',
         getIdTokenResult: async () => ({ token: 'mock-id-token', claims: {}, expirationTime: '', issuedAtTime: '', signInProvider: null, signInSecondFactor: null}),
         reload: async () => {}, toJSON: () => ({}),
-      } as FirebaseUser; // Type assertion needed for mock
+      } as FirebaseUser;
 
       setAuthUser(mockFbUser);
       setUserProfile(profile);
@@ -154,35 +154,48 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (triggerLoading) setLoading(false);
   };
 
-  const signUp = async (data: SignUpFormData): Promise<FirebaseUser | AuthError> => {
+  const signUp = async (data: SignUpFormData): Promise<FirebaseUser | AuthError | { code: string; message: string }> => {
     setLoading(true);
     try {
+      // Grade Validation (numeric standard between 4 and 12)
+      const numericStandard = parseInt(data.standard, 10);
+      if (isNaN(numericStandard) || numericStandard < 4 || numericStandard > 12) {
+        setLoading(false);
+        return { code: 'validation/invalid-grade', message: 'Standard must be between Grade 4 and Grade 12.' };
+      }
+
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
       const firebaseUser = userCredential.user;
-
       setAuthUser(firebaseUser);
 
       // Simulate school verification
-      const enteredSchoolName = data.schoolName || '';
-      const matchedSchool = mockSchoolsData.find(school => school.name.toLowerCase() === enteredSchoolName.toLowerCase());
+      const schoolNameLower = data.schoolName.toLowerCase();
+      const matchedSchool = mockSchoolsData.find(school => school.name.toLowerCase() === schoolNameLower);
 
+      const currentTimestamp = new Date().toISOString();
       const newProfile: UserProfileData = {
         uid: firebaseUser.uid,
         email: firebaseUser.email,
-        displayName: data.fullName || firebaseUser.displayName || firebaseUser.email, // Use fullName from form
+        displayName: data.fullName, // Use fullName from form
         role: 'student', // Enforce student role
         photoURL: firebaseUser.photoURL,
         fullName: data.fullName,
-        schoolName: enteredSchoolName,
+        schoolName: data.schoolName,
         schoolId: matchedSchool?.id,
         schoolVerifiedByOrganizer: !!matchedSchool,
-        standard: data.standard,
-        division: data.division,
+        standard: data.standard, // Store the numeric string e.g. "10"
+        division: data.division || undefined, // Store as undefined if empty
         registeredEvents: [],
         tasks: [],
+        createdAt: currentTimestamp,
+        updatedAt: currentTimestamp,
       };
       setUserProfile(newProfile);
       if (typeof window !== "undefined") localStorage.setItem('mockUserRole', 'student');
+      
+      // In a real app, here you would call a Cloud Function to save newProfile to Firestore.
+      // For simulation, we are directly setting it in context.
+      
       setLoading(false);
       return firebaseUser;
     } catch (error) {
@@ -200,24 +213,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const firebaseUser = userCredential.user;
         setAuthUser(firebaseUser);
 
+        // Try to find a matching mock profile
         const matchingMockProfile = Object.values(mockUserProfiles).find(p => p.email === firebaseUser.email);
         if (matchingMockProfile) {
           setUserProfile(matchingMockProfile);
           if (typeof window !== "undefined") localStorage.setItem('mockUserRole', matchingMockProfile.role);
         } else {
-          // If no mock profile, default to student role for direct Firebase login
-          // For a more robust system, fetch profile from Firestore here
-          const basicProfile: UserProfileData = {
+          // If no detailed mock profile, and this user was not created via our new signUp flow
+          // (which would have set a 'student' profile), then create a default student profile.
+          // This simulates fetching from Firestore or creating a default if not found.
+          // For now, we assume any Firebase user not in mocks is a new student or a student
+          // whose detailed profile wasn't pre-loaded in mockUserProfiles.
+           const currentTimestamp = new Date().toISOString();
+           const basicProfile: UserProfileData = {
             uid: firebaseUser.uid, email: firebaseUser.email,
             displayName: firebaseUser.displayName || firebaseUser.email,
-            role: 'student', // Default to student if no specific profile found
+            role: 'student',
             photoURL: firebaseUser.photoURL,
-            registeredEvents: [], tasks: [],
-            // Populate other student fields if available or sensible defaults
             fullName: firebaseUser.displayName || firebaseUser.email,
-            schoolName: 'Unknown School (Update Profile)',
+            schoolName: 'Unknown School (Please update profile)',
             schoolVerifiedByOrganizer: false,
             standard: 'N/A',
+            registeredEvents: [], tasks: [],
+            createdAt: currentTimestamp,
+            updatedAt: currentTimestamp,
           };
           setUserProfile(basicProfile);
           if (typeof window !== "undefined") localStorage.setItem('mockUserRole', 'student');
@@ -233,7 +252,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return error as AuthError;
       }
     } else if (typeof data === 'string' && mockUserProfiles[data as UserRole]) {
-      setMockUserRole(data as UserRole); // setMockUserRole handles loading
+      setMockUserRole(data as UserRole);
       const profile = mockUserProfiles[data as UserRole];
       return {
           uid: profile.uid, email: profile.email, displayName: profile.displayName, photoURL: profile.photoURL,
@@ -250,7 +269,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logOut = async () => {
     setLoading(true);
-    // await auth.signOut(); // Uncomment if using real Firebase sessions and want to sign out
+    // await auth.signOut(); // For real Firebase sessions
     setAuthUser(null);
     setUserProfile(null);
     if (typeof window !== "undefined") localStorage.removeItem('mockUserRole');
