@@ -12,6 +12,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import type { SignUpFormData } from '@/types';
 import { UserPlus, Loader2, LogIn } from 'lucide-react';
+import type { AuthError } from 'firebase/auth';
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -50,14 +51,22 @@ export default function SignUpPage() {
 
     setIsLoading(true);
     try {
-      // AuthContext.signUp will default new users to 'student' role
       const result = await signUp(formData);
-      if (typeof result === 'object' && 'code' in result) { // AuthError
-        toast({
-          title: 'Sign Up Failed',
-          description: result.message || 'An unknown error occurred.',
-          variant: 'destructive',
-        });
+      if (typeof result === 'object' && 'code' in result && (result as AuthError).code) { // AuthError
+        const authError = result as AuthError;
+        if (authError.code === 'auth/email-already-in-use') {
+          toast({
+            title: 'Email Already Exists',
+            description: 'This email address is already registered. Please try logging in or use a different email.',
+            variant: 'destructive',
+          });
+        } else {
+          toast({
+            title: 'Sign Up Failed',
+            description: authError.message || 'An unknown error occurred.',
+            variant: 'destructive',
+          });
+        }
       } else { // FirebaseUser
         toast({
           title: 'Sign Up Successful!',
