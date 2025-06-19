@@ -53,10 +53,10 @@ export interface UserProfileData {
   // Student specific fields
   fullName?: string;
   schoolName?: string;
-  schoolId?: string; 
+  schoolId?: string | null; // Can be null if school is not from master list
   schoolVerifiedByOrganizer?: boolean; 
   standard?: string; 
-  division?: string; 
+  division?: string | null; // Can be null
   // Organizational fields
   department?: string;
   assignedEventSlug?: string;
@@ -114,7 +114,7 @@ export interface SignUpFormData {
   confirmPassword?: string;
   schoolName: string;
   standard: string; // e.g., "4", "10", "12"
-  division?: string;
+  division?: string | null; // Made explicitly nullable
 }
 
 export interface LoginFormData {
@@ -196,3 +196,4 @@ export interface SchoolData {
   addedBy?: string; 
   createdAt?: string;
 }
+

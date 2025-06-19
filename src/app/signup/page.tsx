@@ -16,7 +16,7 @@ import { UserPlus, Loader2, LogIn, School as SchoolIconLucide } from 'lucide-rea
 import { auth, db } from '@/lib/firebase';
 import { createUserWithEmailAndPassword, type AuthError } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
-import { mockSchoolsData } from '@/data/mockSchools';
+import { mockSchoolsData } from '@/data/mockSchools'; // Import mock schools data
 
 const gradeLevels = Array.from({ length: 9 }, (_, i) => `${i + 4}`); // Grades 4 through 12
 
@@ -90,27 +90,34 @@ export default function SignUpPage() {
         const uid = user.uid;
         console.log("Firebase Auth user created:", user.email, "UID:", uid);
 
-        // --- Step 3: Prepare Student Profile Data for Firestore ---
-        let schoolId: string | undefined = undefined;
-        let schoolVerifiedByOrganizer = false;
-        const schoolNameLower = formData.schoolName.toLowerCase().trim();
-        const matchedSchool = mockSchoolsData.find(s => s.name.toLowerCase().trim() === schoolNameLower);
+        // --- Step 3: Determine schoolId and schoolVerifiedByOrganizer ---
+        let determinedSchoolId: string | null = null;
+        let determinedSchoolVerified: boolean = false;
+        const formSchoolNameLower = formData.schoolName.trim().toLowerCase();
+
+        const matchedSchool = mockSchoolsData.find(
+          (school) => school.name.trim().toLowerCase() === formSchoolNameLower
+        );
 
         if (matchedSchool) {
-          schoolId = matchedSchool.id;
-          schoolVerifiedByOrganizer = true;
+          determinedSchoolId = matchedSchool.id;
+          determinedSchoolVerified = true;
+          console.log("School found in mock data:", matchedSchool.name, "ID:", determinedSchoolId);
+        } else {
+          console.log("School not found in mock data, will be marked for review:", formData.schoolName);
         }
 
+        // --- Step 4: Prepare Student Profile Data for Firestore ---
         const studentProfileData: UserProfileData = {
             uid: uid,
             email: formData.email,
             fullName: formData.fullName,
             displayName: formData.fullName, // Default displayName to fullName
-            schoolName: formData.schoolName,
-            schoolId: schoolId,
-            schoolVerifiedByOrganizer: schoolVerifiedByOrganizer,
+            schoolName: formData.schoolName, // Store the name as entered/selected by user
+            schoolId: determinedSchoolId, // This will be null if not found
+            schoolVerifiedByOrganizer: determinedSchoolVerified,
             standard: formData.standard,
-            division: formData.division || undefined,
+            division: formData.division || null, // Ensure division is null if empty
             role: 'student',
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
@@ -121,13 +128,12 @@ export default function SignUpPage() {
         console.log("Attempting to save profile to Firestore for UID:", uid);
         console.log("Data to be saved:", studentProfileData);
 
-        // --- Step 4: Save Student Profile to Cloud Firestore ---
+        // --- Step 5: Save Student Profile to Cloud Firestore ---
         const userDocRef = doc(db, 'users', uid);
         await setDoc(userDocRef, studentProfileData);
 
         console.log("Firestore document for UID", uid, "created successfully!");
         console.log("Response from setDoc (implicitly void for success, but promise resolved): Promise fulfilled.");
-
 
         // --- Success: Both Auth & Firestore operations completed ---
         toast({
@@ -135,7 +141,7 @@ export default function SignUpPage() {
             description: 'Please sign in to continue.',
         });
 
-        router.push('/login'); // Redirect to login page
+        router.push('/login'); 
 
     } catch (error: any) {
         console.error("--- SIGN UP PROCESS ERROR ---");
@@ -161,7 +167,7 @@ export default function SignUpPage() {
                     errorTitle = 'Weak Password';
                     errorMessage = 'The password is too weak (minimum 6 characters).';
                     break;
-                case 'permission-denied': // Firestore specific
+                case 'permission-denied': 
                     errorTitle = 'Permission Error';
                     errorMessage = 'Failed to save profile data due to security rules. Please check Firestore rules in console.';
                     console.error("DEBUG: Firebase Security Rules likely denied the Firestore write!");
@@ -235,7 +241,7 @@ export default function SignUpPage() {
                   ))}
                 </datalist>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">If your school is not listed, please type its full name.</p>
+              <p className="text-xs text-muted-foreground mt-1">If your school is not listed, please type its full name. It will be reviewed.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -244,7 +250,6 @@ export default function SignUpPage() {
                   value={formData.standard}
                   onValueChange={(value) => handleSelectChange('standard', value)}
                   disabled={isLoading}
-                  required
                 >
                   <SelectTrigger id="standard">
                     <SelectValue placeholder="Select your grade" />
