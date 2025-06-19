@@ -126,6 +126,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const storedRole = typeof window !== "undefined" ? localStorage.getItem('mockUserRole') as UserRole | null : null;
         
         // Check if there's an existing profile that matches the UID (from previous signUp or login)
+        // THIS CHECK IS IMPORTANT: If setUserProfile was called (e.g. by signUp page), don't overwrite it here.
         if (userProfile && userProfile.uid === firebaseUser.uid) {
           // Profile already set (e.g., by signUp or previous login in this session), do nothing to overwrite
         } else if (storedRole && mockUserProfiles[storedRole] && mockUserProfiles[storedRole].uid === firebaseUser.uid) {
@@ -140,8 +141,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (typeof window !== "undefined") localStorage.setItem('mockUserRole', matchingMockProfileByEmail.role);
           } else {
             // Default to a basic student profile if no other profile is found.
-            // This means if a user signs up, their detailed profile is set by signUp().
-            // If they log in directly and aren't in mocks, they get a basic student profile.
+            // This means if a user logs in directly and isn't in mocks, they get a basic student profile.
+            // If they just signed up, the signup page itself should have set a more detailed profile via setUserProfile.
             const currentTimestamp = new Date().toISOString();
             const basicStudentProfile: UserProfileData = {
               uid: firebaseUser.uid,
@@ -170,7 +171,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, []); // Removed userProfile from dependency array to avoid re-setting on profile updates
 
 
   const setMockUserRole = (role: UserRole | null, triggerLoading: boolean = true) => {
@@ -184,7 +185,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         refreshToken: 'mock-refresh-token', tenantId: null, delete: async () => {}, getIdToken: async () => 'mock-id-token',
         getIdTokenResult: async () => ({ token: 'mock-id-token', claims: {}, expirationTime: '', issuedAtTime: '', signInProvider: null, signInSecondFactor: null}),
         reload: async () => {}, toJSON: () => ({}),
-      } as FirebaseUser; // Type assertion might be needed for complex FirebaseUser fields
+      } as FirebaseUser; 
 
       setAuthUser(mockFbUser);
       setUserProfile(profile);
@@ -200,49 +201,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signUp = async (data: SignUpFormData): Promise<FirebaseUser | AuthError | { code: string; message: string }> => {
     setLoading(true);
     try {
-      // Grade Validation (numeric standard between 4 and 12)
+      // --- Grade Validation (Client-Side before Auth call) ---
       const numericStandard = parseInt(data.standard, 10);
       if (isNaN(numericStandard) || numericStandard < 4 || numericStandard > 12) {
         setLoading(false);
+        // This custom error will be caught by the signup page's handleSubmit
         return { code: 'validation/invalid-grade', message: 'Standard must be between Grade 4 and Grade 12.' };
       }
 
+      // --- Step 1: Create user in Firebase Authentication ---
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
       const firebaseUser = userCredential.user;
-      setAuthUser(firebaseUser);
-
-      // Simulate school verification
-      const schoolNameLower = data.schoolName.toLowerCase();
-      const matchedSchool = mockSchoolsData.find(school => school.name.toLowerCase() === schoolNameLower);
-
-      const currentTimestamp = new Date().toISOString();
-      const newProfile: UserProfileData = {
-        uid: firebaseUser.uid,
-        email: firebaseUser.email,
-        displayName: data.fullName,
-        role: 'student', 
-        photoURL: firebaseUser.photoURL,
-        fullName: data.fullName,
-        schoolName: data.schoolName,
-        schoolId: matchedSchool?.id,
-        schoolVerifiedByOrganizer: !!matchedSchool,
-        standard: data.standard, 
-        division: data.division || undefined,
-        registeredEvents: [],
-        tasks: [],
-        createdAt: currentTimestamp,
-        updatedAt: currentTimestamp,
-      };
-      setUserProfile(newProfile);
-      if (typeof window !== "undefined") localStorage.setItem('mockUserRole', 'student');
       
+      // The signup page will now handle profile preparation and calling setUserProfile.
+      // This function primarily ensures Firebase Auth user creation and basic validation.
+      
+      // IMPORTANT: Do NOT call setUserProfile here anymore as per new flow.
+      // The signup page will call setUserProfile after this function returns the firebaseUser.
+
       setLoading(false);
       return firebaseUser;
+
     } catch (error) {
-      console.error("Firebase SignUp Error:", error);
+      // This catch block handles errors from createUserWithEmailAndPassword directly.
+      const authError = error as AuthError;
+      console.error("--- SIGN UP PROCESS ERROR (Firebase Auth) ---");
+      console.error("Error type:", authError.name);
+      console.error("Error code:", authError.code);
+      console.error("Error message:", authError.message);
+      console.error("Full error object:", authError);
       setLoading(false);
-      return error as AuthError;
+      return authError; // Return the Firebase AuthError
     }
+    // No finally block needed here for setLoading as it's handled in try/catch
   };
 
   const logIn = async (data: LoginFormData | UserRole): Promise<FirebaseUser | AuthError | { message: string }> => {
@@ -251,29 +242,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
         const firebaseUser = userCredential.user;
-        setAuthUser(firebaseUser);
-
+        // AuthUser will be set by onAuthStateChanged.
+        // Profile (mocked) will also be set by onAuthStateChanged or if already present.
+        // Forcing a profile set here can conflict with onAuthStateChanged.
+        // Just ensure the local storage role hint is set if we find a mock.
         const matchingMockProfile = Object.values(mockUserProfiles).find(p => p.email === firebaseUser.email);
         if (matchingMockProfile) {
-          setUserProfile(matchingMockProfile);
-          if (typeof window !== "undefined") localStorage.setItem('mockUserRole', matchingMockProfile.role);
+            if (typeof window !== "undefined") localStorage.setItem('mockUserRole', matchingMockProfile.role);
+            setUserProfile(matchingMockProfile); // Explicitly set for immediate UI update
         } else {
-           const currentTimestamp = new Date().toISOString();
-           const basicProfile: UserProfileData = {
-            uid: firebaseUser.uid, email: firebaseUser.email,
-            displayName: firebaseUser.displayName || firebaseUser.email,
-            role: 'student', // Default to student if no specific organizational profile
-            photoURL: firebaseUser.photoURL,
-            fullName: firebaseUser.displayName || firebaseUser.email,
-            schoolName: 'Unknown School (Please update profile)',
-            schoolVerifiedByOrganizer: false,
-            standard: 'N/A',
-            registeredEvents: [], tasks: [],
-            createdAt: currentTimestamp,
-            updatedAt: currentTimestamp,
-          };
-          setUserProfile(basicProfile);
-          if (typeof window !== "undefined") localStorage.setItem('mockUserRole', 'student');
+            if (typeof window !== "undefined") localStorage.setItem('mockUserRole', 'student'); // Default if no specific mock
+            // onAuthStateChanged will handle creating a basic student profile if none exists
         }
         setLoading(false);
         return firebaseUser;
@@ -286,7 +265,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return error as AuthError;
       }
     } else if (typeof data === 'string' && mockUserProfiles[data as UserRole]) {
-      setMockUserRole(data as UserRole, false); // false to avoid double loading if called from onAuthStateChanged
+      setMockUserRole(data as UserRole, false); 
       const profile = mockUserProfiles[data as UserRole];
        setLoading(false);
       return {
@@ -319,3 +298,5 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
+
+    

@@ -11,16 +11,16 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import type { SignUpFormData } from '@/types';
+import type { SignUpFormData, UserProfileData } from '@/types';
 import { UserPlus, Loader2, LogIn, School as SchoolIconLucide } from 'lucide-react';
-import type { AuthError } from 'firebase/auth';
+import type { AuthError, User as FirebaseUser } from 'firebase/auth';
 import { mockSchoolsData } from '@/data/mockSchools';
 
 const gradeLevels = Array.from({ length: 9 }, (_, i) => `${i + 4}`); // Grades 4 through 12
 
 export default function SignUpPage() {
   const router = useRouter();
-  const { signUp } = useAuth();
+  const { signUp, setUserProfile } = useAuth(); // Added setUserProfile
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<SignUpFormData>({
@@ -43,12 +43,16 @@ export default function SignUpPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    console.log("--- SIGN UP PROCESS STARTED ---");
+    console.log("Attempting sign up with form data:", formData);
+
     if (formData.password !== formData.confirmPassword) {
       toast({
         title: 'Password Mismatch',
         description: 'Passwords do not match.',
         variant: 'destructive',
       });
+      console.log("--- SIGN UP PROCESS ENDED (Password Mismatch) ---");
       return;
     }
     if (!formData.email || !formData.password || !formData.fullName || !formData.schoolName || !formData.standard) {
@@ -57,24 +61,86 @@ export default function SignUpPage() {
         description: 'Full Name, Email, Password, School, and Standard are required.',
         variant: 'destructive',
       });
+      console.log("--- SIGN UP PROCESS ENDED (Missing Fields) ---");
       return;
     }
 
     setIsLoading(true);
     try {
+      // Step 1: Create user in Firebase Authentication (via AuthContext)
+      // Grade validation is now inside the signUp method of AuthContext
       const result = await signUp(formData);
-      
-      if (result && typeof result === 'object' && 'code' in result && (result as AuthError).code) {
-        const authError = result as AuthError;
-        let errorMessage = authError.message || 'An unknown error occurred during sign up.';
+
+      if (result && 'uid' in result) { // Check if it's a FirebaseUser object (success)
+        const user = result as FirebaseUser;
+        const uid = user.uid;
+        console.log("Firebase Auth user created successfully via AuthContext:", user.email, "UID:", uid);
+
+        // Step 2: Prepare Student Profile Data
+        const currentTimestamp = new Date().toISOString();
+        let schoolId: string | undefined = undefined;
+        let schoolVerifiedByOrganizer = false;
+        const schoolNameLower = formData.schoolName.toLowerCase();
+        const matchedSchool = mockSchoolsData.find(s => s.name.toLowerCase() === schoolNameLower);
+
+        if (matchedSchool) {
+          schoolId = matchedSchool.id;
+          schoolVerifiedByOrganizer = true;
+        }
+        
+        const studentProfileData: UserProfileData = {
+          uid: uid,
+          email: user.email,
+          fullName: formData.fullName,
+          displayName: formData.fullName,
+          schoolName: formData.schoolName,
+          schoolId: schoolId,
+          schoolVerifiedByOrganizer: schoolVerifiedByOrganizer,
+          standard: formData.standard,
+          division: formData.division || undefined,
+          role: 'student',
+          photoURL: user.photoURL,
+          registeredEvents: [],
+          tasks: [],
+          createdAt: currentTimestamp,
+          updatedAt: currentTimestamp,
+        };
+
+        console.log("Attempting to save profile to context (simulating Firestore save) for UID:", uid);
+        console.log("Data to be saved:", studentProfileData);
+
+        // Step 3: Save Student Profile to AuthContext (simulating Firestore write)
+        setUserProfile(studentProfileData); // Update the global state
+        if (typeof window !== "undefined") localStorage.setItem('mockUserRole', 'student');
+
+
+        console.log("Profile for UID", uid, "set in AuthContext successfully (simulated Firestore write)!");
+
+        toast({
+          title: 'Account created successfully!',
+          description: 'Please sign in to continue.',
+        });
+        router.push('/login'); // Redirect to login page
+
+      } else { // Handle error object from signUp
+        const error = result as AuthError | { code: string; message: string }; // Cast to error type
+        console.error("--- SIGN UP PROCESS ERROR (from signUp context) ---");
+        console.error("Error type:", (error as any).name || 'CustomError');
+        console.error("Error code:", error.code);
+        console.error("Error message:", error.message);
+        console.error("Full error object:", error);
+        
+        let errorMessage = error.message || 'An unexpected error occurred.';
         let errorTitle = 'Sign Up Failed';
 
-        if (authError.code === 'auth/email-already-in-use') {
+        if (error.code === 'auth/email-already-in-use') {
           errorTitle = 'Email Already Exists';
           errorMessage = 'This email address is already registered. Please try logging in or use a different email.';
-        } else if (authError.code === 'validation/invalid-grade') {
+        } else if (error.code === 'validation/invalid-grade') {
            errorTitle = 'Invalid Grade';
-           errorMessage = authError.message; // Use message from error for specific validation
+           // errorMessage is already set from the error object
+        } else if (error.code === 'auth/weak-password') {
+            errorMessage = 'The password is too weak (minimum 6 characters).';
         }
         
         toast({
@@ -82,16 +148,15 @@ export default function SignUpPage() {
           description: errorMessage,
           variant: 'destructive',
         });
-
-      } else { // Assuming success if no error object with 'code' is returned
-        toast({
-          title: 'Account created successfully!',
-          description: 'Please sign in to continue.',
-        });
-        router.push('/login'); // Redirect to login page
       }
     } catch (error: any) {
-      // This catch block might be redundant if signUp always returns specific error objects or FirebaseUser
+      // Catch any other unexpected errors during the process
+      console.error("--- SIGN UP PROCESS UNEXPECTED ERROR ---");
+      console.error("Error type:", error.name);
+      console.error("Error code:", error.code);
+      console.error("Error message:", error.message);
+      console.error("Full error object:", error);
+
       toast({
         title: 'Sign Up Error',
         description: error.message || 'An unexpected error occurred during sign up.',
@@ -99,6 +164,7 @@ export default function SignUpPage() {
       });
     } finally {
       setIsLoading(false);
+      console.log("--- SIGN UP PROCESS ENDED ---");
     }
   };
 
@@ -162,7 +228,7 @@ export default function SignUpPage() {
                   value={formData.standard}
                   onValueChange={(value) => handleSelectChange('standard', value)}
                   disabled={isLoading}
-                  required
+                  
                 >
                   <SelectTrigger id="standard">
                     <SelectValue placeholder="Select your grade" />
@@ -199,3 +265,5 @@ export default function SignUpPage() {
     </div>
   );
 }
+
+    
