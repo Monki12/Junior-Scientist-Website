@@ -13,10 +13,12 @@ import { useToast } from '@/hooks/use-toast';
 import type { SignUpFormData, UserProfileData } from '@/types';
 import { UserPlus, Loader2, LogIn, School as SchoolIconLucide } from 'lucide-react';
 
-import { auth, db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase'; // Ensure 'db' (Firestore instance) is imported!
 import { createUserWithEmailAndPassword, type AuthError } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
-import { mockSchoolsData } from '@/data/mockSchools'; // Import mock schools data
+import { doc, setDoc } from 'firebase/firestore'; // Import doc and setDoc
+import { mockSchoolsData } from '@/data/mockSchools';
+import { useAuth } from '@/hooks/use-auth';
+
 
 const gradeLevels = Array.from({ length: 9 }, (_, i) => `${i + 4}`); // Grades 4 through 12
 
@@ -24,6 +26,8 @@ export default function SignUpPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const authContext = useAuth();
+
 
   const [formData, setFormData] = useState<SignUpFormData>({
     fullName: '',
@@ -70,8 +74,8 @@ export default function SignUpPage() {
     setIsLoading(true);
 
     try {
-        // --- Step 1: Client-Side Grade Validation ---
-        const numericStandard = parseInt(formData.standard, 10);
+        // --- Step 1: Client-Side Grade Validation (Crucial before any Firebase calls) ---
+        const numericStandard = parseInt(formData.standard);
         if (isNaN(numericStandard) || numericStandard < 4 || numericStandard > 12) {
             toast({
                 title: 'Invalid Grade',
@@ -87,14 +91,13 @@ export default function SignUpPage() {
         console.log("Attempting Firebase Auth user creation for:", formData.email);
         const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
         const user = userCredential.user;
-        const uid = user.uid;
+        const uid = user.uid; // Get the unique user ID from Firebase Auth
         console.log("Firebase Auth user created:", user.email, "UID:", uid);
 
-        // --- Step 3: Determine schoolId and schoolVerifiedByOrganizer ---
+        // --- Step 3: Determine schoolId and schoolVerifiedByOrganizer (for client-side context) ---
         let determinedSchoolId: string | null = null;
-        let determinedSchoolVerified: boolean = false;
+        let determinedSchoolVerified = false;
         const formSchoolNameLower = formData.schoolName.trim().toLowerCase();
-
         const matchedSchool = mockSchoolsData.find(
           (school) => school.name.trim().toLowerCase() === formSchoolNameLower
         );
@@ -104,36 +107,53 @@ export default function SignUpPage() {
           determinedSchoolVerified = true;
           console.log("School found in mock data:", matchedSchool.name, "ID:", determinedSchoolId);
         } else {
-          console.log("School not found in mock data, will be marked for review:", formData.schoolName);
+          console.log("School not found in mock data, will be marked for review (client-side):", formData.schoolName);
         }
 
-        // --- Step 4: Prepare Student Profile Data for Firestore ---
-        const studentProfileData: UserProfileData = {
-            uid: uid,
-            email: formData.email,
+        // --- Step 4: Prepare Student Profile Data STRICTLY for Firestore (matching security rules) ---
+        const profileDataForFirestore = {
+            // uid is the doc ID, not usually stored as a field within the document itself when using doc(db, 'users', uid)
             fullName: formData.fullName,
-            displayName: formData.fullName, // Default displayName to fullName
-            schoolName: formData.schoolName, // Store the name as entered/selected by user
-            schoolId: determinedSchoolId, // This will be null if not found
-            schoolVerifiedByOrganizer: determinedSchoolVerified,
+            email: formData.email,
+            schoolName: formData.schoolName,
             standard: formData.standard,
-            division: formData.division || null, // Ensure division is null if empty
-            role: 'student',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            registeredEvents: [],
-            tasks: [],
+            division: formData.division || null,
+            role: 'student', // Enforced by security rules
+            createdAt: new Date(), // Firestore will convert this to a Timestamp
+            updatedAt: new Date(), // Firestore will convert this to a Timestamp
+            // schoolId and schoolVerifiedByOrganizer are OMITTED here
+            // because the provided Firestore 'create' rule does not currently allow them.
         };
 
         console.log("Attempting to save profile to Firestore for UID:", uid);
-        console.log("Data to be saved:", studentProfileData);
+        console.log("Data to be saved to Firestore:", profileDataForFirestore);
 
         // --- Step 5: Save Student Profile to Cloud Firestore ---
         const userDocRef = doc(db, 'users', uid);
-        await setDoc(userDocRef, studentProfileData);
+        await setDoc(userDocRef, profileDataForFirestore);
 
-        console.log("Firestore document for UID", uid, "created successfully!");
+        console.log("Firestore document for UID", uid, "created successfully with data:", profileDataForFirestore);
         console.log("Response from setDoc (implicitly void for success, but promise resolved): Promise fulfilled.");
+
+        // --- Step 6: Prepare complete profile for AuthContext (client-side state) ---
+        const completeProfileForContext: UserProfileData = {
+            uid: uid,
+            email: formData.email,
+            fullName: formData.fullName,
+            schoolName: formData.schoolName,
+            standard: formData.standard,
+            division: formData.division || null,
+            role: 'student',
+            createdAt: profileDataForFirestore.createdAt.toISOString(),
+            updatedAt: profileDataForFirestore.updatedAt.toISOString(),
+            schoolId: determinedSchoolId, // Include client-determined value
+            schoolVerifiedByOrganizer: determinedSchoolVerified, // Include client-determined value
+            registeredEvents: [],
+            tasks: [],
+        };
+        authContext.setUserProfile(completeProfileForContext); // Update client-side auth context
+        if (typeof window !== "undefined") localStorage.setItem('mockUserRole', 'student');
+
 
         // --- Success: Both Auth & Firestore operations completed ---
         toast({
@@ -141,7 +161,7 @@ export default function SignUpPage() {
             description: 'Please sign in to continue.',
         });
 
-        router.push('/login'); 
+        router.push('/login'); // Changed from /signin to /login to match existing pages
 
     } catch (error: any) {
         console.error("--- SIGN UP PROCESS ERROR ---");
@@ -250,6 +270,7 @@ export default function SignUpPage() {
                   value={formData.standard}
                   onValueChange={(value) => handleSelectChange('standard', value)}
                   disabled={isLoading}
+                  required
                 >
                   <SelectTrigger id="standard">
                     <SelectValue placeholder="Select your grade" />

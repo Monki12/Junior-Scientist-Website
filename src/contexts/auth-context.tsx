@@ -53,6 +53,7 @@ const mockGlobalParticipants: EventParticipant[] = [
   { id: 'stud-global-7', name: 'Student Test User', email: 'student.test@example.com', contactNumber: '555-0101', schoolName: 'Springfield High International', registrationDate: new Date('2024-07-07T08:00:00Z').toISOString(), paymentStatus: 'paid', registeredEventSlugs: ['model-united-nations', 'ex-quiz-it', 'robo-challenge'], customData: {} },
 ];
 
+
 const mockUserProfiles: Record<UserRole, UserProfileData> = {
   student: {
     uid: 'mock-student-uid-12345', email: 'student.test@example.com', displayName: 'Alex Johnson', role: 'student', photoURL: 'https://placehold.co/120x120.png?text=AJ',
@@ -104,7 +105,8 @@ interface AuthContextType {
   authUser: FirebaseUser | null;
   userProfile: UserProfileData | null;
   loading: boolean;
-  // signUp now directly handles student profile creation in AuthContext
+  // signUp is now primarily managed by the signup page itself for direct Firestore interaction
+  // It remains here for potential other uses or refactoring if needed
   signUp: (data: SignUpFormData) => Promise<FirebaseUser | AuthError | { code: string; message: string }>;
   logIn: (data: LoginFormData | UserRole) => Promise<FirebaseUser | AuthError | { message: string }>;
   logOut: () => Promise<void>;
@@ -135,32 +137,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const fetchedProfile = userDocSnap.data() as UserProfileData;
             console.log("[AuthContext] Firestore profile FOUND for UID:", firebaseUser.uid, fetchedProfile);
             setUserProfile(fetchedProfile);
-            if (typeof window !== "undefined") localStorage.setItem('mockUserRole', fetchedProfile.role);
+            // No need to set mockUserRole in localStorage here as Firestore is the source of truth
           } else {
             console.warn("[AuthContext] Firestore profile NOT FOUND for UID:", firebaseUser.uid);
-            // This case should be less frequent if signup flow ensures profile creation.
-            // For users who might have an Auth account but no Firestore doc (e.g. from a previous system state)
-            // or if using mock login for an email that doesn't match a mock profile.
-            const storedRole = typeof window !== "undefined" ? localStorage.getItem('mockUserRole') as UserRole | null : null;
-            if (storedRole && mockUserProfiles[storedRole] && mockUserProfiles[storedRole].email === firebaseUser.email) {
-                console.log("[AuthContext] Using mock profile based on storedRole and matching email for role:", storedRole);
-                setUserProfile(mockUserProfiles[storedRole]);
-            } else {
-                console.log("[AuthContext] No specific profile, setting basic student default for UID:", firebaseUser.uid);
-                const basicProfile: UserProfileData = {
-                    uid: firebaseUser.uid,
-                    email: firebaseUser.email,
-                    displayName: firebaseUser.displayName || firebaseUser.email,
-                    role: 'student', // Default to student
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
-                };
-                setUserProfile(basicProfile);
-                if (typeof window !== "undefined") localStorage.setItem('mockUserRole', 'student');
-            }
+            // This case indicates a user exists in Auth but not in Firestore.
+            // Could happen if signup Firestore write failed previously or manual deletion.
+            // For now, set a minimal profile. A robust app might redirect to a "complete profile" page.
+            const basicProfile: UserProfileData = {
+                uid: firebaseUser.uid,
+                email: firebaseUser.email,
+                displayName: firebaseUser.displayName || firebaseUser.email,
+                role: 'student', // Default, or could be an 'unknown' role
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            };
+            setUserProfile(basicProfile);
           }
         } catch (error) {
             console.error("[AuthContext] Error fetching user profile from Firestore:", error);
+            // Fallback if Firestore read fails
             const basicProfile: UserProfileData = {
                 uid: firebaseUser.uid,
                 email: firebaseUser.email,
@@ -170,7 +165,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 updatedAt: new Date().toISOString(),
             };
             setUserProfile(basicProfile);
-            if (typeof window !== "undefined") localStorage.setItem('mockUserRole', 'student');
         }
       } else {
         console.log("[AuthContext] onAuthStateChanged: No Firebase user.");
@@ -207,65 +201,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (triggerLoading) setLoading(false);
   };
 
-  // Updated signUp function (client-side simulation of atomic creation)
+  // signUp function in AuthContext is now simplified, as primary logic moved to signup/page.tsx
+  // This one now mainly handles Auth user creation and basic validation if called directly.
   const signUp = async (data: SignUpFormData): Promise<FirebaseUser | AuthError | { code: string; message: string }> => {
     setLoading(true);
     try {
-      // 1. Grade Validation
       const numericStandard = parseInt(data.standard, 10);
       if (isNaN(numericStandard) || numericStandard < 4 || numericStandard > 12) {
         setLoading(false);
         return { code: 'validation/invalid-grade', message: 'Standard must be between Grade 4 and Grade 12.' };
       }
 
-      // 2. Create Firebase Auth User
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
-      const firebaseUser = userCredential.user;
-      setAuthUser(firebaseUser); // Set authUser immediately
-
-      // 3. Determine schoolId and schoolVerifiedByOrganizer (Simulated Firestore interaction)
-      let determinedSchoolId: string | null = null;
-      let determinedSchoolVerified = false;
-      const formSchoolNameLower = data.schoolName.trim().toLowerCase();
-      const matchedSchool = mockSchoolsData.find(
-        (school) => school.name.trim().toLowerCase() === formSchoolNameLower
-      );
-      if (matchedSchool) {
-        determinedSchoolId = matchedSchool.id;
-        determinedSchoolVerified = true;
-      }
-      
-      // 4. Construct UserProfileData (Simulated Firestore document creation)
-      const studentProfileData: UserProfileData = {
-        uid: firebaseUser.uid,
-        email: firebaseUser.email,
-        fullName: data.fullName,
-        displayName: data.fullName,
-        schoolName: data.schoolName,
-        schoolId: determinedSchoolId,
-        schoolVerifiedByOrganizer: determinedSchoolVerified,
-        standard: data.standard,
-        division: data.division || null,
-        role: 'student',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        registeredEvents: [],
-        tasks: [],
-      };
-      
-      // Simulate saving to Firestore by setting userProfile in context
-      // In a real app, this would be an await setDoc(doc(db, 'users', firebaseUser.uid), studentProfileData);
-      // and if it failed, you'd ideally delete firebaseUser via admin SDK in a Cloud Function.
-      setUserProfile(studentProfileData);
-      if (typeof window !== "undefined") localStorage.setItem('mockUserRole', 'student');
-
+      // The onAuthStateChanged listener will handle setting authUser and fetching/setting userProfile from Firestore.
+      // The signup page itself handles the immediate Firestore write.
       setLoading(false);
-      return firebaseUser;
+      return userCredential.user;
     } catch (error) {
       setLoading(false);
-      // If createUserWithEmailAndPassword failed, authUser would not have been set,
-      // and userProfile would not be set.
-      return error as AuthError; // This will have codes like 'auth/email-already-in-use'
+      return error as AuthError;
     }
   };
 
@@ -274,7 +228,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (typeof data === 'object' && 'email' in data && 'password' in data) {
       try {
         const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
-        // User profile will be fetched by onAuthStateChanged.
+        // onAuthStateChanged will handle fetching profile from Firestore.
+        // localStorage for mockUserRole is now less critical if Firestore is source of truth,
+        // but can be kept for purely mock scenarios if direct Firebase login fails/isn't primary.
         const matchingMockProfile = Object.values(mockUserProfiles).find(p => p.email === data.email);
         if (matchingMockProfile) {
             if (typeof window !== "undefined") localStorage.setItem('mockUserRole', matchingMockProfile.role);
@@ -292,6 +248,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return error as AuthError;
       }
     } else if (typeof data === 'string' && mockUserProfiles[data as UserRole]) {
+      // This path is for purely mock role selection, bypassing Firebase Auth for that session.
       setMockUserRole(data as UserRole, false); 
       const profile = mockUserProfiles[data as UserRole];
        setLoading(false);
@@ -311,6 +268,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logOut = async () => {
     setLoading(true);
     await auth.signOut(); 
+    // onAuthStateChanged will set authUser and userProfile to null
     setLoading(false);
   };
 
@@ -322,6 +280,3 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-
-    
-
