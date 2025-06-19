@@ -40,13 +40,12 @@ export default function SubEventDetailPage() {
 
   const [isRegistered, setIsRegistered] = useState(false);
   const [registrationDetails, setRegistrationDetails] = useState<EventRegistration | null>(null);
+  const [teamDetails, setTeamDetails] = useState<EventTeam | null>(null); // State for team details
+  const [loadingTeamDetails, setLoadingTeamDetails] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
   
   const [isTeamFormOpen, setIsTeamFormOpen] = useState(false);
   const [teamName, setTeamName] = useState('');
-  // For simplicity, team members might be added later or by searching UIDs if this were a full app
-  // const [teamMemberEmails, setTeamMemberEmails] = useState<string[]>(['']); 
-
 
   useEffect(() => {
     if (subEventSlug) {
@@ -74,15 +73,50 @@ export default function SubEventDetailPage() {
           } else {
             setIsRegistered(false);
             setRegistrationDetails(null);
+            setTeamDetails(null); // Clear team details if not registered
           }
         } catch (error) {
           console.error("Error checking registration status:", error);
           toast({ title: "Error", description: "Could not check registration status.", variant: "destructive" });
         }
+      } else {
+        setIsRegistered(false);
+        setRegistrationDetails(null);
+        setTeamDetails(null);
       }
     };
     checkRegistration();
   }, [authUser, event, toast]);
+
+  useEffect(() => {
+    const fetchTeamDetails = async () => {
+      if (registrationDetails?.isTeamRegistration && registrationDetails.teamId) {
+        setLoadingTeamDetails(true);
+        try {
+          const teamDocRef = doc(db, 'event_teams', registrationDetails.teamId);
+          const teamDocSnap = await getDoc(teamDocRef);
+          if (teamDocSnap.exists()) {
+            setTeamDetails(teamDocSnap.data() as EventTeam);
+          } else {
+            console.warn(`Team document with ID ${registrationDetails.teamId} not found.`);
+            setTeamDetails(null);
+          }
+        } catch (error) {
+          console.error("Error fetching team details:", error);
+          toast({ title: "Error", description: "Could not fetch team details.", variant: "destructive" });
+          setTeamDetails(null);
+        } finally {
+          setLoadingTeamDetails(false);
+        }
+      } else {
+        setTeamDetails(null); // Clear team details if not a team registration or no teamId
+      }
+    };
+
+    if (isRegistered) {
+        fetchTeamDetails();
+    }
+  }, [registrationDetails, isRegistered, toast]);
 
 
   const handleIndividualRegistration = async () => {
@@ -130,13 +164,12 @@ export default function SubEventDetailPage() {
     let teamDocId = '';
 
     try {
-      // Step 1: Create the team document
       const newTeam: EventTeam = {
         eventId: event.id,
         teamName: teamName.trim(),
         teamLeaderId: authUser.uid,
-        memberUids: [authUser.uid], // Initially, only the leader
-        teamSize: 1, // Initially 1
+        memberUids: [authUser.uid], 
+        teamSize: 1, 
         status: 'pending',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -145,7 +178,6 @@ export default function SubEventDetailPage() {
       teamDocId = teamDocRef.id;
       console.log("Team created with ID:", teamDocId);
 
-      // Step 2: Register the team leader for the event with this team
       const newRegistration: EventRegistration = {
         userId: authUser.uid,
         eventId: event.id,
@@ -162,6 +194,7 @@ export default function SubEventDetailPage() {
       
       setIsRegistered(true);
       setRegistrationDetails({ ...newRegistration, id: regDocRef.id, registeredAt: new Date().toISOString(), lastUpdatedAt: new Date().toISOString() });
+      // Team details will be fetched by the useEffect hook
       toast({ title: "Team Created & Registered!", description: `Team "${teamName}" created and you're registered for ${event.title}.` });
       setIsTeamFormOpen(false);
       setTeamName('');
@@ -169,7 +202,6 @@ export default function SubEventDetailPage() {
     } catch (error: any) {
       console.error("Error during team registration:", error);
       toast({ title: "Team Registration Failed", description: error.message || "Could not create team or register.", variant: "destructive" });
-      // Potential rollback logic here is complex for client-side. If team created but registration failed.
     } finally {
       setIsRegistering(false);
     }
@@ -266,8 +298,22 @@ export default function SubEventDetailPage() {
                 <div className="text-center py-4">
                   <Ticket className="h-8 w-8 mx-auto mb-2 text-green-500" />
                   <p className="font-semibold text-foreground">You are registered for this event!</p>
-                  {registrationDetails?.isTeamRegistration && registrationDetails.teamId && (
-                    <p className="text-sm text-muted-foreground">Team ID: {registrationDetails.teamId} (Further team details in dashboard)</p>
+                  {registrationDetails?.isTeamRegistration && (
+                    loadingTeamDetails ? (
+                      <p className="text-sm text-muted-foreground flex items-center justify-center gap-1"><Loader2 className="h-4 w-4 animate-spin"/>Loading team details...</p>
+                    ) : teamDetails ? (
+                      <>
+                        <p className="text-sm text-muted-foreground">Team: <strong>{teamDetails.teamName}</strong></p>
+                        <p className="text-xs text-muted-foreground">
+                          Members: {teamDetails.memberUids.length > 0 ? `(${teamDetails.memberUids.length}) UIDs: ${teamDetails.memberUids.join(', ')}` : 'No members listed yet.'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">(Further team details in dashboard)</p>
+                      </>
+                    ) : registrationDetails.teamId ? (
+                      <p className="text-sm text-muted-foreground">Team ID: {registrationDetails.teamId} (Could not load team name)</p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Team registration, but no team details found.</p>
+                    )
                   )}
                    <Badge variant={registrationDetails?.registrationStatus === 'approved' ? 'default' : 'secondary'} className="mt-1 capitalize">
                     Status: {registrationDetails?.registrationStatus || 'N/A'}
@@ -297,7 +343,6 @@ export default function SubEventDetailPage() {
         </Card>
       </article>
 
-      {/* Dialog for Team Creation */}
       <AlertDialog open={isTeamFormOpen} onOpenChange={setIsTeamFormOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -317,25 +362,6 @@ export default function SubEventDetailPage() {
                 disabled={isRegistering}
               />
             </div>
-            {/* 
-            <div className="space-y-2">
-                <Label>Invite Team Members (Optional - by Email)</Label>
-                {teamMemberEmails.map((email, index) => (
-                     <Input key={index} type="email" placeholder={`Member ${index + 1} email`} value={email} 
-                            onChange={(e) => {
-                                const newEmails = [...teamMemberEmails];
-                                newEmails[index] = e.target.value;
-                                setTeamMemberEmails(newEmails);
-                            }} 
-                            disabled={isRegistering} 
-                     />
-                ))}
-                <Button variant="outline" size="sm" onClick={() => setTeamMemberEmails([...teamMemberEmails, ''])} disabled={isRegistering || teamMemberEmails.length >= (event.maxTeamMembers || 5) -1}>
-                    <PlusCircle className="mr-2 h-4 w-4" /> Add Member Slot
-                </Button>
-                 <p className="text-xs text-muted-foreground">Max {event.maxTeamMembers || 'N/A'} members including yourself.</p>
-            </div>
-             */}
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isRegistering}>Cancel</AlertDialogCancel>
