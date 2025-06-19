@@ -1,9 +1,10 @@
 
 'use client';
 
-import type { User as FirebaseUser, AuthError } from 'firebase/auth';
+import { createUserWithEmailAndPassword, type User as FirebaseUser, type AuthError } from 'firebase/auth'; // Added createUserWithEmailAndPassword
 import { createContext, useState, useEffect, ReactNode } from 'react';
 import type { SignUpFormData, LoginFormData, UserProfileData, UserRole, Task, RegisteredEventInfo, EventParticipant } from '@/types';
+import { auth } from '@/lib/firebase'; // Imported Firebase auth instance
 // subEventsData can be imported if needed for event titles etc., but dashboard will fetch from its own data source for now.
 
 // More diversified mock tasks
@@ -170,7 +171,7 @@ interface AuthContextType {
   authUser: FirebaseUser | null;
   userProfile: UserProfileData | null;
   loading: boolean;
-  signUp: (data: SignUpFormData) => Promise<FirebaseUser | AuthError | { message: string }>;
+  signUp: (data: SignUpFormData) => Promise<FirebaseUser | AuthError>;
   logIn: (data: LoginFormData | UserRole) => Promise<FirebaseUser | AuthError | { message: string }>;
   logOut: () => Promise<void>;
   setMockUserRole: (role: UserRole | null) => void;
@@ -186,15 +187,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const storedRole = typeof window !== "undefined" ? localStorage.getItem('mockUserRole') as UserRole | null : null;
-    if (storedRole && mockUserProfiles[storedRole]) { // Ensure stored role is valid
+    if (storedRole && mockUserProfiles[storedRole]) { 
       setMockUserRole(storedRole);
     } else {
-      // If no valid stored role, or on initial load without a role, clear auth state.
-      // This prevents defaulting to a student or any other role if localStorage is empty or invalid.
       setAuthUser(null);
       setUserProfile(null);
        if (typeof window !== "undefined") {
-          localStorage.removeItem('mockUserRole'); // Clean up invalid stored role
+          localStorage.removeItem('mockUserRole'); 
        }
     }
     setLoading(false);
@@ -238,12 +237,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(false);
   };
 
-  const signUp = async (data: SignUpFormData): Promise<{ message: string }> => {
-    console.warn("Mock Auth: signUp called. In mock mode, new users are not actually created. Please use mock login.");
-    return { message: "Sign up is in mock mode. Please use mock login." };
+  const signUp = async (data: SignUpFormData): Promise<FirebaseUser | AuthError> => {
+    console.warn("AuthContext: Attempting direct Firebase sign-up. Full profile creation beyond auth is still basic/mock.");
+    setLoading(true);
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      const firebaseUser = userCredential.user;
+      
+      setAuthUser(firebaseUser);
+      // Create a basic mock student profile for the new Firebase user
+      const newProfile: UserProfileData = {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        displayName: data.name || firebaseUser.displayName || firebaseUser.email, // Use provided name or fallback
+        role: 'student', // Default new sign-ups to student
+        photoURL: firebaseUser.photoURL,
+        registeredEvents: [],
+        tasks: [],
+      };
+      setUserProfile(newProfile);
+      if (typeof window !== "undefined") {
+        localStorage.setItem('mockUserRole', 'student'); // Store role for persistence
+      }
+      setLoading(false);
+      return firebaseUser;
+    } catch (error) {
+      console.error("Firebase SignUp Error:", error);
+      setLoading(false);
+      return error as AuthError;
+    }
   };
 
-  const logIn = async (data: LoginFormData | UserRole): Promise<{ message: string } | FirebaseUser> => {
+  const logIn = async (data: LoginFormData | UserRole): Promise<{ message: string } | FirebaseUser | AuthError> => {
     console.warn("Mock Auth: logIn called.");
     let loggedInUser: FirebaseUser | null = null;
     let roleToSet: UserRole | null = null;
@@ -260,16 +285,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (roleToSet) {
       setMockUserRole(roleToSet);
       const profile = mockUserProfiles[roleToSet];
-      loggedInUser = { uid: profile.uid, email: profile.email, displayName: profile.displayName, photoURL: profile.photoURL } as FirebaseUser; // Simplified mock FirebaseUser
+      // Create a FirebaseUser-like object for the mock login
+      loggedInUser = { 
+        uid: profile.uid, 
+        email: profile.email, 
+        displayName: profile.displayName, 
+        photoURL: profile.photoURL,
+        emailVerified: true,
+        isAnonymous: false,
+        metadata: {},
+        providerData: [],
+        providerId: 'mock',
+        refreshToken: 'mock-refresh-token',
+        tenantId: null,
+        delete: async () => {},
+        getIdToken: async () => 'mock-id-token',
+        getIdTokenResult: async () => ({ token: 'mock-id-token', claims: {}, expirationTime: '', issuedAtTime: '', signInProvider: null, signInSecondFactor: null}),
+        reload: async () => {},
+        toJSON: () => ({}),
+       } as FirebaseUser;
     } else {
-      // If no specific role found or invalid input, perhaps clear auth or default carefully
-      // For now, let's clear it to avoid assuming a default role on failed "login by email"
       setMockUserRole(null);
       return { message: "Mock login: Unknown credentials or role. Please select a role directly." };
     }
 
     if(loggedInUser) return loggedInUser;
-    // This path should ideally not be reached if roleToSet leads to a valid profile.
     return { message: "Mock login: Failed to establish user session." };
   };
 

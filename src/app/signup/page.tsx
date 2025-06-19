@@ -2,34 +2,123 @@
 'use client';
 
 import Link from 'next/link';
+import { useState, type FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Info } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useAuth } from '@/hooks/use-auth';
+import { useToast } from '@/hooks/use-toast';
+import type { SignUpFormData } from '@/types';
+import { UserPlus, Loader2, LogIn } from 'lucide-react';
 
 export default function SignUpPage() {
+  const router = useRouter();
+  const { signUp } = useAuth();
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState<SignUpFormData>({
+    name: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+  });
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({ ...formData, [e.target.id]: e.target.value });
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (formData.password !== formData.confirmPassword) {
+      toast({
+        title: 'Password Mismatch',
+        description: 'Passwords do not match.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!formData.email || !formData.password) {
+      toast({
+        title: 'Missing Fields',
+        description: 'Email and Password are required.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const result = await signUp(formData);
+      // Check if 'code' exists, indicating an AuthError from Firebase
+      if ('code' in result) {
+        toast({
+          title: 'Sign Up Failed',
+          description: result.message || 'An unknown error occurred.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Sign Up Successful!',
+          description: 'You have been successfully signed up. Redirecting to dashboard...',
+        });
+        router.push('/dashboard');
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Sign Up Error',
+        description: error.message || 'An unexpected error occurred during sign up.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center animate-fade-in-up">
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="text-center">
-          <Info className="mx-auto h-12 w-12 text-primary mb-4" />
-          <CardTitle className="text-3xl font-headline text-primary">Sign Up Mock Mode</CardTitle>
+          <UserPlus className="mx-auto h-12 w-12 text-primary mb-4" />
+          <CardTitle className="text-3xl font-headline text-primary">Create an Account</CardTitle>
           <CardDescription>
-            User sign-up is currently in a temporary mock mode for development. 
-            New accounts are not being created in Firebase.
+            Join EventFlow to explore and manage events.
           </CardDescription>
         </CardHeader>
-        <CardContent className="text-center">
-          <p className="text-muted-foreground mb-6">
-            To test different user roles, please use the "Mock Login" page.
-          </p>
-          <Button asChild className="w-full bg-primary hover:bg-primary/90">
-            <Link href="/login">Go to Mock Login</Link>
-          </Button>
-        </CardContent>
-        <CardFooter className="flex justify-center">
+        <form onSubmit={handleSubmit}>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="name">Display Name (Optional)</Label>
+              <Input id="name" type="text" placeholder="Your Name" value={formData.name} onChange={handleChange} disabled={isLoading} />
+            </div>
+            <div>
+              <Label htmlFor="email">Email Address</Label>
+              <Input id="email" type="email" placeholder="you@example.com" value={formData.email} onChange={handleChange} required disabled={isLoading} />
+            </div>
+            <div>
+              <Label htmlFor="password">Password</Label>
+              <Input id="password" type="password" placeholder="••••••••" value={formData.password} onChange={handleChange} required disabled={isLoading} />
+            </div>
+            <div>
+              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Input id="confirmPassword" type="password" placeholder="••••••••" value={formData.confirmPassword} onChange={handleChange} required disabled={isLoading} />
+            </div>
+            <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isLoading}>
+              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
+              Sign Up
+            </Button>
+          </CardContent>
+        </form>
+        <CardFooter className="flex flex-col items-center space-y-2">
           <p className="text-sm text-muted-foreground">
-            Original sign-up functionality will be restored later.
+            Already have an account or want to use mock roles?
           </p>
+          <Button variant="outline" asChild className="w-full">
+            <Link href="/login">
+              <LogIn className="mr-2 h-4 w-4" /> Go to Mock Login
+            </Link>
+          </Button>
         </CardFooter>
       </Card>
     </div>

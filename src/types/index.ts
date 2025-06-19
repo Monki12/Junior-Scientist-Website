@@ -95,7 +95,7 @@ export interface SubEvent {
   organizers?: string[];
   event_representatives?: string[];
   registeredParticipantCount?: number;
-  isFeatured?: boolean; // Added for homepage featured events
+  isFeatured?: boolean;
 }
 
 export interface SignUpFormData {
