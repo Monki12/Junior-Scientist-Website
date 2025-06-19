@@ -6,11 +6,12 @@ import { useParams, notFound, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { subEventsData } from '@/data/subEvents';
-import type { SubEvent } from '@/types';
+import type { SubEvent, EventRegistration, EventTeam, UserProfileData } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,24 +21,32 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, CalendarDays, ExternalLink, Info, Image as ImageIcon, CheckCircle, Loader2, UserCheck, Users } from 'lucide-react';
+import { ArrowLeft, CalendarDays, ExternalLink, Info, Image as ImageIcon, CheckCircle, Loader2, UserCheck, Users, UserPlus, PlusCircle, AlertTriangle, Ticket } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
+import { db } from '@/lib/firebase';
+import { collection, addDoc, query, where, getDocs, serverTimestamp, doc, setDoc, getDoc } from 'firebase/firestore';
 
 export default function SubEventDetailPage() {
   const params = useParams();
   const { subEventSlug } = params;
   const [event, setEvent] = useState<SubEvent | null>(null);
-  const { authUser, userProfile, setUserProfile, loading: authLoading } = useAuth();
+  const { authUser, userProfile, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
 
   const [isRegistered, setIsRegistered] = useState(false);
+  const [registrationDetails, setRegistrationDetails] = useState<EventRegistration | null>(null);
   const [isRegistering, setIsRegistering] = useState(false);
+  
+  const [isTeamFormOpen, setIsTeamFormOpen] = useState(false);
   const [teamName, setTeamName] = useState('');
-  const [isTeamNameDialogOpen, setIsTeamNameDialogOpen] = useState(false);
+  // For simplicity, team members might be added later or by searching UIDs if this were a full app
+  // const [teamMemberEmails, setTeamMemberEmails] = useState<string[]>(['']); 
+
 
   useEffect(() => {
     if (subEventSlug) {
@@ -51,55 +60,134 @@ export default function SubEventDetailPage() {
   }, [subEventSlug]);
 
   useEffect(() => {
-    if (event && userProfile && (userProfile.role === 'student' || userProfile.role === 'test')) {
-      setIsRegistered(userProfile.registeredEvents?.some(re => re.eventSlug === event.slug) || false);
-    }
-  }, [userProfile, event]);
+    const checkRegistration = async () => {
+      if (event && authUser) {
+        try {
+          const registrationsRef = collection(db, 'event_registrations');
+          const q = query(registrationsRef, where('userId', '==', authUser.uid), where('eventId', '==', event.id));
+          const querySnapshot = await getDocs(q);
+          if (!querySnapshot.empty) {
+            setIsRegistered(true);
+            const regData = querySnapshot.docs[0].data() as EventRegistration;
+            regData.id = querySnapshot.docs[0].id;
+            setRegistrationDetails(regData);
+          } else {
+            setIsRegistered(false);
+            setRegistrationDetails(null);
+          }
+        } catch (error) {
+          console.error("Error checking registration status:", error);
+          toast({ title: "Error", description: "Could not check registration status.", variant: "destructive" });
+        }
+      }
+    };
+    checkRegistration();
+  }, [authUser, event, toast]);
 
-  const openTeamNameDialog = () => {
-    if (!userProfile || !event) return;
-     if (userProfile.role !== 'student' && userProfile.role !== 'test') {
-        toast({
-            title: "Registration Failed",
-            description: "Only students can register for events.",
-            variant: "destructive",
-        });
-        return;
+
+  const handleIndividualRegistration = async () => {
+    if (!authUser || !event || !userProfile) {
+      toast({ title: "Error", description: "User or event data missing.", variant: "destructive"});
+      return;
     }
-    setIsTeamNameDialogOpen(true);
+    setIsRegistering(true);
+    try {
+      const newRegistration: EventRegistration = {
+        userId: authUser.uid,
+        eventId: event.id,
+        registeredAt: serverTimestamp(),
+        registrationStatus: 'pending',
+        isTeamRegistration: false,
+        teamId: null,
+        admitCardUrl: null,
+        presentee: false,
+        submittedDocuments: null,
+        lastUpdatedAt: serverTimestamp(),
+      };
+      const docRef = await addDoc(collection(db, 'event_registrations'), newRegistration);
+      setIsRegistered(true);
+      setRegistrationDetails({ ...newRegistration, id: docRef.id, registeredAt: new Date().toISOString(), lastUpdatedAt: new Date().toISOString() }); // Simulate timestamp
+      toast({ title: "Registration Submitted!", description: `You've successfully submitted your registration for ${event.title}.` });
+    } catch (error: any) {
+      console.error("Error during individual registration:", error);
+      toast({ title: "Registration Failed", description: error.message || "Could not submit registration.", variant: "destructive" });
+    } finally {
+      setIsRegistering(false);
+    }
   };
 
-  const handleActualRegister = async (currentTeamName?: string) => {
-    if (!userProfile || !event || !setUserProfile) return;
+  const handleCreateTeamAndRegister = async () => {
+    if (!authUser || !event || !teamName.trim() || !userProfile) {
+      toast({ title: "Error", description: "Team name is required and user/event data must be present.", variant: "destructive"});
+      return;
+    }
+    if (!event.isTeamBased) {
+      toast({title: "Error", description: "This is not a team-based event.", variant: "destructive"});
+      return;
+    }
+
     setIsRegistering(true);
-    
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+    let teamDocId = '';
 
-    setUserProfile(prevProfile => {
-      if (!prevProfile) return null;
-      const newRegisteredEvent = { eventSlug: event.slug, teamName: currentTeamName || undefined };
-      const updatedRegisteredEvents = [...(prevProfile.registeredEvents || []), newRegisteredEvent];
-      // Ensure no duplicate event slugs, preferring the latest registration if somehow duplicated (though UI should prevent this)
-      const uniqueRegisteredEvents = Array.from(new Map(updatedRegisteredEvents.map(item => [item.eventSlug, item])).values());
-      return { ...prevProfile, registeredEvents: uniqueRegisteredEvents };
-    });
+    try {
+      // Step 1: Create the team document
+      const newTeam: EventTeam = {
+        eventId: event.id,
+        teamName: teamName.trim(),
+        teamLeaderId: authUser.uid,
+        memberUids: [authUser.uid], // Initially, only the leader
+        teamSize: 1, // Initially 1
+        status: 'pending',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+      const teamDocRef = await addDoc(collection(db, 'event_teams'), newTeam);
+      teamDocId = teamDocRef.id;
+      console.log("Team created with ID:", teamDocId);
 
-    setIsRegistered(true);
-    setIsRegistering(false);
-    setIsTeamNameDialogOpen(false);
-    setTeamName(''); 
-    toast({
-      title: "Registration Successful!",
-      description: `You have successfully registered for ${event.title}${currentTeamName ? ` with team '${currentTeamName}'` : ''}.`,
-    });
+      // Step 2: Register the team leader for the event with this team
+      const newRegistration: EventRegistration = {
+        userId: authUser.uid,
+        eventId: event.id,
+        registeredAt: serverTimestamp(),
+        registrationStatus: 'pending',
+        isTeamRegistration: true,
+        teamId: teamDocId,
+        admitCardUrl: null,
+        presentee: false,
+        submittedDocuments: null,
+        lastUpdatedAt: serverTimestamp(),
+      };
+      const regDocRef = await addDoc(collection(db, 'event_registrations'), newRegistration);
+      
+      setIsRegistered(true);
+      setRegistrationDetails({ ...newRegistration, id: regDocRef.id, registeredAt: new Date().toISOString(), lastUpdatedAt: new Date().toISOString() });
+      toast({ title: "Team Created & Registered!", description: `Team "${teamName}" created and you're registered for ${event.title}.` });
+      setIsTeamFormOpen(false);
+      setTeamName('');
+
+    } catch (error: any) {
+      console.error("Error during team registration:", error);
+      toast({ title: "Team Registration Failed", description: error.message || "Could not create team or register.", variant: "destructive" });
+      // Potential rollback logic here is complex for client-side. If team created but registration failed.
+    } finally {
+      setIsRegistering(false);
+    }
   };
   
   const handleRegistrationAttempt = () => {
-    if (!event) return;
-    if (event.isTeamEvent) {
-      openTeamNameDialog();
+    if (!authUser) {
+      router.push(`/login?redirect=/events/${event?.slug}`);
+      return;
+    }
+    if (!userProfile || (userProfile.role !== 'student' && userProfile.role !== 'test')) {
+      toast({ title: "Registration Denied", description: "Only students can register for events.", variant: "destructive" });
+      return;
+    }
+    if (event?.isTeamBased) {
+      setIsTeamFormOpen(true);
     } else {
-      handleActualRegister();
+      handleIndividualRegistration();
     }
   };
 
@@ -107,9 +195,6 @@ export default function SubEventDetailPage() {
   if (authLoading || !event) {
     return <div className="flex justify-center items-center min-h-[calc(100vh-10rem)] text-xl text-muted-foreground"><Loader2 className="h-8 w-8 animate-spin mr-2" />Loading event details...</div>;
   }
-
-  const currentRegistrationDetails = userProfile?.registeredEvents?.find(re => re.eventSlug === event.slug);
-
 
   return (
     <div className="max-w-5xl mx-auto py-8 px-4 animate-fade-in-up">
@@ -124,7 +209,7 @@ export default function SubEventDetailPage() {
           <h1 className="text-4xl md:text-5xl font-bold text-primary mb-3">{event.title}</h1>
           <div className="space-x-2">
             <Badge variant="secondary" className="text-md bg-primary/10 text-primary">{event.superpowerCategory}</Badge>
-            {event.isTeamEvent && <Badge variant="outline" className="text-md bg-accent/10 text-accent border-accent"><Users className="mr-1 h-4 w-4"/>Team Event</Badge>}
+            {event.isTeamBased && <Badge variant="outline" className="text-md bg-accent/10 text-accent border-accent"><Users className="mr-1 h-4 w-4"/>Team Event</Badge>}
           </div>
         </header>
 
@@ -150,34 +235,13 @@ export default function SubEventDetailPage() {
           </CardHeader>
           <CardContent className="prose prose-invert dark:prose-invert max-w-none text-foreground/90 text-lg leading-relaxed">
             <p>{event.detailedDescription}</p>
+            {event.isTeamBased && (
+              <p className="mt-2 text-sm text-accent">
+                This is a team event. Min members: {event.minTeamMembers || 'N/A'}, Max members: {event.maxTeamMembers || 'N/A'}.
+              </p>
+            )}
           </CardContent>
         </Card>
-
-        {event.galleryImages && event.galleryImages.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center text-2xl text-accent">
-                <ImageIcon className="mr-2 h-6 w-6" />
-                Gallery
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {event.galleryImages.map((img, index) => (
-                  <div key={index} className="relative aspect-video rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-shadow">
-                    <Image 
-                      src={img.src} 
-                      alt={img.alt} 
-                      fill
-                      style={{ objectFit: 'cover' }}
-                      data-ai-hint={img.dataAiHint} 
-                    />
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         <Card className="bg-accent/10 border-accent">
           <CardHeader>
@@ -194,18 +258,22 @@ export default function SubEventDetailPage() {
             {!authUser ? (
               <Button size="lg" asChild className="w-full md:w-auto bg-accent hover:bg-accent/90 text-accent-foreground text-lg py-3 px-6">
                 <Link href={`/login?redirect=/events/${event.slug}`}>
-                  Register Now / Login <ExternalLink className="ml-2 h-5 w-5" />
+                  Login to Register <ExternalLink className="ml-2 h-5 w-5" />
                 </Link>
               </Button>
             ) : (userProfile && (userProfile.role === 'student' || userProfile.role === 'test')) ? (
               isRegistered ? (
                 <div className="text-center py-4">
-                  <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-500" />
-                  <p className="font-semibold text-foreground">You are already registered for this event.</p>
-                  {currentRegistrationDetails?.teamName && (
-                    <p className="text-sm text-muted-foreground">Team: {currentRegistrationDetails.teamName}</p>
+                  <Ticket className="h-8 w-8 mx-auto mb-2 text-green-500" />
+                  <p className="font-semibold text-foreground">You are registered for this event!</p>
+                  {registrationDetails?.isTeamRegistration && registrationDetails.teamId && (
+                    <p className="text-sm text-muted-foreground">Team ID: {registrationDetails.teamId} (Further team details in dashboard)</p>
                   )}
-                  <Button variant="link" asChild className="mt-1 text-primary"><Link href="/dashboard">View in Dashboard</Link></Button>
+                   <Badge variant={registrationDetails?.registrationStatus === 'approved' ? 'default' : 'secondary'} className="mt-1 capitalize">
+                    Status: {registrationDetails?.registrationStatus || 'N/A'}
+                  </Badge>
+                  <br/>
+                  <Button variant="link" asChild className="mt-2 text-primary"><Link href="/dashboard">View in Dashboard</Link></Button>
                 </div>
               ) : (
                 <Button 
@@ -215,7 +283,7 @@ export default function SubEventDetailPage() {
                   className="w-full md:w-auto bg-green-500 hover:bg-green-600 text-white text-lg py-3 px-6"
                 >
                   {isRegistering ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <UserCheck className="mr-2 h-5 w-5" />}
-                  Confirm Registration &amp; Proceed to Mock Payment
+                  Register for Event
                 </Button>
               )
             ) : (
@@ -223,23 +291,24 @@ export default function SubEventDetailPage() {
             )}
             
             <CardDescription className="text-sm text-muted-foreground pt-2">
-              Register for: {event.title}. (Mock payment simulation after confirmation)
+              Register for: {event.title}. Your registration status will be updated by organizers.
             </CardDescription>
           </CardContent>
         </Card>
       </article>
 
-      {event?.isTeamEvent && (
-        <AlertDialog open={isTeamNameDialogOpen} onOpenChange={setIsTeamNameDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Enter Team Name (Optional)</AlertDialogTitle>
-              <AlertDialogDescription>
-                You are registering for &quot;{event.title}&quot;. If you are part of a team, please enter your team name below. Otherwise, you can leave it blank.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <div className="py-4">
-              <Label htmlFor="teamNameInput" className="mb-2 block">Team Name</Label>
+      {/* Dialog for Team Creation */}
+      <AlertDialog open={isTeamFormOpen} onOpenChange={setIsTeamFormOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Register Team for &quot;{event.title}&quot;</AlertDialogTitle>
+            <AlertDialogDescription>
+              Enter your team name. You will be the team leader. You can invite other members later from your dashboard.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4 space-y-3">
+            <div>
+              <Label htmlFor="teamNameInput" className="mb-2 block">Team Name <span className="text-destructive">*</span></Label>
               <Input 
                 id="teamNameInput"
                 value={teamName}
@@ -248,16 +317,37 @@ export default function SubEventDetailPage() {
                 disabled={isRegistering}
               />
             </div>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={isRegistering}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={() => handleActualRegister(teamName)} disabled={isRegistering}>
-                {isRegistering ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Register
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
+            {/* 
+            <div className="space-y-2">
+                <Label>Invite Team Members (Optional - by Email)</Label>
+                {teamMemberEmails.map((email, index) => (
+                     <Input key={index} type="email" placeholder={`Member ${index + 1} email`} value={email} 
+                            onChange={(e) => {
+                                const newEmails = [...teamMemberEmails];
+                                newEmails[index] = e.target.value;
+                                setTeamMemberEmails(newEmails);
+                            }} 
+                            disabled={isRegistering} 
+                     />
+                ))}
+                <Button variant="outline" size="sm" onClick={() => setTeamMemberEmails([...teamMemberEmails, ''])} disabled={isRegistering || teamMemberEmails.length >= (event.maxTeamMembers || 5) -1}>
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Member Slot
+                </Button>
+                 <p className="text-xs text-muted-foreground">Max {event.maxTeamMembers || 'N/A'} members including yourself.</p>
+            </div>
+             */}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isRegistering}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCreateTeamAndRegister} disabled={isRegistering || !teamName.trim()}>
+              {isRegistering ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Create Team & Register
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
+
+    

@@ -11,7 +11,9 @@ export type UserRole =
 
 export type TaskPriority = 'High' | 'Medium' | 'Low';
 export type TaskStatus = 'Not Started' | 'In Progress' | 'Pending Review' | 'Completed';
-export type EventStatus = 'Planning' | 'Active' | 'Completed' | 'Cancelled';
+export type EventStatus = 'Planning' | 'Active' | 'Completed' | 'Cancelled' | 'open' | 'closed'; // Added open/closed for event.status
+export type RegistrationStatus = 'pending' | 'approved' | 'declined' | 'cancelled';
+export type TeamStatus = 'pending' | 'approved' | 'disqualified';
 
 
 export interface Task {
@@ -21,24 +23,25 @@ export interface Task {
   assignedTo?: string[];
   assignedByName?: string;
   assignedByUid?: string;
-  eventSlug?: string;
-  dueDate?: string;
+  eventSlug?: string; // Links to SubEvent slug
+  eventId?: string; // Could also link to SubEvent id if preferred
+  dueDate?: string; // ISO Date string
   priority: TaskPriority;
   status: TaskStatus;
   points?: number;
   attachments?: { name: string, url: string }[];
   subtasks?: { text: string, completed: boolean }[];
-  createdBy?: string;
-  createdAt: string;
-  updatedAt: string;
+  createdBy?: string; // UID of creator
+  createdAt: string; // ISO Date string
+  updatedAt: string; // ISO Date string
   customTaskData?: Record<string, any>;
 }
 
-export interface RegisteredEventInfo {
+export interface RegisteredEventInfo { // Primarily for UserProfileData if still used for simple list
   eventSlug: string;
   teamName?: string;
   teamMembers?: { id: string, name: string, role?: string }[];
-  admitCardStatus?: 'published' | 'pending' | 'unavailable';
+  admitCardStatus?: 'published' | 'pending' | 'unavailable'; // This could be derived from EventRegistration
   eventDate?: string;
   registrationDate?: string;
   paymentStatus?: 'paid' | 'pending' | 'waived' | 'failed';
@@ -47,46 +50,28 @@ export interface RegisteredEventInfo {
 export interface UserProfileData {
   uid: string;
   email: string | null;
-  displayName: string | null; 
+  fullName?: string; // Made optional as per rules for create (must be string if present)
+  schoolName?: string; // Made optional
+  schoolId?: string | null;
+  schoolVerifiedByOrganizer?: boolean;
+  standard?: string; // Made optional
+  division?: string | null;
   role: UserRole;
   photoURL?: string | null;
-  // Student specific fields
-  fullName?: string;
-  schoolName?: string;
-  schoolId?: string | null; // Can be null if school is not from master list
-  schoolVerifiedByOrganizer?: boolean; 
-  standard?: string; 
-  division?: string | null; // Can be null
-  // Organizational fields
   department?: string;
-  assignedEventSlug?: string;
-  assignedEventSlugs?: string[];
-  // Common fields
+  assignedEventSlug?: string; // For single event rep
+  assignedEventSlugs?: string[]; // For organizer of multiple events
   phoneNumbers?: string[];
-  registeredEvents?: RegisteredEventInfo[];
+  registeredEvents?: RegisteredEventInfo[]; // This might be deprecated in favor of querying event_registrations
   tasks?: Task[];
   points?: number;
   credibilityScore?: number;
-  allPlatformParticipants?: EventParticipant[];
-  createdAt?: string;
-  updatedAt?: string;
+  allPlatformParticipants?: EventParticipant[]; // For overall_head
+  createdAt?: string | Date; // Allow Date for initial client-side, convert to string/Timestamp for Firestore
+  updatedAt?: string | Date;
 }
 
-export interface Event { // This is an older type, SubEvent is primarily used now
-  id: string;
-  title: string;
-  description: string;
-  date: string;
-  time?: string;
-  location: string;
-  organizerId: string;
-  imageUrl?: string;
-  capacity?: number;
-  category?: string;
-  dataAiHint?: string;
-}
-
-export interface SubEvent {
+export interface SubEvent { // This is the primary Event type used
   id: string;
   slug: string;
   title: string;
@@ -95,15 +80,21 @@ export interface SubEvent {
   detailedDescription: string;
   mainImage: { src: string; alt: string; dataAiHint: string };
   galleryImages?: Array<{ src: string; alt: string; dataAiHint: string }>;
-  registrationLink: string;
-  deadline?: string;
-  isTeamEvent?: boolean;
-  eventDate?: string;
-  status?: EventStatus;
+  registrationLink: string; // May become obsolete if internal registration is built
+  deadline?: string; // ISO Date string
+  eventDate?: string; // ISO Date string
+  
+  // New fields based on normalization requirements
+  isTeamBased?: boolean;
+  minTeamMembers?: number;
+  maxTeamMembers?: number;
+  organizerUids?: string[]; // Array of UIDs of organizers
+  status?: EventStatus; // e.g., 'open', 'closed', 'cancelled', 'Planning', 'Active', 'Completed'
+
   venue?: string;
-  organizers?: string[];
-  event_representatives?: string[];
-  registeredParticipantCount?: number;
+  // organizers?: string[]; // old field, replaced by organizerUids
+  // event_representatives?: string[]; // old field, could be part of organizerUids with specific role elsewhere or a separate link
+  registeredParticipantCount?: number; // This would be a derived count
   isFeatured?: boolean;
 }
 
@@ -113,8 +104,9 @@ export interface SignUpFormData {
   password: string;
   confirmPassword?: string;
   schoolName: string;
-  standard: string; // e.g., "4", "10", "12"
-  division?: string | null; // Made explicitly nullable
+  standard: string;
+  division?: string | null;
+  // schoolId and schoolVerifiedByOrganizer are derived, not directly from form
 }
 
 export interface LoginFormData {
@@ -139,14 +131,7 @@ export interface CustomColumnDefinition {
   description?: string;
 }
 
-export interface CustomTaskColumnDefinition {
-  id: string;
-  name: string;
-  dataType: 'text' | 'number' | 'checkbox' | 'dropdown' | 'date';
-  options?: string[];
-  defaultValue?: any;
-  description?: string;
-}
+export interface CustomTaskColumnDefinition extends CustomColumnDefinition {}
 
 
 export type ParticipantCustomData = Record<string, any> & {
@@ -158,13 +143,13 @@ export type ParticipantCustomData = Record<string, any> & {
 };
 
 
-export interface EventParticipant {
-  id: string;
+export interface EventParticipant { // Generic participant data, often for overall views
+  id: string; // user UID
   name: string;
   email: string;
   contactNumber?: string;
   schoolName?: string;
-  registrationDate: string;
+  registrationDate: string; // ISO Date string
   paymentStatus: 'paid' | 'pending' | 'waived' | 'failed';
   customData?: ParticipantCustomData;
   registeredEventSlugs?: string[];
@@ -178,13 +163,7 @@ export interface ActiveDynamicFilter {
   isCustom: boolean;
 }
 
-export interface ActiveTaskFilter {
-  id: string;
-  columnId: string; 
-  columnName: string;
-  value: string;
-  isCustom?: boolean;
-}
+export interface ActiveTaskFilter extends ActiveDynamicFilter {}
 
 export interface SchoolData {
   id: string;
@@ -192,8 +171,36 @@ export interface SchoolData {
   city?: string;
   state?: string;
   country?: string;
-  isVerified: boolean; 
-  addedBy?: string; 
-  createdAt?: string;
+  isVerified: boolean;
+  addedBy?: string; // UID of admin/organizer
+  createdAt?: string; // ISO Date string
 }
 
+// New normalized collection interfaces
+export interface EventRegistration {
+  id?: string; // Firestore document ID (auto-generated or [userId]_[eventId])
+  userId: string; // UID of the student
+  eventId: string; // ID of the event (maps to SubEvent.id or a dedicated events collection ID)
+  registeredAt: any; // Firestore Timestamp or string/Date for client
+  registrationStatus: RegistrationStatus; // e.g., 'pending', 'approved', 'declined', 'cancelled'
+  isTeamRegistration: boolean;
+  teamId?: string | null; // Reference to event_teams document ID
+  admitCardUrl?: string | null;
+  presentee?: boolean; // Default false, marked by organizer
+  submittedDocuments?: string[] | null; // URLs to documents in Storage
+  lastUpdatedAt: any; // Firestore Timestamp or string/Date for client
+}
+
+export interface EventTeam {
+  id?: string; // Firestore document ID (auto-generated)
+  eventId: string;
+  teamName: string;
+  teamLeaderId: string; // UID of the team leader
+  memberUids: string[]; // Array of UIDs of all team members
+  teamSize: number;
+  status: TeamStatus; // e.g., 'pending', 'approved', 'disqualified'
+  createdAt: any; // Firestore Timestamp or string/Date for client
+  updatedAt: any; // Firestore Timestamp or string/Date for client
+}
+
+    

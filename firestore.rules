@@ -1,0 +1,202 @@
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to get a user's role
+    function getRole(uid) {
+      // Allow reading own document to get role.
+      // Ensure this path is correct and user can read their own document.
+      return get(/databases/$(database)/documents/users/$(uid)).data.role;
+    }
+
+    // Helper function to check if a user is an organizer (or higher admin)
+    function isOrganizer(uid) {
+      let role = getRole(uid);
+      return role == 'organizer' || role == 'admin' || role == 'overall_head' || role == 'event_representative';
+    }
+
+    // Helper function to check if a user is a specific organizer for an event
+    // This assumes event data is in /events/{eventId} and contains an organizerUids array.
+    // If using subEventsData.ts as source of truth, this check might need to be different or handled client-side before write.
+    // For rules, we assume an /events/{eventId} collection.
+    function isEventOrganizer(uid, eventId) {
+      let eventDoc = get(/databases/$(database)/documents/events/$(eventId)).data;
+      // Check if organizerUids exists and is a list, then check if uid is in it.
+      return isOrganizer(uid) && 
+             (eventDoc.organizerUids is list && uid in eventDoc.organizerUids);
+    }
+
+    // --- Users Collection Rules ---
+    match /users/{userId} {
+      // Students can only CREATE their OWN profile (document ID must be their UID)
+      // And MUST include all mandatory fields with correct types, matching the 10 fields.
+      allow create: if request.auth != null &&
+                       request.auth.uid == userId &&
+                       request.resource.data.role == 'student' &&
+                       request.resource.data.fullName is string &&
+                       request.resource.data.email is string &&
+                       request.resource.data.schoolName is string &&
+                       request.resource.data.standard is string &&
+                       request.resource.data.standard.matches('^(4|5|6|7|8|9|10|11|12)$') &&
+                       (request.resource.data.division == null || request.resource.data.division is string) &&
+                       (request.resource.data.schoolId == null || request.resource.data.schoolId is string) && 
+                       (request.resource.data.schoolVerifiedByOrganizer is bool) && 
+                       request.resource.data.createdAt is timestamp &&
+                       request.resource.data.updatedAt is timestamp &&
+                       request.resource.data.size() == 10; // Ensure exactly 10 fields
+
+      // Students can read their own profile
+      // Organizers/Admins can read ANY user profile
+      allow read: if request.auth != null && (
+                    request.auth.uid == userId || 
+                    isOrganizer(request.auth.uid)
+                  );
+
+      // Students can only UPDATE specific fields on their own profile
+      allow update: if request.auth != null && request.auth.uid == userId && (
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'fullName', 'schoolName', 'standard', 'division', 'updatedAt', 'photoURL', 'phoneNumbers' 
+            // Students might update these. 'updatedAt' must be serverTimestamp or validated.
+            // Ensure request.resource.data.updatedAt == request.time for server timestamp updates.
+        ]) && request.resource.data.updatedAt == request.time // Enforce server timestamp for student updates
+      );
+      // Organizers/Admins can update specific fields for ANY user (e.g., for verification)
+      // Overall heads/Admins can also update 'role'
+      allow update: if request.auth != null && isOrganizer(request.auth.uid) && (
+        request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'schoolId', 'schoolName', 'schoolVerifiedByOrganizer', 'updatedAt', 'role', 
+            'department', 'assignedEventSlug', 'assignedEventSlugs', 'points', 'credibilityScore'
+        ]) && request.resource.data.updatedAt == request.time // Enforce server timestamp
+        // Add specific check if only admin/overall_head can change 'role'
+        && (request.resource.data.role == resource.data.role || (getRole(request.auth.uid) == 'admin' || getRole(request.auth.uid) == 'overall_head'))
+      );
+    }
+
+    // --- Events Collection Rules (Assuming you have this collection for event data) ---
+    // If subEventsData.ts is the source, these rules are for a potential future Firestore 'events' collection.
+    match /events/{eventId} {
+      // All authenticated users can read event details
+      allow read: if request.auth != null;
+      // Only Organizers/Admins/OverallHeads can create, update, or delete events
+      allow create, update, delete: if request.auth != null && (getRole(request.auth.uid) == 'organizer' || getRole(request.auth.uid) == 'admin' || getRole(request.auth.uid) == 'overall_head');
+    }
+
+    // --- Event Registrations Collection Rules ---
+    match /event_registrations/{registrationId} {
+      // Students can CREATE their own registration
+      allow create: if request.auth != null &&
+                       request.auth.uid == request.resource.data.userId && // Registration must be for themselves
+                       request.resource.data.userId is string &&
+                       request.resource.data.eventId is string &&
+                       request.resource.data.registeredAt == request.time && // Use server timestamp
+                       request.resource.data.registrationStatus == 'pending' && // Initial status
+                       request.resource.data.isTeamRegistration is bool &&
+                       (request.resource.data.teamId == null || request.resource.data.teamId is string) &&
+                       request.resource.data.admitCardUrl == null && // Should be null initially
+                       request.resource.data.presentee == false && // Must start as false
+                       request.resource.data.submittedDocuments == null && // Should be null or empty list initially
+                       request.resource.data.lastUpdatedAt == request.time && // Use server timestamp
+                       // Ensure all expected fields are present for create, matching EventRegistration type
+                       request.resource.data.size() == 10; // Count based on your EventRegistration type
+
+      // Students can read their own registrations
+      // Organizers/Admins can read registrations for events they manage or all events
+      allow read: if request.auth != null && (
+                    request.auth.uid == resource.data.userId ||
+                    isOrganizer(request.auth.uid) // Simplified: any organizer can read any registration
+                    // More granular: isEventOrganizer(request.auth.uid, resource.data.eventId)
+                  );
+
+      allow update: if request.auth != null && (
+        // Students can update their own registration to 'cancelled'
+        (request.auth.uid == resource.data.userId &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['registrationStatus', 'lastUpdatedAt']) &&
+         request.resource.data.registrationStatus == 'cancelled' &&
+         request.resource.data.lastUpdatedAt == request.time)
+        ||
+        // Organizers for the specific event (or general organizers/admins) can update certain fields
+        (isOrganizer(request.auth.uid) && // Simplified to any organizer for now
+         request.resource.data.diff(resource.data).affectedKeys().hasAny([
+           'admitCardUrl', 'presentee', 'registrationStatus', 'submittedDocuments', 'lastUpdatedAt'
+         ]) &&
+         request.resource.data.lastUpdatedAt == request.time &&
+         (request.resource.data.presentee is bool || request.resource.data.presentee == null) &&
+         (request.resource.data.registrationStatus in ['approved', 'declined', 'pending', 'cancelled'])
+        )
+      );
+
+      allow delete: if false; // Typically, soft delete (e.g., status 'cancelled') or admin only
+    }
+
+    // --- Event Teams Collection Rules ---
+    match /event_teams/{teamId} {
+      allow create: if request.auth != null &&
+                       request.auth.uid == request.resource.data.teamLeaderId &&
+                       request.resource.data.eventId is string &&
+                       request.resource.data.teamName is string &&
+                       request.resource.data.teamLeaderId is string &&
+                       request.resource.data.memberUids is list &&
+                       request.resource.data.memberUids.size() >= 1 &&
+                       request.resource.data.memberUids.hasAny([request.auth.uid]) && // Leader must be in members
+                       request.resource.data.teamSize is number &&
+                       request.resource.data.status == 'pending' &&
+                       request.resource.data.createdAt == request.time &&
+                       request.resource.data.updatedAt == request.time &&
+                       request.resource.data.size() == 8; // Count fields for EventTeam
+
+      allow read: if request.auth != null && (
+        (resource.data.memberUids is list && request.auth.uid in resource.data.memberUids) || // If user is a member
+        isOrganizer(request.auth.uid) // Organizers can read any team
+        // More granular: isEventOrganizer(request.auth.uid, resource.data.eventId)
+      );
+
+      allow update: if request.auth != null && (
+        // Team Leader can update team name, members, teamSize
+        (request.auth.uid == resource.data.teamLeaderId &&
+         request.resource.data.diff(resource.data).affectedKeys().hasAny(['teamName', 'memberUids', 'teamSize', 'updatedAt']) &&
+         request.resource.data.memberUids is list &&
+         (request.resource.data.memberUids.size() == 0 || request.auth.uid in request.resource.data.memberUids) && // Leader must remain or team empty
+         request.resource.data.updatedAt == request.time
+        ) ||
+        // Organizers can update team status
+        (isOrganizer(request.auth.uid) && // Simplified to any organizer
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']) &&
+         request.resource.data.status in ['approved', 'disqualified', 'pending'] &&
+         request.resource.data.updatedAt == request.time
+        )
+      );
+
+      allow delete: if false;
+    }
+
+    // --- Schools Collection Rules ---
+    match /schools/{schoolId} {
+        allow read: if request.auth != null;
+        allow create, update, delete: if request.auth != null && 
+                                         (getRole(request.auth.uid) == 'overall_head' || 
+                                          getRole(request.auth.uid) == 'admin' || 
+                                          getRole(request.auth.uid) == 'organizer');
+    }
+
+    // --- Tasks Collection Rules (Example, adapt as needed) ---
+    match /tasks/{taskId} {
+        // Define who can read tasks (e.g., assigned user, creator, organizers)
+        allow read: if request.auth != null && 
+                       (resource.data.assignedTo.hasAny([request.auth.uid]) || 
+                        resource.data.createdBy == request.auth.uid || 
+                        isOrganizer(request.auth.uid));
+        // Define who can create tasks (e.g., organizers)
+        allow create: if request.auth != null && isOrganizer(request.auth.uid);
+        // Define who can update tasks (e.g., assigned user for status, organizers for more)
+        allow update: if request.auth != null && 
+                         ( (request.auth.uid in resource.data.assignedTo && 
+                            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
+                           isOrganizer(request.auth.uid) ); // Organizers can update more fields
+        allow delete: if request.auth != null && isOrganizer(request.auth.uid);
+    }
+
+  }
+}
+
+    

@@ -7,7 +7,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/hooks/use-auth';
 import { subEventsData } from '@/data/subEvents';
-import type { UserRole, SubEvent, Task, RegisteredEventInfo, UserProfileData, EventParticipant, CustomColumnDefinition, ActiveDynamicFilter, ParticipantCustomData, EventStatus } from '@/types';
+import type { UserRole, SubEvent, Task, RegisteredEventInfo, UserProfileData, EventParticipant, CustomColumnDefinition, ActiveDynamicFilter, ParticipantCustomData, EventStatus, EventRegistration, EventTeam } from '@/types'; // Added EventRegistration, EventTeam
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -23,6 +23,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Calendar } from '@/components/ui/calendar';
+import { db } from '@/lib/firebase'; // Import db
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore'; // Firestore imports
+
 
 import { format, isToday, isPast, isThisWeek, startOfDay, parseISO, isValid } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -30,11 +33,15 @@ import {
   Loader2, BarChartBig, Edit, Users, FileScan, Settings, BookUser, ListChecks, CalendarDays, UserCircle, Bell, GraduationCap, School, Download, Info, Briefcase, Newspaper, Award, Star, CheckCircle, ClipboardList, TrendingUp, Building, Activity, ShieldCheck, ExternalLink, Home, Search, CalendarCheck, Ticket, Users2, Phone, Mail, Milestone, MapPin, Clock, UsersRound, CheckSquare, BarChartHorizontalBig, Rss, AlertTriangle, Filter as FilterIcon, PlusCircle, GanttChartSquare, Rows, Tag, XIcon, Pencil, Trash2, CalendarRange, LayoutDashboard, CalendarIcon
 } from 'lucide-react';
 
-interface RegisteredEventDisplay extends SubEvent {
+interface StudentRegisteredEventDisplay extends SubEvent { // SubEvent has most details
+  registrationId: string;
   teamName?: string;
-  teamMembers?: { id: string, name: string, role?: string }[];
-  admitCardStatus?: 'published' | 'pending' | 'unavailable';
+  teamId?: string;
+  teamMembers?: { id: string, name: string, role?: string }[]; // For display
+  admitCardUrl?: string | null;
+  registrationStatus?: EventRegistration['registrationStatus'];
 }
+
 
 const defaultEventFormState: Omit<SubEvent, 'id' | 'slug' | 'mainImage'> & { mainImageSrc: string; mainImageAlt: string; mainImageAiHint: string; event_representatives_str: string; organizers_str: string } = {
   title: '',
@@ -47,25 +54,23 @@ const defaultEventFormState: Omit<SubEvent, 'id' | 'slug' | 'mainImage'> & { mai
   registrationLink: '',
   deadline: undefined,
   eventDate: undefined,
-  isTeamEvent: false,
+  isTeamBased: false,
   status: 'Planning',
   venue: '',
-  organizers: [],
-  event_representatives: [],
+  organizerUids: [], // Changed from organizers
+  // event_representatives: [], // This might be part of organizerUids or a separate role management
   registeredParticipantCount: 0,
-  event_representatives_str: '',
-  organizers_str: '',
+  event_representatives_str: '', // For form input
+  organizers_str: '', // For form input (organizerUids)
 };
 
 
-// Helper function to determine badge variant for task priority
 const getPriorityBadgeVariant = (priority: Task['priority']): "destructive" | "secondary" | "outline" => {
   if (priority === 'High') return 'destructive';
   if (priority === 'Medium') return 'secondary';
   return 'outline';
 };
 
-// Helper function to determine badge variant for task status
 const getStatusBadgeVariant = (status: Task['status']): { variant: "default" | "secondary" | "outline" | "destructive", colorClass: string } => {
   switch (status) {
     case 'Completed': return { variant: 'default', colorClass: 'bg-green-500/10 border-green-500/30 text-green-700 dark:bg-green-700/20 dark:text-green-300' };
@@ -78,28 +83,23 @@ const getStatusBadgeVariant = (status: Task['status']): { variant: "default" | "
 
 const getEventStatusBadgeVariant = (status: EventStatus | undefined): "default" | "secondary" | "outline" | "destructive" => {
     switch (status) {
-        case 'Active': return 'default'; 
+        case 'Active': case 'open': return 'default'; 
         case 'Planning': return 'secondary';
         case 'Completed': return 'outline'; 
-        case 'Cancelled': return 'destructive';
+        case 'Cancelled': case 'closed': return 'destructive';
         default: return 'outline';
     }
 };
 
-export default function DashboardPage({
-  params: pageParams, // Renamed to avoid conflict with useParams hook if used later
-  searchParams: pageSearchParams, // Renamed
-}: {
-  params: { [key: string]: string | string[] | undefined };
-  searchParams: { [key: string]: string | string[] | undefined };
-}) {
+export default function DashboardPage() {
   const { authUser, userProfile, setUserProfile, loading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   
   const [localUserProfileTasks, setLocalUserProfileTasks] = useState<Task[]>([]);
+  const [studentRegisteredFullEvents, setStudentRegisteredFullEvents] = useState<StudentRegisteredEventDisplay[]>([]);
 
-  // State for Overall Head's Global Participant View
+
   const [globalParticipants, setGlobalParticipants] = useState<EventParticipant[]>([]);
   const [globalSearchTerm, setGlobalSearchTerm] = useState('');
   const [globalSchoolFilter, setGlobalSchoolFilter] = useState('all');
@@ -116,7 +116,6 @@ export default function DashboardPage({
   const [newGlobalFilterColumn, setNewGlobalFilterColumn] = useState<{ id: string, name: string, isCustom: boolean } | null>(null);
   const [newGlobalFilterValue, setNewGlobalFilterValue] = useState('');
 
-  // State for Overall Head's Event Management View
   const [allPlatformEvents, setAllPlatformEvents] = useState<SubEvent[]>(subEventsData); 
   const [eventSearchTerm, setEventSearchTerm] = useState('');
   const [eventStatusFilter, setEventStatusFilter] = useState<EventStatus | 'all'>('all');
@@ -142,11 +141,58 @@ export default function DashboardPage({
       if (userProfile.role === 'overall_head' && userProfile.allPlatformParticipants) {
         setGlobalParticipants(userProfile.allPlatformParticipants);
       }
+
+      // Fetch student's registered events if they are a student
+      if ((userProfile.role === 'student' || userProfile.role === 'test') && authUser) {
+        const fetchStudentRegistrations = async () => {
+          try {
+            const registrationsRef = collection(db, 'event_registrations');
+            const q = query(registrationsRef, where('userId', '==', authUser.uid));
+            const querySnapshot = await getDocs(q);
+            
+            const fetchedRegistrations: StudentRegisteredEventDisplay[] = [];
+            for (const regDoc of querySnapshot.docs) {
+              const regData = regDoc.data() as EventRegistration;
+              const eventDetail = subEventsData.find(event => event.id === regData.eventId);
+              if (eventDetail) {
+                let teamNameDisplay: string | undefined = undefined;
+                if (regData.isTeamRegistration && regData.teamId) {
+                   try {
+                    const teamDocRef = doc(db, 'event_teams', regData.teamId);
+                    const teamDocSnap = await getDoc(teamDocRef);
+                    if(teamDocSnap.exists()){
+                        teamNameDisplay = (teamDocSnap.data() as EventTeam).teamName;
+                    }
+                   } catch (teamError) {
+                       console.error("Error fetching team details for student dashboard:", teamError);
+                   }
+                }
+                fetchedRegistrations.push({
+                  ...eventDetail,
+                  registrationId: regDoc.id,
+                  teamId: regData.teamId || undefined,
+                  teamName: teamNameDisplay,
+                  admitCardUrl: regData.admitCardUrl,
+                  registrationStatus: regData.registrationStatus,
+                });
+              }
+            }
+            setStudentRegisteredFullEvents(fetchedRegistrations);
+          } catch (error) {
+            console.error("Error fetching student registrations:", error);
+            toast({ title: "Error", description: "Could not fetch your registered events.", variant: "destructive" });
+          }
+        };
+        fetchStudentRegistrations();
+      }
+
+
     } else {
       setLocalUserProfileTasks([]); 
       setGlobalParticipants([]);
+      setStudentRegisteredFullEvents([]);
     }
-  }, [authUser, userProfile, loading, router]);
+  }, [authUser, userProfile, loading, router, toast]);
 
 
   const handleTaskCompletionToggle = (taskId: string) => {
@@ -363,7 +409,6 @@ export default function DashboardPage({
     }
   };
 
-  // Event Management specific logic for Overall Head
   const filteredEventsForOverallHead = useMemo(() => {
     return allPlatformEvents.filter(event => {
       const searchTermLower = eventSearchTerm.toLowerCase();
@@ -394,7 +439,7 @@ export default function DashboardPage({
         return;
      }
 
-    const eventData: Omit<SubEvent, 'id' | 'slug'> = {
+    const eventDataToSave: Omit<SubEvent, 'id' | 'slug'> = { // Ensure this matches SubEvent structure
         title: currentEventForm.title,
         superpowerCategory: currentEventForm.superpowerCategory,
         shortDescription: currentEventForm.shortDescription,
@@ -407,29 +452,31 @@ export default function DashboardPage({
         registrationLink: currentEventForm.registrationLink,
         deadline: currentEventForm.deadline,
         eventDate: currentEventForm.eventDate,
-        isTeamEvent: currentEventForm.isTeamEvent,
+        isTeamBased: currentEventForm.isTeamEvent,
         status: currentEventForm.status,
         venue: currentEventForm.venue,
-        organizers: currentEventForm.organizers_str.split(',').map(s => s.trim()).filter(Boolean),
-        event_representatives: currentEventForm.event_representatives_str.split(',').map(s => s.trim()).filter(Boolean),
+        organizerUids: currentEventForm.organizers_str.split(',').map(s => s.trim()).filter(Boolean),
+        // event_representatives not directly on SubEvent, handle separately or as part of organizerUids role
         registeredParticipantCount: currentEventForm.registeredParticipantCount || 0,
     };
 
     if (editingEventId) {
         const updatedEvent = { 
-            ...allPlatformEvents.find(e => e.id === editingEventId)!,
-            ...eventData,
-            slug: eventData.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, ''), 
+            ...allPlatformEvents.find(e => e.id === editingEventId)!, // Base existing event
+            ...eventDataToSave, // Override with new data
+            slug: eventDataToSave.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, ''), 
         };
         setAllPlatformEvents(prev => prev.map(event => event.id === editingEventId ? updatedEvent : event));
-        toast({ title: "Event Updated", description: `Event "${eventData.title}" has been updated.`});
+        // TODO: Firestore update call for event 'editingEventId' with 'updatedEvent' data
+        toast({ title: "Event Updated", description: `Event "${eventDataToSave.title}" has been updated.`});
     } else {
         const newEvent: SubEvent = {
-            id: `event-${Date.now()}`,
-            slug: eventData.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, ''),
-            ...eventData,
+            id: `event-${Date.now()}`, // Client-side generated ID
+            slug: eventDataToSave.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, ''),
+            ...eventDataToSave,
         };
         setAllPlatformEvents(prev => [newEvent, ...prev]);
+        // TODO: Firestore add call for 'newEvent' data
         toast({ title: "Event Created", description: `Event "${newEvent.title}" has been added.`});
     }
     setIsEventFormDialogOpen(false);
@@ -459,8 +506,8 @@ export default function DashboardPage({
         isTeamEvent: event.isTeamEvent || false,
         status: event.status || 'Planning',
         venue: event.venue || '',
-        organizers_str: (event.organizers || []).join(', '),
-        event_representatives_str: (event.event_representatives || []).join(', '),
+        organizers_str: (event.organizerUids || []).join(', '), // Changed from organizers
+        event_representatives_str: '', // This might be part of organizerUids with specific role
         registeredParticipantCount: event.registeredParticipantCount || 0,
     });
     setIsEventFormDialogOpen(true);
@@ -472,6 +519,7 @@ export default function DashboardPage({
   const confirmDeleteEvent = () => {
     if (eventToDelete) {
       setAllPlatformEvents(prev => prev.filter(e => e.id !== eventToDelete.id));
+      // TODO: Firestore delete call for eventToDelete.id
       toast({ title: `Mock: Event "${eventToDelete.title}" deleted.`});
       setIsDeleteEventConfirmOpen(false);
       setEventToDelete(null);
@@ -491,28 +539,13 @@ export default function DashboardPage({
 
   // Student Dashboard
   if (role === 'student' || (role === 'test' && !userProfile.tasks?.length && !userProfile.assignedEventSlugs?.length && !userProfile.allPlatformParticipants?.length)) { 
-    const studentRegisteredFullEvents: RegisteredEventDisplay[] = userProfile.registeredEvents
-      ?.map(registeredInfo => {
-        const eventDetail = subEventsData.find(event => event.slug === registeredInfo.eventSlug);
-        if (eventDetail) {
-          return { 
-            ...eventDetail, 
-            teamName: registeredInfo.teamName, 
-            teamMembers: registeredInfo.teamMembers,
-            admitCardStatus: registeredInfo.admitCardStatus,
-          };
-        }
-        return null; 
-      })
-      .filter(event => event !== null) as RegisteredEventDisplay[] || [];
-
     return (
       <div className="space-y-10 animate-fade-in-up">
         <Card className="shadow-md-soft rounded-xl overflow-hidden">
           <CardContent className="p-6 flex flex-col sm:flex-row items-center gap-6 bg-gradient-to-br from-primary/5 via-background to-background">
             <Avatar className="h-24 w-24 text-3xl border-2 border-primary shadow-md shrink-0">
-              <AvatarImage src={userProfile.photoURL || undefined} alt={userProfile.displayName || 'Student'} />
-              <AvatarFallback className="bg-primary/10 text-primary">{(userProfile.displayName || userProfile.email || 'S')[0].toUpperCase()}</AvatarFallback>
+              <AvatarImage src={userProfile.photoURL || undefined} alt={userProfile.fullName || userProfile.displayName || 'Student'} />
+              <AvatarFallback className="bg-primary/10 text-primary">{(userProfile.fullName || userProfile.displayName || userProfile.email || 'S')[0].toUpperCase()}</AvatarFallback>
             </Avatar>
             <div className="space-y-1 text-center sm:text-left">
               <h1 className="text-2xl md:text-3xl font-bold text-primary">{userProfile.fullName || userProfile.displayName || 'Student Dashboard'}</h1>
@@ -544,7 +577,7 @@ export default function DashboardPage({
           {studentRegisteredFullEvents.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {studentRegisteredFullEvents.map(event => (
-                <Card key={event.id} className="overflow-hidden shadow-soft hover:shadow-md-soft transition-shadow rounded-xl flex flex-col">
+                <Card key={event.registrationId} className="overflow-hidden shadow-soft hover:shadow-md-soft transition-shadow rounded-xl flex flex-col">
                   <Link href={`/events/${event.slug}`} className="block group flex flex-col flex-grow">
                     <div className="relative w-full h-40">
                       <Image
@@ -559,17 +592,15 @@ export default function DashboardPage({
                     <CardHeader className="pb-2">
                       <CardTitle className="text-lg group-hover:text-primary">{event.title}</CardTitle>
                       {event.eventDate && <CardDescription className="text-xs flex items-center gap-1"><CalendarDays className="h-3 w-3"/> {new Date(event.eventDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</CardDescription>}
+                      <Badge variant={event.registrationStatus === 'approved' ? 'default' : 'secondary'} className="mt-1 text-xs capitalize self-start">
+                        Status: {event.registrationStatus || 'N/A'}
+                      </Badge>
                     </CardHeader>
                     <CardContent className="pt-0 flex-grow">
                       <p className="text-sm text-muted-foreground line-clamp-2 mb-2">{event.shortDescription}</p>
-                      {event.isTeamEvent && event.teamName && (
+                      {event.isTeamBased && event.teamName && (
                         <div className="mt-2">
                           <p className="text-xs text-accent font-semibold flex items-center gap-1"><Users className="h-4 w-4"/>Team: {event.teamName}</p>
-                          {event.teamMembers && event.teamMembers.length > 0 && (
-                            <ul className="text-xs text-muted-foreground list-disc list-inside pl-1">
-                              {event.teamMembers.map(member => <li key={member.id || member.name}>{member.name}</li>)}
-                            </ul>
-                          )}
                            <Button variant="link" size="sm" className="text-xs h-auto p-0 mt-1 text-destructive/80 hover:text-destructive" onClick={(e) => {e.preventDefault(); alert("Leave Team functionality coming soon!")}}>Leave Team</Button>
                         </div>
                       )}
@@ -600,25 +631,35 @@ export default function DashboardPage({
           <p className="text-muted-foreground mb-6">Download your admit cards for upcoming events.</p>
           {studentRegisteredFullEvents.length > 0 ? (
              <div className="space-y-4">
-                {studentRegisteredFullEvents.map(event => (
+                {studentRegisteredFullEvents.filter(e => e.registrationStatus === 'approved').map(event => ( // Only show for approved
                     <Card key={`admit-${event.id}`} className="shadow-soft rounded-xl">
                         <CardContent className="p-4 flex flex-col sm:flex-row justify-between items-center gap-3">
                             <div>
                                 <h3 className="font-semibold text-foreground">{event.title}</h3>
                                 <p className="text-sm text-muted-foreground">Event Date: {event.eventDate ? new Date(event.eventDate).toLocaleDateString() : 'TBA'}</p>
                             </div>
-                            {event.admitCardStatus === 'published' ? (
-                                <Button className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-md shadow-sm">
-                                    <Download className="mr-2 h-4 w-4" /> Download Admit Card
+                            {event.admitCardUrl ? (
+                                <Button asChild className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-md shadow-sm">
+                                    <a href={event.admitCardUrl} target="_blank" rel="noopener noreferrer">
+                                      <Download className="mr-2 h-4 w-4" /> Download Admit Card
+                                    </a>
                                 </Button>
                             ) : (
-                                <Badge variant={event.admitCardStatus === 'pending' ? 'secondary': 'outline'} className="text-xs py-1 px-2">
-                                    {event.admitCardStatus === 'pending' ? 'Admit Card Generation Pending' : 'Admit Card Not Available Yet'}
+                                <Badge variant={'outline'} className="text-xs py-1 px-2">
+                                    Admit Card Not Yet Available
                                 </Badge>
                             )}
                         </CardContent>
                     </Card>
                 ))}
+                {studentRegisteredFullEvents.filter(e => e.registrationStatus === 'approved').length === 0 && (
+                     <Card className="shadow-soft rounded-xl">
+                        <CardContent className="text-center py-10 text-muted-foreground">
+                            <Newspaper className="h-12 w-12 mx-auto mb-3 text-primary/50" />
+                            <p>No admit cards available for your approved registrations yet.</p>
+                        </CardContent>
+                    </Card>
+                )}
              </div>
           ) : (
              <Card className="shadow-soft rounded-xl">
@@ -638,8 +679,8 @@ export default function DashboardPage({
             <Card className="shadow-soft rounded-xl">
                 <CardContent className="text-center py-10 text-muted-foreground">
                     <Users2 className="h-12 w-12 mx-auto mb-3 text-primary/50" />
-                    <p>Team management features are coming soon!</p>
-                    <p className="text-sm">You'll be able to view team details, invite members, and more.</p>
+                    <p>Team management features (inviting members, viewing full team details) are coming soon!</p>
+                    <p className="text-sm">You can currently create a team when registering for a team event.</p>
                 </CardContent>
             </Card>
         </section>
@@ -647,6 +688,7 @@ export default function DashboardPage({
     );
   }
 
+  // Overall Head Dashboard remains largely the same, but `organizers_str` in event form now maps to `organizerUids`
   if (role === 'overall_head') {
     const activeGlobalStaticFiltersForDisplay = [
         globalSearchTerm && { label: 'Search', value: globalSearchTerm },
@@ -792,6 +834,8 @@ export default function DashboardPage({
                       <SelectItem value="all">All Statuses</SelectItem>
                       <SelectItem value="Planning">Planning</SelectItem>
                       <SelectItem value="Active">Active</SelectItem>
+                      <SelectItem value="open">Open (for Reg)</SelectItem>
+                      <SelectItem value="closed">Closed (for Reg)</SelectItem>
                       <SelectItem value="Completed">Completed</SelectItem>
                       <SelectItem value="Cancelled">Cancelled</SelectItem>
                     </SelectContent>
@@ -840,10 +884,11 @@ export default function DashboardPage({
                           </TableCell>
                           <TableCell>{event.registeredParticipantCount || 0}</TableCell>
                           <TableCell className="text-xs max-w-[150px] truncate">
-                            {event.event_representatives && event.event_representatives.length > 0 ? event.event_representatives.join(', ') : <span className="text-muted-foreground italic">None</span>}
+                            {/* TODO: Display actual ERs based on roles/assignments */}
+                            {(event.organizerUids?.includes('mock-representative-uid') ? 'Test Event Rep Bob' : '') || <span className="text-muted-foreground italic">None</span>}
                           </TableCell>
                            <TableCell className="text-xs max-w-[150px] truncate">
-                             {event.organizers && event.organizers.length > 0 ? event.organizers.join(', ') : <span className="text-muted-foreground italic">None</span>}
+                             {event.organizerUids && event.organizerUids.length > 0 ? event.organizerUids.map(uid => mockUserProfiles[userProfile?.role || 'student']?.displayName || uid).join(', ') : <span className="text-muted-foreground italic">None</span>}
                            </TableCell>
                           <TableCell className="text-right space-x-1">
                             <Button variant="ghost" size="icon" className="hover:bg-muted/50 h-8 w-8" onClick={() => openEditEventDialog(event)}>
@@ -1195,6 +1240,8 @@ export default function DashboardPage({
                                 <SelectContent>
                                     <SelectItem value="Planning">Planning</SelectItem>
                                     <SelectItem value="Active">Active</SelectItem>
+                                    <SelectItem value="open">Open (for Reg)</SelectItem>
+                                    <SelectItem value="closed">Closed (for Reg)</SelectItem>
                                     <SelectItem value="Completed">Completed</SelectItem>
                                     <SelectItem value="Cancelled">Cancelled</SelectItem>
                                 </SelectContent>
@@ -1209,16 +1256,16 @@ export default function DashboardPage({
                     </div>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <Label htmlFor="eventOrganizers">Organizers (comma-separated names)</Label>
-                            <Input id="eventOrganizers" value={currentEventForm.organizers_str} onChange={e => handleEventFormChange('organizers_str', e.target.value)} placeholder="Alice, Bob, Carol" />
+                            <Label htmlFor="eventOrganizers">Organizer UIDs (comma-separated)</Label>
+                            <Input id="eventOrganizers" value={currentEventForm.organizers_str} onChange={e => handleEventFormChange('organizers_str', e.target.value)} placeholder="uid1, uid2, uid3" />
                         </div>
                         <div>
-                            <Label htmlFor="eventRepresentatives">Event Representatives (comma-separated names)</Label>
-                            <Input id="eventRepresentatives" value={currentEventForm.event_representatives_str} onChange={e => handleEventFormChange('event_representatives_str', e.target.value)} placeholder="Dave, Eve" />
+                            <Label htmlFor="eventRepresentatives">Event Representative UIDs (comma-separated)</Label>
+                            <Input id="eventRepresentatives" value={currentEventForm.event_representatives_str} onChange={e => handleEventFormChange('event_representatives_str', e.target.value)} placeholder="uid_rep1, uid_rep2" />
                         </div>
                     </div>
                      <div>
-                        <Label htmlFor="eventRegLink">Registration Link (optional)</Label>
+                        <Label htmlFor="eventRegLink">Registration Link (optional external)</Label>
                         <Input id="eventRegLink" value={currentEventForm.registrationLink} onChange={e => handleEventFormChange('registrationLink', e.target.value)} placeholder="/signup?event=your-event-slug" />
                     </div>
 
@@ -1448,7 +1495,7 @@ export default function DashboardPage({
       dashboardTitle = "Admin Dashboard";
        quickActions = [
         { href: '/admin/tasks', label: 'Global Task Mgmt', icon: Settings},
-        { href: '/organizer/events/manage', label: 'Manage All Events', icon: Briefcase }, //This might change to the overall head's event mngmt view
+        { href: '/organizer/events/manage', label: 'Manage All Events', icon: Briefcase },
         { href: '/admin/users', label: 'Manage Users', icon: Users}, 
         { href: '/ocr-tool', label: 'Scan Forms (OCR)', icon: FileScan },
         { href: '/organizer/event-tasks', label: 'All Event Tasks', icon: ListChecks },
@@ -1489,6 +1536,7 @@ export default function DashboardPage({
           </div>
         </div>
         {(role === 'organizer' || role === 'overall_head' || role === 'admin') && (
+           // Keep the old create event button for now, or remove if OH dashboard handles all creation.
           <Button asChild className="bg-accent hover:bg-accent/90 text-accent-foreground mt-4 md:mt-0 rounded-lg shadow-soft">
             <Link href="/organizer/events/create">Create New Event (Legacy)</Link>
           </Button>
@@ -1641,6 +1689,13 @@ export default function DashboardPage({
                 </Link>
               </Button>
             ))}
+             {(role === 'admin' || role === 'overall_head') && (
+              <Button variant="outline" asChild className="rounded-md">
+                <Link href="/admin/users" className="flex items-center justify-center gap-2 text-sm">
+                  <Users className="h-4 w-4" /> Manage Users
+                </Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
       </section>
@@ -1664,3 +1719,5 @@ export default function DashboardPage({
     </div>
   );
 }
+
+    
