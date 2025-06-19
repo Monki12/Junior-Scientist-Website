@@ -1,0 +1,55 @@
+
+import type { SchoolData } from '@/types';
+
+export const mockSchoolsData: SchoolData[] = [
+  {
+    id: 'school_001',
+    name: 'Springfield High School',
+    city: 'Springfield',
+    state: 'IL',
+    country: 'USA',
+    isVerified: true,
+    addedBy: 'admin_user_uid',
+    createdAt: new Date('2023-01-15T09:00:00Z').toISOString(),
+  },
+  {
+    id: 'school_002',
+    name: 'Northwood Academy',
+    city: 'Northwood',
+    state: 'CA',
+    country: 'USA',
+    isVerified: true,
+    addedBy: 'admin_user_uid',
+    createdAt: new Date('2023-01-20T10:00:00Z').toISOString(),
+  },
+  {
+    id: 'school_003',
+    name: 'Riverside Preparatory',
+    city: 'Riverside',
+    state: 'NY',
+    country: 'USA',
+    isVerified: true,
+    addedBy: 'admin_user_uid',
+    createdAt: new Date('2023-02-01T11:00:00Z').toISOString(),
+  },
+  {
+    id: 'school_004',
+    name: 'Central City High',
+    city: 'Central City',
+    state: 'TX',
+    country: 'USA',
+    isVerified: true,
+    addedBy: 'admin_user_uid',
+    createdAt: new Date('2023-02-10T14:00:00Z').toISOString(),
+  },
+  {
+    id: 'school_005',
+    name: 'Green Valley International School',
+    city: 'Green Valley',
+    state: 'FL',
+    country: 'USA',
+    isVerified: true,
+    addedBy: 'admin_user_uid',
+    createdAt: new Date('2023-03-05T16:00:00Z').toISOString(),
+  },
+];

@@ -1,12 +1,12 @@
 
 import type { User as FirebaseUser } from 'firebase/auth';
 
-export type UserRole = 
-  | 'student' 
-  | 'organizer' 
-  | 'event_representative' 
-  | 'overall_head' 
-  | 'admin' 
+export type UserRole =
+  | 'student'
+  | 'organizer'
+  | 'event_representative'
+  | 'overall_head'
+  | 'admin'
   | 'test';
 
 export type TaskPriority = 'High' | 'Medium' | 'Low';
@@ -18,30 +18,30 @@ export interface Task {
   id: string;
   title: string;
   description?: string;
-  assignedTo?: string[]; 
+  assignedTo?: string[];
   assignedByName?: string;
-  assignedByUid?: string;  
-  eventSlug?: string;      
-  dueDate?: string; 
+  assignedByUid?: string;
+  eventSlug?: string;
+  dueDate?: string;
   priority: TaskPriority;
   status: TaskStatus;
   points?: number;
   attachments?: { name: string, url: string }[];
   subtasks?: { text: string, completed: boolean }[];
-  createdBy?: string; 
-  createdAt: string;      
-  updatedAt: string; 
-  customTaskData?: Record<string, any>; 
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+  customTaskData?: Record<string, any>;
 }
 
 export interface RegisteredEventInfo {
   eventSlug: string;
   teamName?: string;
-  teamMembers?: { id: string, name: string, role?: string }[]; 
+  teamMembers?: { id: string, name: string, role?: string }[];
   admitCardStatus?: 'published' | 'pending' | 'unavailable';
-  eventDate?: string; 
-  registrationDate?: string; 
-  paymentStatus?: 'paid' | 'pending' | 'waived' | 'failed'; 
+  eventDate?: string;
+  registrationDate?: string;
+  paymentStatus?: 'paid' | 'pending' | 'waived' | 'failed';
 }
 
 export interface UserProfileData {
@@ -49,25 +49,34 @@ export interface UserProfileData {
   email: string | null;
   displayName: string | null;
   role: UserRole;
-  photoURL?: string | null; 
-  school?: string; 
-  grade?: string; 
-  phoneNumbers?: string[]; 
-  registeredEvents?: RegisteredEventInfo[]; 
-  department?: string; 
-  assignedEventSlug?: string; 
-  assignedEventSlugs?: string[]; 
-  tasks?: Task[]; 
-  points?: number; 
-  credibilityScore?: number; 
-  allPlatformParticipants?: EventParticipant[]; // For Overall Head
+  photoURL?: string | null;
+  // Student specific fields
+  fullName?: string; // Added
+  school?: string; // Kept for backward compatibility / simple display
+  schoolName?: string; // Explicit school name from form
+  schoolId?: string; // If matched from verified list
+  schoolVerifiedByOrganizer?: boolean; // Status of school verification
+  grade?: string; // Kept for backward compatibility / simple display
+  standard?: string; // e.g. "Grade 10"
+  division?: string; // Optional
+  // Organizational fields
+  department?: string;
+  assignedEventSlug?: string;
+  assignedEventSlugs?: string[];
+  // Common fields
+  phoneNumbers?: string[];
+  registeredEvents?: RegisteredEventInfo[];
+  tasks?: Task[];
+  points?: number;
+  credibilityScore?: number;
+  allPlatformParticipants?: EventParticipant[];
 }
 
-export interface Event { 
+export interface Event {
   id: string;
   title: string;
   description: string;
-  date: string; 
+  date: string;
   time?: string;
   location: string;
   organizerId: string;
@@ -81,15 +90,15 @@ export interface SubEvent {
   id: string;
   slug: string;
   title: string;
-  superpowerCategory: string; 
-  shortDescription: string; 
-  detailedDescription: string; 
+  superpowerCategory: string;
+  shortDescription: string;
+  detailedDescription: string;
   mainImage: { src: string; alt: string; dataAiHint: string };
   galleryImages?: Array<{ src: string; alt: string; dataAiHint: string }>;
-  registrationLink: string; 
-  deadline?: string; 
-  isTeamEvent?: boolean; 
-  eventDate?: string; 
+  registrationLink: string;
+  deadline?: string;
+  isTeamEvent?: boolean;
+  eventDate?: string;
   status?: EventStatus;
   venue?: string;
   organizers?: string[];
@@ -99,10 +108,13 @@ export interface SubEvent {
 }
 
 export interface SignUpFormData {
-  name?: string; 
+  fullName?: string; // Added
   email: string;
   password: string;
-  confirmPassword?: string; 
+  confirmPassword?: string;
+  schoolName?: string; // Added
+  standard?: string; // Added
+  division?: string; // Added
 }
 
 export interface LoginFormData {
@@ -110,7 +122,7 @@ export interface LoginFormData {
   password: string;
 }
 
-export interface StudentData { 
+export interface StudentData {
   name: string;
   school: string;
   grade: string;
@@ -119,26 +131,26 @@ export interface StudentData {
 }
 
 export interface CustomColumnDefinition {
-  id: string; 
-  name: string; 
+  id: string;
+  name: string;
   dataType: 'text' | 'number' | 'checkbox' | 'dropdown' | 'date';
-  options?: string[]; 
+  options?: string[];
   defaultValue?: any;
   description?: string;
 }
 
 export interface CustomTaskColumnDefinition {
-  id: string; 
-  name: string; 
+  id: string;
+  name: string;
   dataType: 'text' | 'number' | 'checkbox' | 'dropdown' | 'date';
-  options?: string[]; 
+  options?: string[];
   defaultValue?: any;
   description?: string;
 }
 
 
 export type ParticipantCustomData = Record<string, any> & {
-  levels?: Record<string, { 
+  levels?: Record<string, {
     present: boolean;
     venue?: string;
     qualified: 'yes' | 'no' | 'auto';
@@ -147,15 +159,15 @@ export type ParticipantCustomData = Record<string, any> & {
 
 
 export interface EventParticipant {
-  id: string; 
+  id: string;
   name: string;
   email: string;
   contactNumber?: string;
   schoolName?: string;
-  registrationDate: string; 
+  registrationDate: string;
   paymentStatus: 'paid' | 'pending' | 'waived' | 'failed';
-  customData?: ParticipantCustomData; 
-  registeredEventSlugs?: string[]; 
+  customData?: ParticipantCustomData;
+  registeredEventSlugs?: string[];
 }
 
 export interface ActiveDynamicFilter {
@@ -171,6 +183,17 @@ export interface ActiveTaskFilter {
   columnId: string; // keyof Task or custom column id
   columnName: string;
   value: string;
-  isCustom?: boolean; 
+  isCustom?: boolean;
 }
 
+// New interface for School Data
+export interface SchoolData {
+  id: string;
+  name: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  isVerified: boolean; // Should be true for all entries in the master list
+  addedBy?: string; // UID of admin/organizer who added it
+  createdAt?: string;
+}

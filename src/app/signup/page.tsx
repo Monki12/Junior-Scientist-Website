@@ -8,11 +8,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Added Select
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import type { SignUpFormData } from '@/types';
-import { UserPlus, Loader2, LogIn } from 'lucide-react';
+import { UserPlus, Loader2, LogIn, School } from 'lucide-react'; // Added School icon
 import type { AuthError } from 'firebase/auth';
+import { mockSchoolsData } from '@/data/mockSchools'; // Import mock schools
+
+const gradeLevels = Array.from({ length: 12 }, (_, i) => `Grade ${i + 1}`);
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -20,14 +24,21 @@ export default function SignUpPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<SignUpFormData>({
-    name: '',
+    fullName: '',
     email: '',
     password: '',
     confirmPassword: '',
+    schoolName: '',
+    standard: '',
+    division: '',
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.id]: e.target.value });
+  };
+
+  const handleSelectChange = (name: keyof SignUpFormData, value: string) => {
+    setFormData({ ...formData, [name]: value });
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -40,10 +51,10 @@ export default function SignUpPage() {
       });
       return;
     }
-    if (!formData.email || !formData.password) {
+    if (!formData.email || !formData.password || !formData.fullName || !formData.schoolName || !formData.standard) {
       toast({
         title: 'Missing Fields',
-        description: 'Email and Password are required.',
+        description: 'Full Name, Email, Password, School, and Standard are required.',
         variant: 'destructive',
       });
       return;
@@ -51,8 +62,8 @@ export default function SignUpPage() {
 
     setIsLoading(true);
     try {
-      const result = await signUp(formData);
-      if (typeof result === 'object' && 'code' in result && (result as AuthError).code) { // AuthError
+      const result = await signUp(formData); // Pass all form data
+      if (typeof result === 'object' && 'code' in result && (result as AuthError).code) {
         const authError = result as AuthError;
         if (authError.code === 'auth/email-already-in-use') {
           toast({
@@ -67,7 +78,7 @@ export default function SignUpPage() {
             variant: 'destructive',
           });
         }
-      } else { // FirebaseUser
+      } else {
         toast({
           title: 'Sign Up Successful!',
           description: 'Welcome! Redirecting to your dashboard...',
@@ -87,7 +98,7 @@ export default function SignUpPage() {
 
   return (
     <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center animate-fade-in-up py-12">
-      <Card className="w-full max-w-md shadow-xl">
+      <Card className="w-full max-w-lg shadow-xl"> {/* Increased max-w-md to max-w-lg */}
         <CardHeader className="text-center">
           <UserPlus className="mx-auto h-12 w-12 text-primary mb-4" />
           <CardTitle className="text-3xl font-headline text-primary">Student Sign Up</CardTitle>
@@ -98,20 +109,68 @@ export default function SignUpPage() {
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             <div>
-              <Label htmlFor="name">Full Name (Optional)</Label>
-              <Input id="name" type="text" placeholder="Your Name" value={formData.name} onChange={handleChange} disabled={isLoading} />
+              <Label htmlFor="fullName">Full Name <span className="text-destructive">*</span></Label>
+              <Input id="fullName" type="text" placeholder="Your Full Name" value={formData.fullName} onChange={handleChange} required disabled={isLoading} />
             </div>
             <div>
-              <Label htmlFor="email">Email Address</Label>
+              <Label htmlFor="email">Email Address <span className="text-destructive">*</span></Label>
               <Input id="email" type="email" placeholder="you@example.com" value={formData.email} onChange={handleChange} required disabled={isLoading} />
             </div>
-            <div>
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" placeholder="••••••••" value={formData.password} onChange={handleChange} required disabled={isLoading} />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="password">Password <span className="text-destructive">*</span></Label>
+                <Input id="password" type="password" placeholder="••••••••" value={formData.password} onChange={handleChange} required disabled={isLoading} />
+              </div>
+              <div>
+                <Label htmlFor="confirmPassword">Confirm Password <span className="text-destructive">*</span></Label>
+                <Input id="confirmPassword" type="password" placeholder="••••••••" value={formData.confirmPassword} onChange={handleChange} required disabled={isLoading} />
+              </div>
             </div>
             <div>
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <Input id="confirmPassword" type="password" placeholder="••••••••" value={formData.confirmPassword} onChange={handleChange} required disabled={isLoading} />
+              <Label htmlFor="schoolName">School Name <span className="text-destructive">*</span></Label>
+              <div className="relative">
+                <School className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="schoolName"
+                  type="text"
+                  placeholder="Type or select your school"
+                  value={formData.schoolName}
+                  onChange={handleChange}
+                  required
+                  disabled={isLoading}
+                  list="schools-datalist"
+                  className="pl-10"
+                />
+                <datalist id="schools-datalist">
+                  {mockSchoolsData.map(school => (
+                    <option key={school.id} value={school.name} />
+                  ))}
+                </datalist>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">If your school is not listed, please type its full name.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="standard">Standard (Grade) <span className="text-destructive">*</span></Label>
+                <Select
+                  value={formData.standard}
+                  onValueChange={(value) => handleSelectChange('standard', value)}
+                  disabled={isLoading}
+                >
+                  <SelectTrigger id="standard">
+                    <SelectValue placeholder="Select your grade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {gradeLevels.map(grade => (
+                      <SelectItem key={grade} value={grade}>{grade}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="division">Division (Optional)</Label>
+                <Input id="division" type="text" placeholder="e.g., A, B, Blue" value={formData.division} onChange={handleChange} disabled={isLoading} />
+              </div>
             </div>
             <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isLoading}>
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
