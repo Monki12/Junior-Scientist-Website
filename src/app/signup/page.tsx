@@ -9,12 +9,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useAuth } from '@/hooks/use-auth'; // To update context if needed after successful operations by onAuthStateChanged
 import { useToast } from '@/hooks/use-toast';
 import type { SignUpFormData, UserProfileData } from '@/types';
 import { UserPlus, Loader2, LogIn, School as SchoolIconLucide } from 'lucide-react';
 
-// Firebase direct imports
 import { auth, db } from '@/lib/firebase';
 import { createUserWithEmailAndPassword, type AuthError } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
@@ -26,7 +24,6 @@ export default function SignUpPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  // const { setUserProfile } = useAuth(); // Not directly setting profile from here; onAuthStateChanged will handle it.
 
   const [formData, setFormData] = useState<SignUpFormData>({
     fullName: '',
@@ -96,8 +93,8 @@ export default function SignUpPage() {
         // --- Step 3: Prepare Student Profile Data for Firestore ---
         let schoolId: string | undefined = undefined;
         let schoolVerifiedByOrganizer = false;
-        const schoolNameLower = formData.schoolName.toLowerCase();
-        const matchedSchool = mockSchoolsData.find(s => s.name.toLowerCase() === schoolNameLower);
+        const schoolNameLower = formData.schoolName.toLowerCase().trim();
+        const matchedSchool = mockSchoolsData.find(s => s.name.toLowerCase().trim() === schoolNameLower);
 
         if (matchedSchool) {
           schoolId = matchedSchool.id;
@@ -106,19 +103,19 @@ export default function SignUpPage() {
 
         const studentProfileData: UserProfileData = {
             uid: uid,
-            email: user.email, // Use email from authenticated user
+            email: user.email,
             fullName: formData.fullName,
-            displayName: formData.fullName, // Set displayName initially to fullName
+            displayName: formData.fullName,
             schoolName: formData.schoolName,
             schoolId: schoolId,
             schoolVerifiedByOrganizer: schoolVerifiedByOrganizer,
             standard: formData.standard,
             division: formData.division || undefined,
-            role: 'student', // Explicitly set role
-            photoURL: user.photoURL, // Store photoURL from Auth if available
-            registeredEvents: [], // Initialize with empty array
-            tasks: [], // Initialize with empty array
-            createdAt: new Date().toISOString(), // Use ISO string for consistency
+            role: 'student',
+            photoURL: user.photoURL,
+            registeredEvents: [],
+            tasks: [],
+            createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
         };
 
@@ -146,10 +143,10 @@ export default function SignUpPage() {
         console.error("Error message:", error.message);
         console.error("Full error object:", error);
 
-        let errorMessage = 'An unexpected error occurred during registration.';
         let errorTitle = 'Sign Up Failed';
+        let errorMessage = 'An unexpected error occurred during registration.';
 
-        if (error.code) { // Firebase errors usually have a code
+        if (error.code) {
             switch (error.code) {
                 case 'auth/email-already-in-use':
                     errorTitle = 'Email Already Exists';
@@ -171,7 +168,7 @@ export default function SignUpPage() {
                 default:
                     errorMessage = error.message || 'An unknown error occurred.';
             }
-        } else if (error.message) { // Fallback for other error types
+        } else if (error.message) {
             errorMessage = error.message;
         }
         
@@ -278,8 +275,15 @@ export default function SignUpPage() {
               <LogIn className="mr-2 h-4 w-4" /> Log In Now
             </Link>
           </Button>
+           <p className="text-xs text-muted-foreground mt-4 text-center">
+            Organizational staff (Admins, Organizers, etc.) should log in via the
+            <Link href="/auth/org-login" className="font-semibold text-primary hover:underline ml-1">
+                Organizational Login page.
+            </Link>
+          </p>
         </CardFooter>
       </Card>
     </div>
   );
 }
+
