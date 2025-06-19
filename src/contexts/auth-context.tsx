@@ -1,13 +1,12 @@
 
 'use client';
 
-import { createUserWithEmailAndPassword, type User as FirebaseUser, type AuthError } from 'firebase/auth'; // Added createUserWithEmailAndPassword
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, type User as FirebaseUser, type AuthError } from 'firebase/auth';
 import { createContext, useState, useEffect, ReactNode } from 'react';
 import type { SignUpFormData, LoginFormData, UserProfileData, UserRole, Task, RegisteredEventInfo, EventParticipant } from '@/types';
-import { auth } from '@/lib/firebase'; // Imported Firebase auth instance
-// subEventsData can be imported if needed for event titles etc., but dashboard will fetch from its own data source for now.
+import { auth } from '@/lib/firebase'; 
 
-// More diversified mock tasks
+// Mock data remains for profile information after authentication or for direct mock role setting
 const mockTasksData: Omit<Task, 'id' | 'assignedTo' | 'createdBy' | 'createdAt' | 'updatedAt' | 'customTaskData' >[] = [
   { title: 'Prepare MUN Delegate Handbook', description: 'Draft handbook including rules of procedure and country profiles.', status: 'Not Started', dueDate: '2024-10-15T00:00:00Z', points: 25, priority: 'High', eventSlug: 'model-united-nations', assignedByName: 'Overall Head Carol' },
   { title: 'Finalize Quiz Questions - Round 1', description: 'Create 50 MCQs for science round.', status: 'In Progress', dueDate: '2024-11-01T00:00:00Z', points: 30, priority: 'High', eventSlug: 'ex-quiz-it', assignedByName: 'Event Rep Bob' },
@@ -21,7 +20,6 @@ const mockTasksData: Omit<Task, 'id' | 'assignedTo' | 'createdBy' | 'createdAt' 
   { title: 'Setup Math-A-Maze Puzzles Online', description: 'Deploy digital version of puzzles for practice.', status: 'Not Started', dueDate: '2024-11-10T00:00:00Z', points: 15, priority: 'Medium', eventSlug: 'math-a-maze', assignedByName: 'Organizer Alice'},
 ];
 
-// Helper to create full Task objects
 const createTaskObject = (
     baseTask: Omit<Task, 'id' | 'assignedTo' | 'createdBy' | 'createdAt' | 'updatedAt' | 'customTaskData'>,
     id: string,
@@ -32,32 +30,15 @@ const createTaskObject = (
     id,
     assignedTo,
     createdBy,
-    createdAt: new Date(Date.now() - Math.random() * 10 * 24 * 60 * 60 * 1000).toISOString(), // Random creation time in last 10 days
+    createdAt: new Date(Date.now() - Math.random() * 10 * 24 * 60 * 60 * 1000).toISOString(), 
     updatedAt: new Date().toISOString(),
     customTaskData: baseTask.title.includes("Quiz") ? { notes: 'Focus on STEM', difficulty: 5 } : {}
 });
 
-
 const mockStudentRegisteredEvents: RegisteredEventInfo[] = [
-  {
-    eventSlug: 'model-united-nations',
-    eventDate: '2024-12-01',
-    admitCardStatus: 'pending'
-  },
-  {
-    eventSlug: 'ex-quiz-it',
-    teamName: 'Quiz Wizards',
-    eventDate: '2024-12-05',
-    admitCardStatus: 'published',
-    teamMembers: [{id: 'mem1', name: 'Jane Doe'}, {id: 'mem2', name: 'John Smith'}]
-  },
-  {
-    eventSlug: 'robo-challenge',
-    eventDate: '2024-11-28',
-    admitCardStatus: 'unavailable',
-    teamName: 'RoboKnights',
-    teamMembers: [{id: 'mem3', name: 'Alice Wonder'}]
-  }
+  { eventSlug: 'model-united-nations', eventDate: '2024-12-01', admitCardStatus: 'pending' },
+  { eventSlug: 'ex-quiz-it', teamName: 'Quiz Wizards', eventDate: '2024-12-05', admitCardStatus: 'published', teamMembers: [{id: 'mem1', name: 'Jane Doe'}, {id: 'mem2', name: 'John Smith'}] },
+  { eventSlug: 'robo-challenge', eventDate: '2024-11-28', admitCardStatus: 'unavailable', teamName: 'RoboKnights', teamMembers: [{id: 'mem3', name: 'Alice Wonder'}] }
 ];
 
 const mockGlobalParticipants: EventParticipant[] = [
@@ -70,100 +51,46 @@ const mockGlobalParticipants: EventParticipant[] = [
   { id: 'stud-global-7', name: 'Student Test User', email: 'student.test@example.com', contactNumber: '555-0101', schoolName: 'Springfield High International', registrationDate: new Date('2024-07-07T08:00:00Z').toISOString(), paymentStatus: 'paid', registeredEventSlugs: ['model-united-nations', 'ex-quiz-it', 'robo-challenge'], customData: {} },
 ];
 
-
 const mockUserProfiles: Record<UserRole, UserProfileData> = {
   student: {
-    uid: 'mock-student-uid-12345',
-    email: 'student.test@example.com',
-    displayName: 'Alex Johnson',
-    role: 'student',
-    photoURL: 'https://placehold.co/120x120.png?text=AJ',
-    school: 'Springfield High International',
-    grade: '10th Grade - Section A',
-    phoneNumbers: ['+1-555-0101', '+1-555-0102'],
-    registeredEvents: mockStudentRegisteredEvents,
+    uid: 'mock-student-uid-12345', email: 'student.test@example.com', displayName: 'Alex Johnson', role: 'student', photoURL: 'https://placehold.co/120x120.png?text=AJ', school: 'Springfield High International', grade: '10th Grade - Section A', phoneNumbers: ['+1-555-0101', '+1-555-0102'], registeredEvents: mockStudentRegisteredEvents, tasks: [],
   },
   organizer: {
-    uid: 'mock-organizer-uid',
-    email: 'organizer.test@example.com',
-    displayName: 'Test Organizer Alice',
-    role: 'organizer',
-    photoURL: 'https://placehold.co/100x100.png?text=TOA',
-    department: 'Logistics',
-    assignedEventSlugs: ['model-united-nations', 'robo-challenge', 'junior-scientist-olympiad', 'math-a-maze'],
+    uid: 'mock-organizer-uid', email: 'organizer.test@example.com', displayName: 'Test Organizer Alice', role: 'organizer', photoURL: 'https://placehold.co/100x100.png?text=TOA', department: 'Logistics', assignedEventSlugs: ['model-united-nations', 'robo-challenge', 'junior-scientist-olympiad', 'math-a-maze'],
     tasks: [
-        createTaskObject(mockTasksData[0], 'task-org-1', ['Test Organizer Alice'], 'Overall Head Carol'), // MUN Handbook
-        createTaskObject(mockTasksData[3], 'task-org-2', ['Test Organizer Alice'], 'Event Rep Bob'), // RoboChallenge Arena
-        createTaskObject(mockTasksData[4], 'task-org-3', ['Test Organizer Alice', 'David (Organizer)'], 'Test Organizer Alice'), // Procure Kits
-        createTaskObject(mockTasksData[8], 'task-org-4', ['Test Organizer Alice'], 'Overall Head Carol'), // Olympiad questions
-        createTaskObject(mockTasksData[9], 'task-org-5', ['Test Organizer Alice'], 'Event Rep Bob'), // Math-A-Maze puzzles
-    ],
-    points: 150,
-    credibilityScore: 75,
+        createTaskObject(mockTasksData[0], 'task-org-1', ['Test Organizer Alice'], 'Overall Head Carol'), 
+        createTaskObject(mockTasksData[3], 'task-org-2', ['Test Organizer Alice'], 'Event Rep Bob'), 
+        createTaskObject(mockTasksData[4], 'task-org-3', ['Test Organizer Alice', 'David (Organizer)'], 'Test Organizer Alice'), 
+        createTaskObject(mockTasksData[8], 'task-org-4', ['Test Organizer Alice'], 'Overall Head Carol'), 
+        createTaskObject(mockTasksData[9], 'task-org-5', ['Test Organizer Alice'], 'Event Rep Bob'), 
+    ].filter(task => task.assignedTo?.includes('Test Organizer Alice')), points: 150, credibilityScore: 75,
   },
   event_representative: {
-    uid: 'mock-representative-uid',
-    email: 'representative.test@example.com',
-    displayName: 'Test Event Rep Bob',
-    role: 'event_representative',
-    photoURL: 'https://placehold.co/100x100.png?text=ERB',
-    department: 'Event Management',
-    assignedEventSlug: 'ex-quiz-it',
+    uid: 'mock-representative-uid', email: 'representative.test@example.com', displayName: 'Test Event Rep Bob', role: 'event_representative', photoURL: 'https://placehold.co/100x100.png?text=ERB', department: 'Event Management', assignedEventSlug: 'ex-quiz-it',
     tasks: [
-        createTaskObject(mockTasksData[1], 'task-er-1', ['Test Event Rep Bob', 'Self (Current User)'], 'Overall Head Carol'), // Finalize Quiz Questions
-        { ...createTaskObject(mockTasksData[2], 'task-er-2', ['Test Organizer Alice'], 'Test Event Rep Bob'), title: 'Follow up on Auditorium Booking for Ex-Quiz-It', eventSlug: 'ex-quiz-it', priority: 'Medium' }
-    ],
-    points: 200,
-    credibilityScore: 80,
+        createTaskObject(mockTasksData[1], 'task-er-1', ['Test Event Rep Bob'], 'Overall Head Carol'), 
+        { ...createTaskObject(mockTasksData[2], 'task-er-2', ['Test Organizer Alice'], 'Test Event Rep Bob'), title: 'Follow up on Auditorium Booking for Ex-Quiz-It', eventSlug: 'ex-quiz-it', priority: 'Medium', assignedTo:['Test Event Rep Bob'] }
+    ].filter(task => task.assignedTo?.includes('Test Event Rep Bob')), points: 200, credibilityScore: 80,
   },
   overall_head: {
-    uid: 'mock-overall-head-uid',
-    email: 'overall.test@example.com',
-    displayName: 'Test Overall Head Carol',
-    role: 'overall_head',
-    photoURL: 'https://placehold.co/100x100.png?text=OHC',
-    department: 'Coordination',
+    uid: 'mock-overall-head-uid', email: 'overall.test@example.com', displayName: 'Test Overall Head Carol', role: 'overall_head', photoURL: 'https://placehold.co/100x100.png?text=OHC', department: 'Coordination',
     tasks: [
-         createTaskObject(mockTasksData[6], 'task-oh-1', ['Test Overall Head Carol', 'Self (Current User)'], 'Admin Dave'), // Volunteer Training
-         { ...createTaskObject(mockTasksData[0], 'task-oh-2', ['Test Organizer Alice'], 'Test Overall Head Carol'), id: 'task-oh-mun-oversee', title: 'Oversee MUN Handbook Creation' }
-    ],
-    points: 300,
-    credibilityScore: 85,
-    allPlatformParticipants: mockGlobalParticipants,
+         createTaskObject(mockTasksData[6], 'task-oh-1', ['Test Overall Head Carol'], 'Admin Dave'), 
+         { ...createTaskObject(mockTasksData[0], 'task-oh-2', ['Test Organizer Alice'], 'Test Overall Head Carol'), id: 'task-oh-mun-oversee', title: 'Oversee MUN Handbook Creation', assignedTo: ['Test Overall Head Carol'] }
+    ].filter(task => task.assignedTo?.includes('Test Overall Head Carol')), points: 300, credibilityScore: 85, allPlatformParticipants: mockGlobalParticipants,
   },
   admin: {
-    uid: 'mock-admin-uid',
-    email: 'admin.test@example.com',
-    displayName: 'Test Admin Dave',
-    role: 'admin',
-    photoURL: 'https://placehold.co/100x100.png?text=TAD',
-    department: 'Administration',
+    uid: 'mock-admin-uid', email: 'admin.test@example.com', displayName: 'Test Admin Dave', role: 'admin', photoURL: 'https://placehold.co/100x100.png?text=TAD', department: 'Administration',
     tasks: [
-        createTaskObject(mockTasksData[5], 'task-adm-1', ['Test Admin Dave'], 'System'), // Website Content
-        createTaskObject(mockTasksData[7], 'task-adm-2', ['Test Admin Dave', 'Self (Current User)'], 'System') // Payment Gateway Test
-    ],
-    points: 500,
-    credibilityScore: 95,
+        createTaskObject(mockTasksData[5], 'task-adm-1', ['Test Admin Dave'], 'System'), 
+        createTaskObject(mockTasksData[7], 'task-adm-2', ['Test Admin Dave'], 'System') 
+    ].filter(task => task.assignedTo?.includes('Test Admin Dave')), points: 500, credibilityScore: 95,
   },
   test: {
-    uid: 'mock-test-uid-67890',
-    email: 'generic.test@example.com',
-    displayName: 'Sam Williams (Test)',
-    role: 'test',
-    photoURL: 'https://placehold.co/120x120.png?text=SW',
-    school: 'Testington Academy Global',
-    grade: '12th Grade - Section B',
-    phoneNumbers: ['+1-555-0201'],
-    registeredEvents: [
-        { eventSlug: 'robo-challenge', teamName: 'RoboKnights', eventDate: '2024-11-28', admitCardStatus: 'pending' },
-        { eventSlug: 'math-a-maze', eventDate: '2024-11-22', admitCardStatus: 'unavailable'}
-    ],
-    department: 'QA',
-    tasks: [
-        { ...createTaskObject(mockTasksData[1], 'task-test-1', ['Sam Williams (Test)'], 'Overall Head Carol'), title: 'Verify Quiz Task Functionality', eventSlug: 'ex-quiz-it', priority: 'Low' }
-    ],
-    points: 50,
-    credibilityScore: 60,
+    uid: 'mock-test-uid-67890', email: 'generic.test@example.com', displayName: 'Sam Williams (Test)', role: 'test', photoURL: 'https://placehold.co/120x120.png?text=SW', school: 'Testington Academy Global', grade: '12th Grade - Section B', phoneNumbers: ['+1-555-0201'],
+    registeredEvents: [ { eventSlug: 'robo-challenge', teamName: 'RoboKnights', eventDate: '2024-11-28', admitCardStatus: 'pending' }, { eventSlug: 'math-a-maze', eventDate: '2024-11-22', admitCardStatus: 'unavailable'} ], department: 'QA',
+    tasks: [ { ...createTaskObject(mockTasksData[1], 'task-test-1', ['Sam Williams (Test)'], 'Overall Head Carol'), title: 'Verify Quiz Task Functionality', eventSlug: 'ex-quiz-it', priority: 'Low' }
+    ].filter(task => task.assignedTo?.includes('Sam Williams (Test)')), points: 50, credibilityScore: 60,
   }
 };
 
@@ -188,77 +115,55 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const storedRole = typeof window !== "undefined" ? localStorage.getItem('mockUserRole') as UserRole | null : null;
     if (storedRole && mockUserProfiles[storedRole]) { 
-      setMockUserRole(storedRole);
+      setMockUserRole(storedRole, false); // Don't set loading to true here initially
     } else {
       setAuthUser(null);
       setUserProfile(null);
-       if (typeof window !== "undefined") {
+      if (typeof window !== "undefined") {
           localStorage.removeItem('mockUserRole'); 
-       }
+      }
     }
     setLoading(false);
   }, []);
 
-  const setMockUserRole = (role: UserRole | null) => {
-    setLoading(true);
+  const setMockUserRole = (role: UserRole | null, triggerLoading: boolean = true) => {
+    if (triggerLoading) setLoading(true);
     if (role && mockUserProfiles[role]) {
       const profile = mockUserProfiles[role];
       const mockFbUser: FirebaseUser = {
-        uid: profile.uid,
-        email: profile.email,
-        displayName: profile.displayName,
-        photoURL: profile.photoURL,
-        emailVerified: true,
-        isAnonymous: false,
-        metadata: {},
-        providerData: [],
-        providerId: 'mock',
-        refreshToken: 'mock-refresh-token',
-        tenantId: null,
-        delete: async () => {},
-        getIdToken: async () => 'mock-id-token',
+        uid: profile.uid, email: profile.email, displayName: profile.displayName, photoURL: profile.photoURL,
+        emailVerified: true, isAnonymous: false, metadata: {}, providerData: [], providerId: 'mock',
+        refreshToken: 'mock-refresh-token', tenantId: null, delete: async () => {}, getIdToken: async () => 'mock-id-token',
         getIdTokenResult: async () => ({ token: 'mock-id-token', claims: {}, expirationTime: '', issuedAtTime: '', signInProvider: null, signInSecondFactor: null}),
-        reload: async () => {},
-        toJSON: () => ({}),
+        reload: async () => {}, toJSON: () => ({}),
       } as FirebaseUser;
 
       setAuthUser(mockFbUser);
       setUserProfile(profile);
-      if (typeof window !== "undefined") {
-        localStorage.setItem('mockUserRole', role);
-      }
+      if (typeof window !== "undefined") localStorage.setItem('mockUserRole', role);
     } else {
       setAuthUser(null);
       setUserProfile(null);
-      if (typeof window !== "undefined") {
-        localStorage.removeItem('mockUserRole');
-      }
+      if (typeof window !== "undefined") localStorage.removeItem('mockUserRole');
     }
-    setLoading(false);
+    if (triggerLoading) setLoading(false);
   };
 
   const signUp = async (data: SignUpFormData): Promise<FirebaseUser | AuthError> => {
-    console.warn("AuthContext: Attempting direct Firebase sign-up. Full profile creation beyond auth is still basic/mock.");
+    console.warn("AuthContext: Attempting direct Firebase sign-up.");
     setLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
       const firebaseUser = userCredential.user;
       
       setAuthUser(firebaseUser);
-      // Create a basic mock student profile for the new Firebase user
       const newProfile: UserProfileData = {
-        uid: firebaseUser.uid,
-        email: firebaseUser.email,
-        displayName: data.name || firebaseUser.displayName || firebaseUser.email, // Use provided name or fallback
-        role: 'student', // Default new sign-ups to student
-        photoURL: firebaseUser.photoURL,
-        registeredEvents: [],
-        tasks: [],
+        uid: firebaseUser.uid, email: firebaseUser.email,
+        displayName: data.name || firebaseUser.displayName || firebaseUser.email,
+        role: 'student', photoURL: firebaseUser.photoURL, registeredEvents: [], tasks: [],
       };
       setUserProfile(newProfile);
-      if (typeof window !== "undefined") {
-        localStorage.setItem('mockUserRole', 'student'); // Store role for persistence
-      }
+      if (typeof window !== "undefined") localStorage.setItem('mockUserRole', 'student');
       setLoading(false);
       return firebaseUser;
     } catch (error) {
@@ -268,68 +173,77 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const logIn = async (data: LoginFormData | UserRole): Promise<{ message: string } | FirebaseUser | AuthError> => {
-    console.warn("Mock Auth: logIn called.");
-    let loggedInUser: FirebaseUser | null = null;
-    let roleToSet: UserRole | null = null;
+  const logIn = async (data: LoginFormData | UserRole): Promise<FirebaseUser | AuthError | { message: string }> => {
+    setLoading(true);
+    // Prioritize direct Firebase login if LoginFormData is provided
+    if (typeof data === 'object' && 'email' in data && 'password' in data) {
+      console.warn("AuthContext: Attempting direct Firebase sign-in.");
+      try {
+        const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
+        const firebaseUser = userCredential.user;
+        setAuthUser(firebaseUser);
 
-    if (typeof data === 'string' && mockUserProfiles[data as UserRole]) {
-      roleToSet = data as UserRole;
-    } else if (typeof data === 'object' && data.email) {
-        const foundRole = Object.values(mockUserProfiles).find(p => p.email === data.email)?.role;
-        if (foundRole) {
-            roleToSet = foundRole;
+        // Attempt to load mock profile if email matches, otherwise set a basic profile
+        const matchingMockProfile = Object.values(mockUserProfiles).find(p => p.email === firebaseUser.email);
+        if (matchingMockProfile) {
+          setUserProfile(matchingMockProfile);
+          if (typeof window !== "undefined") localStorage.setItem('mockUserRole', matchingMockProfile.role);
+        } else {
+          // If no mock profile matches, create a basic one or leave it to be fetched/created later
+          const basicProfile: UserProfileData = {
+            uid: firebaseUser.uid, email: firebaseUser.email,
+            displayName: firebaseUser.displayName || firebaseUser.email,
+            role: 'student', // Default to student if no existing profile
+            photoURL: firebaseUser.photoURL,
+            registeredEvents: [], tasks: [],
+          };
+          setUserProfile(basicProfile);
+          if (typeof window !== "undefined") localStorage.setItem('mockUserRole', 'student');
         }
-    }
-
-    if (roleToSet) {
-      setMockUserRole(roleToSet);
-      const profile = mockUserProfiles[roleToSet];
-      // Create a FirebaseUser-like object for the mock login
-      loggedInUser = { 
-        uid: profile.uid, 
-        email: profile.email, 
-        displayName: profile.displayName, 
-        photoURL: profile.photoURL,
-        emailVerified: true,
-        isAnonymous: false,
-        metadata: {},
-        providerData: [],
-        providerId: 'mock',
-        refreshToken: 'mock-refresh-token',
-        tenantId: null,
-        delete: async () => {},
-        getIdToken: async () => 'mock-id-token',
-        getIdTokenResult: async () => ({ token: 'mock-id-token', claims: {}, expirationTime: '', issuedAtTime: '', signInProvider: null, signInSecondFactor: null}),
-        reload: async () => {},
-        toJSON: () => ({}),
-       } as FirebaseUser;
+        setLoading(false);
+        return firebaseUser;
+      } catch (error) {
+        console.error("Firebase SignIn Error:", error);
+        setAuthUser(null);
+        setUserProfile(null);
+        if (typeof window !== "undefined") localStorage.removeItem('mockUserRole');
+        setLoading(false);
+        return error as AuthError;
+      }
+    } else if (typeof data === 'string' && mockUserProfiles[data as UserRole]) {
+      // Fallback to mock role setting if a UserRole string is passed
+      console.warn("AuthContext: Setting mock user role via logIn function.");
+      setMockUserRole(data as UserRole); // setMockUserRole handles loading state internally if triggerLoading is true (default)
+      // setLoading(false) will be called by setMockUserRole
+      const profile = mockUserProfiles[data as UserRole];
+      return { 
+          uid: profile.uid, email: profile.email, displayName: profile.displayName, photoURL: profile.photoURL,
+          emailVerified: true, isAnonymous: false, metadata: {}, providerData: [], providerId: 'mock',
+          refreshToken: 'mock-refresh-token', tenantId: null, delete: async () => {}, getIdToken: async () => 'mock-id-token',
+          getIdTokenResult: async () => ({ token: 'mock-id-token', claims: {}, expirationTime: '', issuedAtTime: '', signInProvider: null, signInSecondFactor: null}),
+          reload: async () => {}, toJSON: () => ({}),
+      } as FirebaseUser; // Return a FirebaseUser-like object for consistency if needed by caller
     } else {
-      setMockUserRole(null);
-      return { message: "Mock login: Unknown credentials or role. Please select a role directly." };
+      setLoading(false);
+      return { message: "Invalid login data. Provide email/password or a valid UserRole." };
     }
-
-    if(loggedInUser) return loggedInUser;
-    return { message: "Mock login: Failed to establish user session." };
   };
 
   const logOut = async () => {
     console.warn("Mock Auth: logOut called.");
-    setMockUserRole(null);
+    setLoading(true);
+    // Potentially add await auth.signOut(); here if mixing real Firebase sessions
+    setAuthUser(null);
+    setUserProfile(null);
+    if (typeof window !== "undefined") localStorage.removeItem('mockUserRole');
+    setLoading(false);
   };
 
-
   const value = {
-    authUser,
-    userProfile,
-    loading,
-    signUp,
-    logIn,
-    logOut,
-    setMockUserRole,
-    setUserProfile,
+    authUser, userProfile, loading,
+    signUp, logIn, logOut,
+    setMockUserRole, setUserProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-

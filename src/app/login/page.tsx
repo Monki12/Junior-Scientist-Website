@@ -1,35 +1,72 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, FormEvent } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/use-auth';
-import { Loader2, User, Shield } from 'lucide-react';
-import type { UserRole } from '@/types';
-import Link from 'next/link';
+import { useToast } from '@/hooks/use-toast';
+import type { UserRole, LoginFormData } from '@/types';
+import { Loader2, User, Shield, LogIn, KeyRound, UserPlus } from 'lucide-react'; // Added KeyRound, UserPlus
+import { Separator } from '@/components/ui/separator';
 
 const mockRolesToTest: UserRole[] = ['student', 'organizer', 'event_representative', 'overall_head', 'admin', 'test'];
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
-  const { setMockUserRole, loading: authLoading } = useAuth(); // Use the new setMockUserRole
+  const [isFirebaseLoading, setIsFirebaseLoading] = useState(false);
+  const { logIn, setMockUserRole, loading: authLoading } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
+
+  const [formData, setFormData] = useState<LoginFormData>({
+    email: '',
+    password: '',
+  });
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({ ...formData, [e.target.id]: e.target.value });
+  };
+
+  const handleDirectFirebaseLogin = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!formData.email || !formData.password) {
+      toast({ title: "Missing Fields", description: "Email and Password are required for direct login.", variant: "destructive" });
+      return;
+    }
+    setIsFirebaseLoading(true);
+    try {
+      const result = await logIn(formData); // Call logIn with email/password
+      // Check if 'code' exists (AuthError) or 'message' exists (custom error from context)
+      if (result && typeof result === 'object' && ('code' in result || 'message' in result)) {
+         const errorMessage = (result as any).message || 'Login failed. Please check your credentials.';
+        toast({ title: "Login Failed", description: errorMessage, variant: "destructive" });
+      } else {
+        toast({ title: "Login Successful!", description: "Redirecting to dashboard..." });
+        router.push('/dashboard');
+      }
+    } catch (error: any) { // Catch any unexpected errors during the process
+      toast({ title: "Login Error", description: error.message || "An unexpected error occurred.", variant: "destructive" });
+    } finally {
+      setIsFirebaseLoading(false);
+    }
+  };
 
   const handleMockLogin = async (role: UserRole) => {
     setIsLoading(true);
-    // The setMockUserRole function in the context will handle setting authUser and userProfile
     setMockUserRole(role); 
-    // Simulate a small delay for UX if needed, then navigate
-    // No actual async operation, so loading is mostly for UX feedback here
     setTimeout(() => {
       setIsLoading(false);
+      toast({ title: `Mock Login: ${role}`, description: "Successfully logged in with mock role. Redirecting..."});
       router.push('/dashboard'); 
     }, 300);
   };
 
-  if (authLoading && !isLoading) { // Show loader if context is loading but page isn't processing a click
+  if (authLoading && !isLoading && !isFirebaseLoading) {
     return (
       <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -38,22 +75,52 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center animate-fade-in-up">
-      <Card className="w-full max-w-md shadow-xl">
+    <div className="flex min-h-[calc(100vh-15rem)] items-center justify-center py-12 animate-fade-in-up">
+      <Card className="w-full max-w-lg shadow-xl">
         <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-headline text-primary">Select Mock Role to Login</CardTitle>
-          <CardDescription>Authentication is in MOCK mode. Select a role to continue.</CardDescription>
+          <KeyRound className="mx-auto h-12 w-12 text-primary mb-4" />
+          <CardTitle className="text-3xl font-headline text-primary">Welcome Back!</CardTitle>
+          <CardDescription>Log in to your EventFlow account or use mock roles for testing.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        
+        <form onSubmit={handleDirectFirebaseLogin}>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="email">Email Address</Label>
+              <Input id="email" type="email" placeholder="you@example.com" value={formData.email} onChange={handleChange} required disabled={isFirebaseLoading || isLoading} />
+            </div>
+            <div>
+              <Label htmlFor="password">Password</Label>
+              <Input id="password" type="password" placeholder="••••••••" value={formData.password} onChange={handleChange} required disabled={isFirebaseLoading || isLoading} />
+            </div>
+            <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isFirebaseLoading || isLoading}>
+              {isFirebaseLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}
+              Login with Email
+            </Button>
+          </CardContent>
+        </form>
+
+        <div className="px-6 py-2">
+           <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-2 text-muted-foreground">Or continue with mock roles</span>
+            </div>
+            </div>
+        </div>
+
+        <CardContent className="space-y-3 pt-4">
           {mockRolesToTest.map((role) => (
             <Button
               key={role}
               onClick={() => handleMockLogin(role)}
-              className="w-full bg-primary hover:bg-primary/90"
-              disabled={isLoading}
+              className="w-full"
+              disabled={isLoading || isFirebaseLoading}
               variant="outline"
             >
-              {isLoading ? (
+              {isLoading && !isFirebaseLoading ? ( // Show loader only if this button caused it
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 role === 'student' || role === 'test' ? <User className="mr-2 h-4 w-4" /> : <Shield className="mr-2 h-4 w-4" />
@@ -62,11 +129,11 @@ export default function LoginPage() {
             </Button>
           ))}
         </CardContent>
-         <CardFooter className="flex flex-col items-center space-y-2">
+         <CardFooter className="flex flex-col items-center space-y-2 pt-4">
            <p className="text-sm text-muted-foreground">
-            Want to "Sign Up"? (Currently Mocked)
+            Don&apos;t have an account?
             <Link href="/signup" className="font-semibold text-primary hover:underline ml-1">
-              Go to Sign Up
+              <UserPlus className="inline mr-1 h-4 w-4" />Sign Up
             </Link>
           </p>
         </CardFooter>
