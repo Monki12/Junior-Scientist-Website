@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import { ThemeToggle } from '@/components/layout/theme-toggle';
+import { LightBulbToggle } from '@/components/layout/light-bulb-toggle';
 import { 
   Menu, LogOut, UserCircle, Home, Search, Briefcase, Settings, LayoutDashboard, Users, Bell, CalendarCheck, ShieldCheck, ListChecks, FileScan, Phone, MoreHorizontal, ChevronDown
 } from 'lucide-react';
@@ -229,7 +229,7 @@ export default function MainNav() {
         </nav>
 
         <div className="flex items-center gap-2 md:ml-4 ml-auto">
-          <ThemeToggle />
+          <LightBulbToggle />
           {loading ? (
              <div className="h-9 w-9 animate-pulse rounded-full bg-muted"></div>
           ) : authUser ? (
