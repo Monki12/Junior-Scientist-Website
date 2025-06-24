@@ -229,7 +229,7 @@ export default function MainNav() {
         </nav>
 
         <div className="flex items-center gap-2 md:ml-4 ml-auto">
-          <div className="relative top-4">
+          <div>
             <LightBulbToggle />
           </div>
           {loading ? (
