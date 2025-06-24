@@ -229,7 +229,9 @@ export default function MainNav() {
         </nav>
 
         <div className="flex items-center gap-2 md:ml-4 ml-auto">
-          <LightBulbToggle />
+          <div className="relative top-4">
+            <LightBulbToggle />
+          </div>
           {loading ? (
              <div className="h-9 w-9 animate-pulse rounded-full bg-muted"></div>
           ) : authUser ? (
