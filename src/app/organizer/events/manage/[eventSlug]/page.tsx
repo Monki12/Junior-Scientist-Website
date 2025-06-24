@@ -39,6 +39,10 @@ export default function ManageEventDashboardPage() {
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [isEditSettingsDialogOpen, setIsEditSettingsDialogOpen] = useState(false);
 
+  // TODO: For organizer permissions to work with the provided security rules,
+  // this event data must be fetched from a `/subEvents` collection in Firestore,
+  // not from the local `subEventsData.ts` file. The security rules function
+  // `isAssignedToSubEvent` performs a `get()` call on that collection.
   useEffect(() => {
     if (eventSlug) {
       const foundEvent = subEventsData.find(e => e.slug === eventSlug);
@@ -57,6 +61,8 @@ export default function ManageEventDashboardPage() {
       const isEventManagerForThisEvent = userProfile.role === 'event_representative' && userProfile.assignedEventSlug === eventSlug;
       const isAdmin = userProfile.role === 'admin'; // Admins might also have access
       
+      // Note: The logic below relies on client-side data. For security rules to work,
+      // it needs to check against Firestore data, as noted in the TODO above.
       if (!isOverallHead && !isEventManagerForThisEvent && !isAdmin) {
         toast({ title: "Access Denied", description: "You are not authorized to manage this event.", variant: "destructive"});
         router.push('/dashboard'); 
@@ -219,4 +225,3 @@ export default function ManageEventDashboardPage() {
     </div>
   );
 }
-

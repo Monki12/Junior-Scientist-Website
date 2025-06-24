@@ -92,18 +92,17 @@ export default function SignUpPage() {
         console.log("School not found in mock data, will be marked for review:", formData.schoolName);
       }
       
-      // Construct the object with exactly the 10 fields allowed by the security rule
       const profileDataForFirestore = {
           fullName: formData.fullName,
           email: formData.email,
-          schoolName: formData.schoolName, // Store the name student entered
+          schoolName: formData.schoolName,
           standard: formData.standard,
           division: formData.division || null,
           schoolId: determinedSchoolId, 
           schoolVerifiedByOrganizer: determinedSchoolVerified,
-          role: 'student', // Explicitly set role
-          createdAt: serverTimestamp(), // Use serverTimestamp for Firestore
-          updatedAt: serverTimestamp(), // Use serverTimestamp for Firestore
+          role: 'student' as const,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
       };
 
       console.log("Attempting to save profile to Firestore for UID:", uid);
@@ -145,7 +144,6 @@ export default function SignUpPage() {
                 errorTitle = 'Weak Password';
                 errorMessage = 'The password is too weak (minimum 6 characters).';
                 break;
-            // Firestore specific errors often have 'permission-denied' code
             case 'permission-denied':
                 errorTitle = 'Permission Denied';
                 errorMessage = 'Failed to save profile data. This is likely due to Firestore security rules.';
@@ -172,7 +170,7 @@ export default function SignUpPage() {
           <UserPlus className="mx-auto h-12 w-12 text-primary mb-4" />
           <CardTitle className="text-3xl font-headline text-primary">Create Your Student Account</CardTitle>
           <CardDescription>
-            Join EventFlow to explore and participate in exciting events.
+            Join Junior Scientist to explore and participate in exciting events.
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>

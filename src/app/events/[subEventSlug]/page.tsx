@@ -79,7 +79,7 @@ export default function SubEventDetailPage() {
         const q = query(
           collection(db, 'event_registrations'),
           where('userId', '==', currentUserId),
-          where('eventId', '==', event.id)
+          where('subEventId', '==', event.id)
         );
         const querySnapshot = await getDocs(q);
 
@@ -134,9 +134,9 @@ export default function SubEventDetailPage() {
 
     setLoadingAction(true);
     try {
-      const registrationData: Omit<EventRegistration, 'id'> = {
+      const registrationData = {
         userId: currentUserId,
-        eventId: event.id,
+        subEventId: event.id,
         registeredAt: serverTimestamp(),
         registrationStatus: 'pending',
         isTeamRegistration: false,
@@ -145,6 +145,11 @@ export default function SubEventDetailPage() {
         presentee: false,
         submittedDocuments: null,
         lastUpdatedAt: serverTimestamp(),
+        participantInfoSnapshot: {
+          fullName: userProfile.fullName || userProfile.displayName || 'N/A',
+          email: userProfile.email,
+          schoolName: userProfile.schoolName || 'N/A',
+        }
       };
       const docRef = await addDoc(collection(db, 'event_registrations'), registrationData);
       setUserRegistration({ ...registrationData, id: docRef.id, registeredAt: new Date().toISOString(), lastUpdatedAt: new Date().toISOString() }); // Simulate timestamp
@@ -181,29 +186,34 @@ export default function SubEventDetailPage() {
     setLoadingAction(true);
     try {
       const teamRef = doc(collection(db, 'event_teams'));
-      const teamData: Omit<EventTeam, 'id'> = {
+      const teamData = {
         eventId: event.id,
         teamName: createTeamFormData.teamName.trim(),
         teamLeaderId: currentUserId,
         memberUids: [currentUserId],
         teamSize: 1,
-        status: 'pending',
+        status: 'pending' as const,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
       await setDoc(teamRef, teamData);
 
-      const registrationData: Omit<EventRegistration, 'id'> = {
+      const registrationData = {
         userId: currentUserId,
-        eventId: event.id,
+        subEventId: event.id,
         registeredAt: serverTimestamp(),
-        registrationStatus: 'pending',
+        registrationStatus: 'pending' as const,
         isTeamRegistration: true,
         teamId: teamRef.id,
         admitCardUrl: null,
         presentee: false,
         submittedDocuments: null,
         lastUpdatedAt: serverTimestamp(),
+        participantInfoSnapshot: {
+          fullName: userProfile.fullName || userProfile.displayName || 'N/A',
+          email: userProfile.email,
+          schoolName: userProfile.schoolName || 'N/A',
+        }
       };
       const regDocRef = await addDoc(collection(db, 'event_registrations'), registrationData);
       setUserRegistration({ ...registrationData, id: regDocRef.id, registeredAt: new Date().toISOString(), lastUpdatedAt: new Date().toISOString() });
@@ -275,17 +285,22 @@ export default function SubEventDetailPage() {
         updatedAt: serverTimestamp(),
       });
 
-      const registrationData: Omit<EventRegistration, 'id'> = {
+      const registrationData = {
         userId: currentUserId,
-        eventId: event.id,
+        subEventId: event.id,
         registeredAt: serverTimestamp(),
-        registrationStatus: 'pending',
+        registrationStatus: 'pending' as const,
         isTeamRegistration: true,
         teamId: teamToJoin.id,
         admitCardUrl: null,
         presentee: false,
         submittedDocuments: null,
         lastUpdatedAt: serverTimestamp(),
+        participantInfoSnapshot: {
+          fullName: userProfile.fullName || userProfile.displayName || 'N/A',
+          email: userProfile.email,
+          schoolName: userProfile.schoolName || 'N/A',
+        }
       };
       const regDocRef = await addDoc(collection(db, 'event_registrations'), registrationData);
       setUserRegistration({ ...registrationData, id: regDocRef.id, registeredAt: new Date().toISOString(), lastUpdatedAt: new Date().toISOString() });
@@ -511,5 +526,3 @@ export default function SubEventDetailPage() {
     </div>
   );
 }
-
-    

@@ -115,28 +115,46 @@ export default function ManageParticipantsPage() {
       const fetchParticipants = async () => {
         try {
           const registrationsRef = collection(db, 'event_registrations');
-          const q = query(registrationsRef, where('eventId', '==', event.id));
+          const q = query(registrationsRef, where('subEventId', '==', event.id));
           const querySnapshot = await getDocs(q);
           
-          const fetchedParticipants: DisplayParticipant[] = [];
-          for (const regDoc of querySnapshot.docs) {
+          const fetchedParticipantsPromises = querySnapshot.docs.map(async (regDoc) => {
             const regData = regDoc.data() as EventRegistration;
-            // Fetch user details for each registration
+            
+            // Check if participantInfoSnapshot exists and use it
+            if (regData.participantInfoSnapshot) {
+              return {
+                ...regData.participantInfoSnapshot, // Spread the snapshot
+                uid: regData.userId, // Ensure UID is present
+                registrationId: regDoc.id,
+                registrationStatus: regData.registrationStatus,
+                presentee: regData.presentee || false,
+                admitCardUrl: regData.admitCardUrl,
+                registeredAt: regData.registeredAt?.toDate ? regData.registeredAt.toDate().toISOString() : new Date().toISOString(),
+                role: 'student' // Assume role from context
+              } as DisplayParticipant;
+            }
+
+            // Fallback: Fetch user details if snapshot is missing
             const userDocRef = doc(db, 'users', regData.userId);
             const userDocSnap = await getDoc(userDocRef);
             if (userDocSnap.exists()) {
               const userData = userDocSnap.data() as UserProfileData;
-              fetchedParticipants.push({
+              return {
                 ...userData, // Spread user profile data
                 registrationId: regDoc.id,
                 registrationStatus: regData.registrationStatus,
                 presentee: regData.presentee || false,
                 admitCardUrl: regData.admitCardUrl,
-                registeredAt: regData.registeredAt?.toDate ? regData.registeredAt.toDate().toISOString() : new Date().toISOString(), // Handle Timestamp
-              });
+                registeredAt: regData.registeredAt?.toDate ? regData.registeredAt.toDate().toISOString() : new Date().toISOString(),
+              } as DisplayParticipant;
             }
-          }
+            return null;
+          });
+
+          const fetchedParticipants = (await Promise.all(fetchedParticipantsPromises)).filter(p => p !== null) as DisplayParticipant[];
           setParticipants(fetchedParticipants);
+
         } catch (error) {
           console.error("Error fetching participants:", error);
           toast({ title: "Error", description: "Could not fetch participant data.", variant: "destructive" });
@@ -430,5 +448,3 @@ export default function ManageParticipantsPage() {
     </div>
   );
 }
-
-    

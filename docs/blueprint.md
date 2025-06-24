@@ -1,4 +1,4 @@
-# **App Name**: EventFlow
+# **App Name**: Junior Scientist
 
 ## Core Features:
 
