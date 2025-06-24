@@ -196,87 +196,87 @@ export default function MainNav() {
         <Link href="/" className="flex items-center" aria-label="Junior Scientist Home">
           <Logo className="h-12 w-8" />
         </Link>
+        
+        <div className="ml-auto flex items-center gap-2">
+          <nav className="hidden md:flex items-center space-x-1 lg:space-x-2">
+            {allDisplayableNavLinks.length <= MAX_DESKTOP_NAV_LINKS_DIRECT ? (
+              allDisplayableNavLinks.map(link => (
+                <NavLinkItem key={link.href} href={link.href} label={link.label} Icon={link.icon} />
+              ))
+            ) : (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-9 w-9">
+                    <Menu className="h-5 w-5" />
+                    <span className="sr-only">More navigation links</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  {allDisplayableNavLinks.map(link => (
+                    <DropdownMenuItem key={link.href} asChild>
+                      <Link 
+                        href={link.href} 
+                        onClick={(e) => handleLinkClick(link.href, e)}
+                        className="flex items-center w-full"
+                      >
+                        <link.icon className="mr-2 h-4 w-4" />
+                        {link.label}
+                      </Link>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </nav>
 
-        <nav className="hidden md:flex items-center space-x-1 lg:space-x-2 ml-auto">
-          {allDisplayableNavLinks.length <= MAX_DESKTOP_NAV_LINKS_DIRECT ? (
-            allDisplayableNavLinks.map(link => (
-              <NavLinkItem key={link.href} href={link.href} label={link.label} Icon={link.icon} />
-            ))
-          ) : (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-9 w-9">
-                  <Menu className="h-5 w-5" />
-                  <span className="sr-only">More navigation links</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                {allDisplayableNavLinks.map(link => (
-                  <DropdownMenuItem key={link.href} asChild>
-                    <Link 
-                      href={link.href} 
-                      onClick={(e) => handleLinkClick(link.href, e)}
-                      className="flex items-center w-full"
-                    >
-                      <link.icon className="mr-2 h-4 w-4" />
-                      {link.label}
-                    </Link>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </nav>
-
-        <div className="flex items-center gap-2 md:ml-4 ml-auto">
-          <div>
-            <LightBulbToggle />
+          <div className="hidden md:flex items-center gap-2">
+             <LightBulbToggle />
+             {loading ? (
+               <div className="h-9 w-9 animate-pulse rounded-full bg-muted"></div>
+             ) : authUser ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="relative h-10 w-10 rounded-full group p-0">
+                      <UserAvatar />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-56" align="end" forceMount>
+                    <DropdownMenuLabel className="font-normal">
+                      <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-medium leading-none">{userProfile?.displayName || authUser.displayName || authUser.email}</p>
+                        <p className="text-xs leading-none text-muted-foreground">
+                          {authUser.email} {userProfile?.role ? `(${userProfile.role.replace('_', ' ')})` : ''}
+                        </p>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => router.push('/dashboard')}>
+                        <LayoutDashboard className="mr-2 h-4 w-4" />
+                        Dashboard
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push('/profile')}>
+                      <UserCircle className="mr-2 h-4 w-4" />
+                      Profile
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive-foreground focus:bg-destructive/90">
+                      <LogOut className="mr-2 h-4 w-4" />
+                      Log out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+             ) : (
+                <>
+                  <Button variant="outline" asChild>
+                    <Link href="/login">Log In</Link>
+                  </Button>
+                  <Button asChild className="bg-accent hover:bg-accent/80 text-accent-foreground">
+                    <Link href="/signup">Sign Up</Link>
+                  </Button>
+                </>
+             )}
           </div>
-          {loading ? (
-             <div className="h-9 w-9 animate-pulse rounded-full bg-muted"></div>
-          ) : authUser ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-10 w-10 rounded-full group p-0">
-                  <UserAvatar />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end" forceMount>
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{userProfile?.displayName || authUser.displayName || authUser.email}</p>
-                    <p className="text-xs leading-none text-muted-foreground">
-                      {authUser.email} {userProfile?.role ? `(${userProfile.role.replace('_', ' ')})` : ''}
-                    </p>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => router.push('/dashboard')}>
-                    <LayoutDashboard className="mr-2 h-4 w-4" />
-                    Dashboard
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push('/profile')}>
-                  <UserCircle className="mr-2 h-4 w-4" />
-                  Profile
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive-foreground focus:bg-destructive/90">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Log out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <div className="hidden md:flex items-center gap-2">
-              <Button variant="outline" asChild>
-                <Link href="/login">Log In</Link>
-              </Button>
-              <Button asChild className="bg-accent hover:bg-accent/80 text-accent-foreground">
-                <Link href="/signup">Sign Up</Link>
-              </Button>
-            </div>
-          )}
-
+          
           <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
             <SheetTrigger asChild className="md:hidden">
               <Button variant="ghost" size="icon" className="h-9 w-9">
@@ -285,35 +285,44 @@ export default function MainNav() {
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-[280px] p-0 flex flex-col bg-card">
-                <SheetHeader className="border-b p-4">
-                  <SheetTitle className="sr-only">Main Navigation Menu</SheetTitle>
-                   <Link href="/" className="flex items-center" aria-label="Junior Scientist Home" onClick={() => setIsMobileMenuOpen(false)}>
+                <SheetHeader className="border-b p-4 flex flex-row justify-between items-center">
+                  <Link href="/" className="flex items-center" aria-label="Junior Scientist Home" onClick={() => setIsMobileMenuOpen(false)}>
                     <Logo className="h-12 w-8" />
                   </Link>
+                  <LightBulbToggle />
                 </SheetHeader>
                 <nav className="flex-grow space-y-1 p-4 overflow-y-auto">
                   {allDisplayableNavLinks.map(link => (
                      <NavLinkItem key={link.href} href={link.href} label={link.label} Icon={link.icon} onClick={() => setIsMobileMenuOpen(false)} />
                   ))}
                 </nav>
-                {!authUser && !loading && (
-                  <div className="border-t p-4 space-y-2">
-                    <Button variant="outline" className="w-full" asChild onClick={() => setIsMobileMenuOpen(false)}>
-                      <Link href="/login">Log In</Link>
-                    </Button>
-                    <Button className="w-full bg-accent hover:bg-accent/80 text-accent-foreground" asChild onClick={() => setIsMobileMenuOpen(false)}>
-                      <Link href="/signup">Sign Up</Link>
-                    </Button>
-                  </div>
-                )}
-                 {authUser && !loading && (
-                  <div className="border-t p-4 space-y-2">
-                    <Button variant="destructive" className="w-full" onClick={() => {handleLogout(); setIsMobileMenuOpen(false);}}>
-                      <LogOut className="mr-2 h-4 w-4" />
-                      Log out
-                    </Button>
-                  </div>
-                 )}
+                <div className="border-t p-4 mt-auto">
+                  {authUser ? (
+                     <div className="space-y-2">
+                       <div className="flex items-center gap-2 p-2 rounded-md hover:bg-muted">
+                          <UserAvatar/>
+                          <div className="flex flex-col">
+                             <span className="text-sm font-medium leading-none">{userProfile?.displayName || authUser.displayName || "User"}</span>
+                             <span className="text-xs leading-none text-muted-foreground">{authUser.email}</span>
+                          </div>
+                       </div>
+                       <DropdownMenuSeparator />
+                      <Button variant="destructive" className="w-full" onClick={() => {handleLogout(); setIsMobileMenuOpen(false);}}>
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Log out
+                      </Button>
+                    </div>
+                  ) : !loading && (
+                    <div className="space-y-2">
+                      <Button variant="outline" className="w-full" asChild onClick={() => setIsMobileMenuOpen(false)}>
+                        <Link href="/login">Log In</Link>
+                      </Button>
+                      <Button className="w-full bg-accent hover:bg-accent/80 text-accent-foreground" asChild onClick={() => setIsMobileMenuOpen(false)}>
+                        <Link href="/signup">Sign Up</Link>
+                      </Button>
+                    </div>
+                  )}
+                </div>
             </SheetContent>
           </Sheet>
         </div>
