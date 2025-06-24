@@ -92,22 +92,36 @@ export default function MagnetLines({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [mousePosition, setMousePosition] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
+  const mouseMoveEventRef = useRef<MouseEvent | null>(null);
 
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
-      setMousePosition({ x: event.clientX, y: event.clientY });
+      mouseMoveEventRef.current = event;
     };
-    
+
     const handleMouseLeave = () => {
+      mouseMoveEventRef.current = null;
       setMousePosition({ x: null, y: null });
     };
 
+    const updatePosition = () => {
+      if (mouseMoveEventRef.current) {
+        setMousePosition({
+          x: mouseMoveEventRef.current.clientX,
+          y: mouseMoveEventRef.current.clientY,
+        });
+      }
+      animationFrameId = requestAnimationFrame(updatePosition);
+    };
+
+    let animationFrameId = requestAnimationFrame(updatePosition);
     const currentContainer = containerRef.current;
-    // We listen on the window to track the mouse everywhere, not just inside the container
+
     window.addEventListener('mousemove', handleMouseMove);
     currentContainer?.addEventListener('mouseleave', handleMouseLeave);
 
     return () => {
+      cancelAnimationFrame(animationFrameId);
       window.removeEventListener('mousemove', handleMouseMove);
       currentContainer?.removeEventListener('mouseleave', handleMouseLeave);
     };
