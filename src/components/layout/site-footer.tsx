@@ -1,6 +1,7 @@
 
-import { Atom, Shield } from 'lucide-react';
+import { Shield } from 'lucide-react';
 import Link from 'next/link';
+import { Logo } from '@/components/layout/logo';
 
 export default function SiteFooter() {
   return (
@@ -8,11 +9,10 @@ export default function SiteFooter() {
       <div className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start md:items-center">
           <div className="flex flex-col items-center md:items-start text-center md:text-left">
-            <Link href="/" className="flex items-center gap-2 text-lg font-bold text-primary mb-2 font-headline hover:opacity-90">
-              <Atom className="h-6 w-6" />
-              Junior Scientist
+            <Link href="/" aria-label="Junior Scientist Home">
+              <Logo className="h-16 w-11" />
             </Link>
-            <p className="text-xs">Student event registration platform.</p>
+            <p className="text-xs mt-2">Student event registration platform.</p>
             <p className="text-xs">An Initiative by AXIS, VNIT Nagpur.</p>
           </div>
 

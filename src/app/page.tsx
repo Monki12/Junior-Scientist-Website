@@ -3,8 +3,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card'; // Added CardFooter
-import { Atom, CheckCircle, Users, Cpu, Bot, Puzzle, Award, Brain, MessageSquare, TrendingUp, ShieldCheck, BookOpen, Users2, Phone, Mail, Instagram, Facebook, Twitter, ArrowDown, Sparkles, Zap, Trophy, Info } from 'lucide-react'; // Added Info
+import { CheckCircle, Users, Cpu, Bot, Puzzle, Award, Brain, MessageSquare, TrendingUp, ShieldCheck, BookOpen, Users2, Phone, Mail, Instagram, Facebook, Twitter, ArrowDown, Sparkles, Zap, Trophy, Info } from 'lucide-react'; // Added Info
 import { subEventsData } from '@/data/subEvents';
+import { Logo } from '@/components/layout/logo';
 
 const superpowerCategories = [
   {
@@ -67,8 +68,8 @@ export default function JuniorScientistHomePage() {
            <Image src="https://placehold.co/1920x1080.png" alt="Abstract background pattern" fill style={{ objectFit: 'cover' }} data-ai-hint="abstract geometric light" priority />
         </div>
         <div className="container mx-auto px-4 relative z-10">
-          <Atom className="h-16 w-16 md:h-20 md:w-20 text-primary mx-auto mb-6 animate-bounce" /> {/* Changed animation */}
-          <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-4 text-primary uppercase" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+          <Logo className="h-32 w-20 md:h-40 md:w-28 mx-auto mb-6" />
+          <h1 className="sr-only">
             Junior Scientist
           </h1>
           <p className="text-xl md:text-2xl text-foreground/80 mb-6 max-w-3xl mx-auto">

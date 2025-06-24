@@ -19,10 +19,11 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { 
-  Atom, Menu, LogOut, UserCircle, Home, Search, Briefcase, Settings, LayoutDashboard, Users, Bell, CalendarCheck, ShieldCheck, ListChecks, FileScan, Phone, MoreHorizontal, ChevronDown
+  Menu, LogOut, UserCircle, Home, Search, Briefcase, Settings, LayoutDashboard, Users, Bell, CalendarCheck, ShieldCheck, ListChecks, FileScan, Phone, MoreHorizontal, ChevronDown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { UserProfileData } from '@/types';
+import { Logo } from '@/components/layout/logo';
 
 
 const commonBaseLinks = [
@@ -180,7 +181,7 @@ export default function MainNav() {
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between">
           <div className="flex items-center gap-2 text-lg font-bold text-primary">
-            <Atom className="h-6 w-6 animate-pulse" />
+            <div className="h-8 w-12 animate-pulse rounded-md bg-muted"></div>
             <span className="w-32 h-6 bg-muted rounded animate-pulse"></span>
           </div>
           <div className="h-8 w-20 animate-pulse rounded-md bg-muted"></div>
@@ -192,7 +193,9 @@ export default function MainNav() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
       <div className="container flex h-16 items-center">
-        <NavLinkItem href="/" label="Junior Scientist" Icon={Atom} isBranding />
+        <Link href="/" className="flex items-center" aria-label="Junior Scientist Home">
+          <Logo className="h-12 w-8" />
+        </Link>
 
         <nav className="hidden md:flex items-center space-x-1 lg:space-x-2 ml-auto">
           {allDisplayableNavLinks.length <= MAX_DESKTOP_NAV_LINKS_DIRECT ? (
@@ -282,7 +285,9 @@ export default function MainNav() {
             <SheetContent side="right" className="w-[280px] p-0 flex flex-col bg-card">
                 <SheetHeader className="border-b p-4">
                   <SheetTitle className="sr-only">Main Navigation Menu</SheetTitle>
-                  <NavLinkItem href="/" label="Junior Scientist" Icon={Atom} isBranding onClick={() => setIsMobileMenuOpen(false)}/>
+                   <Link href="/" className="flex items-center" aria-label="Junior Scientist Home" onClick={() => setIsMobileMenuOpen(false)}>
+                    <Logo className="h-12 w-8" />
+                  </Link>
                 </SheetHeader>
                 <nav className="flex-grow space-y-1 p-4 overflow-y-auto">
                   {allDisplayableNavLinks.map(link => (
