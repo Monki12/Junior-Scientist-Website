@@ -10,7 +10,7 @@ import { BellRing, Loader2, Info, CheckCircle, AlertTriangle } from 'lucide-reac
 
 // Mock notifications data
 const initialMockNotifications = [
-  { id: '1', type: 'info', title: 'Welcome to EventFlow!', message: 'Explore events and manage your activities seamlessly.', date: '2024-07-28', read: false },
+  { id: '1', type: 'info', title: 'Welcome to Junior Scientist!', message: 'Explore events and manage your activities seamlessly.', date: '2024-07-28', read: false },
   { id: '2', type: 'success', title: 'Profile Updated', message: 'Your profile information has been successfully updated.', date: '2024-07-27', read: true },
   { id: '3', type: 'warning', title: 'Upcoming Event Reminder', message: 'Tech Conference 2024 is starting in 3 days.', date: '2024-07-26', read: false },
   { id: '4', type: 'info', title: 'New Event Posted', message: 'Check out the new "Art Workshop" event in your area.', date: '2024-07-25', read: true },

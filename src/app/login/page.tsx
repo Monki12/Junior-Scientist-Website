@@ -82,7 +82,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-lg shadow-xl">
         <CardHeader className="text-center">
           <KeyRound className="mx-auto h-12 w-12 text-primary mb-4" />
-          <CardTitle className="text-3xl font-headline text-primary">Welcome to EventFlow!</CardTitle>
+          <CardTitle className="text-3xl font-headline text-primary">Welcome to Junior Scientist!</CardTitle>
           <CardDescription>Log in to access your student dashboard or use mock roles for testing.</CardDescription>
         </CardHeader>
         

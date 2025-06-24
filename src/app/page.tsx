@@ -55,8 +55,8 @@ const perks = [
   },
 ];
 
-// Homepage uses the new EventFlow theme
-export default function EventFlowHomePage() {
+// Homepage uses the new Junior Scientist theme
+export default function JuniorScientistHomePage() {
   const featuredEvents = subEventsData.filter(event => event.isFeatured).slice(0, 3);
 
   return (
@@ -202,14 +202,14 @@ export default function EventFlowHomePage() {
           <p className="text-xl md:text-2xl font-semibold italic max-w-3xl mx-auto">
             "We empower students to explore their potential and shape the future through engaging events."
           </p>
-           <p className="text-md text-accent-foreground/80 mt-3">- The EventFlow Team</p>
+           <p className="text-md text-accent-foreground/80 mt-3">- The Junior Scientist Team</p>
         </div>
       </section>
       
       {/* Perks Section */}
       <section className="w-full py-12 md:py-20 bg-background">
         <div className="container mx-auto px-4">
-           <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 text-primary">Why Choose EventFlow?</h2>
+           <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 text-primary">Why Choose Junior Scientist?</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {perks.map((perk) => (
               <Card key={perk.title} className="bg-card shadow-soft p-6 text-center rounded-xl border border-border/30">
@@ -229,7 +229,7 @@ export default function EventFlowHomePage() {
           <p className="text-lg text-muted-foreground mb-8 max-w-lg mx-auto">Have questions or want to partner with us? We'd love to hear from you!</p>
           <div className="flex flex-col md:flex-row justify-center items-center gap-x-6 gap-y-4 mb-8">
              <Button size="lg" variant="outline" className="border-accent text-accent hover:bg-accent/10 hover:text-accent-foreground rounded-lg shadow-sm" asChild>
-              <a href="mailto:contact@eventflow.com">
+              <a href="mailto:contact@juniorscientist.events">
                 <Mail className="mr-2 h-5 w-5" /> Email Us
               </a>
             </Button>

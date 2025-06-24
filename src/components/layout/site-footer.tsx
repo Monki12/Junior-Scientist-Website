@@ -10,14 +10,14 @@ export default function SiteFooter() {
           <div className="flex flex-col items-center md:items-start text-center md:text-left">
             <Link href="/" className="flex items-center gap-2 text-lg font-bold text-primary mb-2 font-headline hover:opacity-90">
               <Atom className="h-6 w-6" />
-              EventFlow
+              Junior Scientist
             </Link>
             <p className="text-xs">Student event registration platform.</p>
             <p className="text-xs">An Initiative by AXIS, VNIT Nagpur.</p>
           </div>
 
           <div className="text-center text-xs">
-            <p>&copy; {new Date().getFullYear()} EventFlow. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} Junior Scientist. All rights reserved.</p>
             <p className="mt-1">
               Powered by Innovation | Designed for Connection
             </p>
@@ -37,4 +37,3 @@ export default function SiteFooter() {
     </footer>
   );
 }
-

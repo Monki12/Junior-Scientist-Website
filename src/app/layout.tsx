@@ -8,8 +8,8 @@ import { ThemeProvider } from '@/contexts/theme-provider';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'EventFlow', // Updated title
-  description: 'Student event registration platform. Explore, register, and manage events seamlessly.',
+  title: 'Junior Scientist',
+  description: 'The official platform for the Junior Scientist event. Explore, register, and manage your participation.',
 };
 
 export default function RootLayout({

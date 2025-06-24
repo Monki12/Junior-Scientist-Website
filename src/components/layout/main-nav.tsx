@@ -192,7 +192,7 @@ export default function MainNav() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
       <div className="container flex h-16 items-center">
-        <NavLinkItem href="/" label="EventFlow" Icon={Atom} isBranding />
+        <NavLinkItem href="/" label="Junior Scientist" Icon={Atom} isBranding />
 
         <nav className="hidden md:flex items-center space-x-1 lg:space-x-2 ml-auto">
           {allDisplayableNavLinks.length <= MAX_DESKTOP_NAV_LINKS_DIRECT ? (
@@ -282,7 +282,7 @@ export default function MainNav() {
             <SheetContent side="right" className="w-[280px] p-0 flex flex-col bg-card">
                 <SheetHeader className="border-b p-4">
                   <SheetTitle className="sr-only">Main Navigation Menu</SheetTitle>
-                  <NavLinkItem href="/" label="EventFlow" Icon={Atom} isBranding onClick={() => setIsMobileMenuOpen(false)}/>
+                  <NavLinkItem href="/" label="Junior Scientist" Icon={Atom} isBranding onClick={() => setIsMobileMenuOpen(false)}/>
                 </SheetHeader>
                 <nav className="flex-grow space-y-1 p-4 overflow-y-auto">
                   {allDisplayableNavLinks.map(link => (
