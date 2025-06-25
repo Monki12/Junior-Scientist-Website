@@ -4,153 +4,114 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper Functions
+    // Helper functions
     function isAuthenticated() {
       return request.auth != null;
     }
-
-    function getUserData(uid) {
-      return get(/databases/$(database)/documents/users/$(uid)).data;
-    }
-
-    function getRole(uid) {
-      // Gracefully handle cases where the role might not exist on a user doc yet
-      return 'role' in getUserData(uid) ? getUserData(uid).role : '';
+    
+    function isStudent(uid) {
+      return getUserData(uid).role == 'student';
     }
 
     function isOverallOrAdmin() {
       return isAuthenticated() && getRole(request.auth.uid) in ['overall_head', 'admin'];
     }
-
-    function isStudent() {
-      return isAuthenticated() && getRole(request.auth.uid) == 'student';
-    }
-
+    
     function isEventRepresentative() {
       return isAuthenticated() && getRole(request.auth.uid) == 'event_representative';
     }
-    
+
     function isOrganizer() {
       return isAuthenticated() && getRole(request.auth.uid) == 'organizer';
     }
 
+    function getRole(uid) {
+      return getUserData(uid).role;
+    }
+    
+    function getUserData(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data;
+    }
+
     function isAssignedToSubEvent(subEventId) {
       let eventData = get(/databases/$(database)/documents/subEvents/$(subEventId)).data;
-      // Check if eventReps exists and is a list before checking for UID
+      let userUID = request.auth.uid;
       return isAuthenticated() && (
         isOverallOrAdmin() ||
-        ('eventReps' in eventData && eventData.eventReps is list && request.auth.uid in eventData.eventReps)
+        (eventData.eventReps != null && userUID in eventData.eventReps) ||
+        (eventData.organizerUids != null && userUID in eventData.organizerUids)
       );
     }
     
     function isValidStudentProfile(data) {
-        return data.role == 'student'
-            && data.fullName is string && data.fullName.size() > 0
-            && data.schoolName is string && data.schoolName.size() > 0
-            && data.standard is string && data.standard.size() > 0
-            && data.email == request.auth.email
-            && data.keys().hasAll(['fullName', 'email', 'schoolName', 'standard', 'role', 'createdAt', 'updatedAt', 'phoneNumbers', 'shortId'])
-            && data.createdAt == request.time && data.updatedAt == request.time;
+        return data.fullName is string && data.fullName.size() > 0 &&
+               data.email is string &&
+               data.schoolName is string && data.schoolName.size() > 0 &&
+               data.standard is string && data.standard.size() > 0 &&
+               data.phoneNumbers is list && data.phoneNumbers.size() > 0 &&
+               data.role == 'student';
     }
     
     function isValidStaffProfile(data) {
-        return data.role in ['organizer', 'event_representative', 'overall_head', 'admin']
-            && data.fullName is string && data.fullName.size() > 0
-            && data.collegeRollNumber is string && data.collegeRollNumber.matches('^[A-Z]{2}\\d{2}[A-Z]{3}\\d{3}$')
-            && data.department is string && data.department.size() > 0
-            && data.email == request.auth.email
-            && data.keys().hasAll(['fullName', 'email', 'collegeRollNumber', 'department', 'role', 'createdAt', 'updatedAt', 'phoneNumbers'])
-            && data.createdAt == request.time && data.updatedAt == request.time;
+        return data.fullName is string && data.fullName.size() > 0 &&
+               data.email is string &&
+               data.collegeRollNumber is string && data.collegeRollNumber.matches('^[A-Z]{2}\\d{2}[A-Z]{3}\\d{3}$') &&
+               data.department is string && data.department.size() > 0 &&
+               data.phoneNumbers is list && data.phoneNumbers.size() > 0 &&
+               data.role in ['organizer', 'event_representative', 'overall_head', 'admin'];
     }
 
-
-    // USER PROFILES
+    // users collection
     match /users/{userId} {
-      allow read: if isAuthenticated() && (request.auth.uid == userId || isOverallOrAdmin());
+      allow create: if 
+        // Case 1: A new user is signing up as a student.
+        (request.auth.uid == userId && isValidStudentProfile(request.resource.data)) ||
+        // Case 2: A user is creating their own initial admin account.
+        (request.auth.uid == userId && isValidStaffProfile(request.resource.data)) ||
+        // Case 3: An existing admin is creating a staff account for someone else.
+        (isOverallOrAdmin() && isValidStaffProfile(request.resource.data));
 
-      allow create: if request.auth.uid == userId && (
-        isValidStudentProfile(request.resource.data) ||
-        isValidStaffProfile(request.resource.data)
-      );
+      allow read: if isAuthenticated();
+      allow update: if 
+        // A user can update their own profile with specific fields
+        (request.auth.uid == userId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'photoURL', 'phoneNumbers', 'additionalNumber', 'schoolName', 'standard', 'division', 'department', 'updatedAt'])) ||
+        // An admin can update more fields on any user
+        (isOverallOrAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'points', 'credibilityScore', 'schoolVerifiedByOrganizer', 'subEventsManaged', 'assignedEventSlug', 'displayName', 'photoURL', 'phoneNumbers', 'additionalNumber', 'schoolName', 'standard', 'division', 'department', 'updatedAt']));
+      allow delete: if isOverallOrAdmin();
+    }
 
-      allow update: if isAuthenticated() && (
-        (request.auth.uid == userId &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'updatedAt', 'photoURL', 'phoneNumbers', 'additionalNumber', 'schoolName', 'standard', 'division', 'department', 'schoolVerifiedByOrganizer'
-          ]) &&
-          request.resource.data.updatedAt == request.time
-        ) ||
-        (isOverallOrAdmin() &&
-          request.resource.data.diff(resource.data).affectedKeys().hasAny([
-            'updatedAt', 'role', 'points', 'credibilityScore', 'subEventsManaged', 'assignedEventSlug',
-            'photoURL', 'phoneNumbers', 'additionalNumber', 'schoolName', 'standard', 'division', 'department', 'schoolVerifiedByOrganizer', 'fullName'
-          ]) &&
-          request.resource.data.updatedAt == request.time
-        )
-      );
-      
+    // subEvents collection
+    match /subEvents/{subEventId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isOverallOrAdmin() &&
+        request.resource.data.title is string &&
+        request.resource.data.superpowerCategory is string &&
+        request.resource.data.isTeamBased is bool;
       allow delete: if isOverallOrAdmin();
     }
     
-    // SUB-EVENTS
-    match /subEvents/{subEventId} {
-      allow read: if isAuthenticated();
-      allow create, update, delete: if isOverallOrAdmin();
-    }
-    
-    // EVENT REGISTRATIONS
+    // event_registrations collection
     match /event_registrations/{registrationId} {
-        allow read: if isAuthenticated() && (
-            request.auth.uid == resource.data.userId ||
-            isAssignedToSubEvent(resource.data.subEventId)
-        );
-        
-        allow create: if isStudent() && request.auth.uid == request.resource.data.userId;
-        
-        allow update: if isAssignedToSubEvent(resource.data.subEventId) && 
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'registrationStatus', 'admitCardUrl', 'presentee', 'submittedDocuments', 'lastUpdatedAt'
-            ]);
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAssignedToSubEvent(resource.data.subEventId));
+      allow update: if isAssignedToSubEvent(resource.data.subEventId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasAny(['registrationStatus', 'admitCardUrl', 'presentee', 'lastUpdatedAt']);
+      allow delete: if isOverallOrAdmin();
     }
     
-    // EVENT TEAMS
+    // event_teams collection
     match /event_teams/{teamId} {
-        allow read: if isAuthenticated() && (
-            ('memberUids' in resource.data && resource.data.memberUids is list && request.auth.uid in resource.data.memberUids) ||
-            isAssignedToSubEvent(resource.data.eventId)
-        );
-        
-        allow create: if isStudent() && request.resource.data.teamLeaderId == request.auth.uid;
-        
-        allow update: if isAuthenticated() && ( 
-            (request.auth.uid == resource.data.teamLeaderId && 
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberUids', 'teamSize', 'updatedAt'])) ||
-            (isAssignedToSubEvent(resource.data.eventId) &&
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']))
-        );
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.teamLeaderId;
+      allow read: if isAuthenticated() && (resource.data.memberUids.hasAny([request.auth.uid]) || isAssignedToSubEvent(resource.data.eventId));
+      allow update: if (isAuthenticated() && request.auth.uid == resource.data.teamLeaderId) || isAssignedToSubEvent(resource.data.eventId);
+      allow delete: if isOverallOrAdmin();
     }
 
-    // TASKS
+    // tasks collection
     match /tasks/{taskId} {
-      function isTaskAssignee() {
-        return 'assignedTo' in resource.data && resource.data.assignedTo is list && getUserData(request.auth.uid).displayName in resource.data.assignedTo;
-      }
-      function isTaskCreator() {
-        return 'createdBy' in resource.data && resource.data.createdBy == getUserData(request.auth.uid).displayName;
-      }
-    
-      allow create: if isOverallOrAdmin();
-
-      allow read: if isAuthenticated() && (
-        isOverallOrAdmin() || isTaskAssignee() || isTaskCreator()
-      );
-      
-      allow update: if isAuthenticated() && (
-        isOverallOrAdmin() ||
-        (isTaskAssignee() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
-        (isTaskCreator() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'points', 'updatedAt', 'title', 'description', 'dueDate', 'priority', 'assignedTo']))
-      );
-      
+      allow create: if isOverallOrAdmin() || isOrganizer() || isEventRepresentative();
+      allow read: if isAuthenticated() && (isOverallOrAdmin() || (resource.data.assignedTo != null && request.auth.token.name in resource.data.assignedTo));
+      allow update: if isAuthenticated() && (isOverallOrAdmin() || (resource.data.assignedTo != null && request.auth.token.name in resource.data.assignedTo));
       allow delete: if isOverallOrAdmin();
     }
   }

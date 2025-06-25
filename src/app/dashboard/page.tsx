@@ -23,7 +23,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Calendar } from '@/components/ui/calendar';
 import { auth, db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, getDoc, updateDoc, serverTimestamp, addDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, updateDoc, serverTimestamp, addDoc, deleteDoc } from 'firebase/firestore';
 
 
 import { format, isToday, isPast, isThisWeek, startOfDay, parseISO, isValid } from 'date-fns';
@@ -49,7 +49,7 @@ const defaultEventFormState: Omit<SubEvent, 'id' | 'slug' | 'mainImage'> & { mai
   maxTeamMembers: 1,
   status: 'Planning',
   venue: '',
-  eventReps: [],
+  eventReps: '',
   registeredParticipantCount: 0,
   organizers_str: '',
 };
@@ -420,14 +420,18 @@ export default function DashboardPage() {
   };
 
   const confirmDeleteEvent = async () => {
-    // This is a destructive action and should be handled with care
-    // For now, we will just remove from local state.
-    // In a real app, this would involve deleting from Firestore and handling cascading deletes.
     if (eventToDelete) {
-      setAllPlatformEvents(prev => prev.filter(e => e.id !== eventToDelete.id));
-      toast({ title: `Mock: Event "${eventToDelete.title}" deleted.`});
-      setIsDeleteEventConfirmOpen(false);
-      setEventToDelete(null);
+       try {
+        await deleteDoc(doc(db, "subEvents", eventToDelete.id));
+        setAllPlatformEvents(prev => prev.filter(e => e.id !== eventToDelete.id));
+        toast({ title: `Event "${eventToDelete.title}" deleted.`});
+      } catch (error) {
+        console.error("Error deleting event:", error);
+        toast({ title: "Error", description: "Could not delete the event.", variant: "destructive" });
+      } finally {
+        setIsDeleteEventConfirmOpen(false);
+        setEventToDelete(null);
+      }
     }
   };
 
@@ -720,7 +724,7 @@ export default function DashboardPage() {
                         <TableHead>Date</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Participants</TableHead>
-                        <TableHead>Actions</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -738,6 +742,11 @@ export default function DashboardPage() {
                             <Button variant="ghost" size="icon" className="hover:bg-muted/50 h-8 w-8" onClick={() => openEditEventDialog(event)}>
                               <Pencil className="h-4 w-4" /> <span className="sr-only">Edit Event</span>
                             </Button>
+                             <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" className="hover:bg-destructive/10 h-8 w-8" onClick={() => setEventToDelete(event)}>
+                                <Trash2 className="h-4 w-4 text-destructive" /> <span className="sr-only">Delete Event</span>
+                              </Button>
+                            </AlertDialogTrigger>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -759,13 +768,12 @@ export default function DashboardPage() {
         }}>
             <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>{editingEventId ? `Edit Event` : "Create New Event"}</DialogTitle>
+                    <DialogTitle>{editingEventId ? `Edit Event: ${currentEventForm.title}` : "Create New Event"}</DialogTitle>
                     <DialogDescription>
                        Fill in the details for the event. Click save when you&apos;re done.
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleEventFormSubmit} className="grid gap-4 py-4">
-                    {/* Form fields as before... */}
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <Label htmlFor="eventTitle">Event Title</Label>
@@ -784,8 +792,12 @@ export default function DashboardPage() {
                             </Select>
                         </div>
                     </div>
+                     <div>
+                        <Label htmlFor="shortDescription">Short Description (for cards)</Label>
+                        <Textarea id="shortDescription" value={currentEventForm.shortDescription} onChange={e => setCurrentEventForm(f => ({...f, shortDescription: e.target.value}))} rows={2}/>
+                    </div>
                     <div>
-                        <Label htmlFor="detailedDescription">Detailed Description</Label>
+                        <Label htmlFor="detailedDescription">Detailed Description (for event page)</Label>
                         <Textarea id="detailedDescription" value={currentEventForm.detailedDescription} onChange={e => setCurrentEventForm(f => ({...f, detailedDescription: e.target.value}))} rows={5}/>
                     </div>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -818,9 +830,36 @@ export default function DashboardPage() {
                             </Popover>
                         </div>
                     </div>
+                     <div className="space-y-2">
+                        <Label>Team Settings</Label>
+                        <div className='flex items-center space-x-2'>
+                           <Checkbox id="isTeamBased" checked={currentEventForm.isTeamBased} onCheckedChange={checked => setCurrentEventForm(f => ({...f, isTeamBased: !!checked}))} />
+                           <Label htmlFor='isTeamBased'>This is a team-based event</Label>
+                        </div>
+                        {currentEventForm.isTeamBased && (
+                            <div className='grid grid-cols-2 gap-4 pl-6'>
+                               <div>
+                                 <Label htmlFor="minTeamMembers">Min Team Size</Label>
+                                 <Input id="minTeamMembers" type="number" value={currentEventForm.minTeamMembers} onChange={e => setCurrentEventForm(f => ({...f, minTeamMembers: Number(e.target.value)}))} />
+                               </div>
+                               <div>
+                                 <Label htmlFor="maxTeamMembers">Max Team Size</Label>
+                                 <Input id="maxTeamMembers" type="number" value={currentEventForm.maxTeamMembers} onChange={e => setCurrentEventForm(f => ({...f, maxTeamMembers: Number(e.target.value)}))} />
+                               </div>
+                            </div>
+                        )}
+                    </div>
                     <div>
                         <Label htmlFor="eventReps">Event Representative UIDs (comma-separated)</Label>
                         <Input id="eventReps" value={currentEventForm.eventReps} onChange={e => setCurrentEventForm(f => ({...f, eventReps: e.target.value}))} />
+                    </div>
+                     <div>
+                        <Label htmlFor="organizers_str">Organizer UIDs (comma-separated)</Label>
+                        <Input id="organizers_str" value={currentEventForm.organizers_str} onChange={e => setCurrentEventForm(f => ({...f, organizers_str: e.target.value}))} />
+                    </div>
+                    <div>
+                        <Label htmlFor="venue">Venue</Label>
+                        <Input id="venue" value={currentEventForm.venue} onChange={e => setCurrentEventForm(f => ({...f, venue: e.target.value}))} />
                     </div>
                     <DialogFooter>
                         <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
@@ -829,8 +868,24 @@ export default function DashboardPage() {
                 </form>
             </DialogContent>
         </Dialog>
+
+        <AlertDialog open={isDeleteEventConfirmOpen} onOpenChange={setIsDeleteEventConfirmOpen}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        This action cannot be undone. This will permanently delete the event
+                        &quot;{eventToDelete?.title}&quot; and all associated registrations.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={confirmDeleteEvent} className="bg-destructive hover:bg-destructive/90">
+                        Yes, delete event
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
-
-    
