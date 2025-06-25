@@ -357,74 +357,9 @@ export default function EventTasksPage() {
             </CardTitle>
             <CardDescription>Manage, assign, and track tasks for your event(s).</CardDescription>
           </div>
-           <Dialog open={isTaskFormDialogOpen} onOpenChange={(isOpen) => {
-                setIsTaskFormDialogOpen(isOpen);
-                if (!isOpen) {
-                    setEditingTaskId(null);
-                    setCurrentTaskForm(defaultTaskFormState);
-                }
-            }}>
-                <DialogTrigger asChild>
-                <Button className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-soft" onClick={() => { setEditingTaskId(null); setCurrentTaskForm(defaultTaskFormState); setIsTaskFormDialogOpen(true); }}>
-                    <PlusCircle className="mr-2 h-5 w-5" /> Add New Task
-                </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-lg">
-                <DialogHeader>
-                    <DialogTitle>{editingTaskId ? 'Edit Task' : 'Create New Task'}</DialogTitle>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                    <Input placeholder="Title" value={currentTaskForm.title} onChange={e => setCurrentTaskForm({ ...currentTaskForm, title: e.target.value })} />
-                    <Textarea placeholder="Description" value={currentTaskForm.description} onChange={e => setCurrentTaskForm({ ...currentTaskForm, description: e.target.value })} />
-                    <Popover>
-                        <PopoverTrigger asChild>
-                        <Button variant="outline" className={`justify-start text-left font-normal ${!currentTaskForm.dueDate && "text-muted-foreground"}`}>
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {currentTaskForm.dueDate ? format(currentTaskForm.dueDate, "PPP") : <span>Pick a due date</span>}
-                        </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                          <Calendar mode="single" selected={currentTaskForm.dueDate} onSelect={date => setCurrentTaskForm({ ...currentTaskForm, dueDate: date })} initialFocus />
-                        </PopoverContent>
-                    </Popover>
-                    <Select value={currentTaskForm.priority} onValueChange={v => setCurrentTaskForm({...currentTaskForm, priority: v})}>
-                        <SelectTrigger><SelectValue placeholder="Priority"/></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="High">High</SelectItem>
-                            <SelectItem value="Medium">Medium</SelectItem>
-                            <SelectItem value="Low">Low</SelectItem>
-                        </SelectContent>
-                    </Select>
-                     <Select value={currentTaskForm.eventSlug} onValueChange={v => setCurrentTaskForm({...currentTaskForm, eventSlug: v})}>
-                        <SelectTrigger><SelectValue placeholder="Assign to Event"/></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="">General</SelectItem>
-                            {allEvents.map(e => <SelectItem key={e.id} value={e.slug}>{e.title}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline" className="justify-between">
-                                {currentTaskForm.assignedTo.length > 0 ? `${currentTaskForm.assignedTo.length} users selected` : "Select Assignees"}
-                                <ChevronDown className="ml-2 h-4 w-4 opacity-50"/>
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                            {mockAssignableUsersForEvent.map(user => (
-                            <DropdownMenuCheckboxItem key={user} checked={currentTaskForm.assignedTo.includes(user)} onCheckedChange={checked => {
-                                const newAssigned = checked ? [...currentTaskForm.assignedTo, user] : currentTaskForm.assignedTo.filter((u:string) => u !== user);
-                                setCurrentTaskForm({...currentTaskForm, assignedTo: newAssigned});
-                            }}>{user}</DropdownMenuCheckboxItem>
-                            ))}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-
-                </div>
-                <DialogFooter>
-                    <Button onClick={handleTaskFormSubmit}>Save Task</Button>
-                </DialogFooter>
-                </DialogContent>
-            </Dialog>
+           <Button className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-soft" onClick={() => { setEditingTaskId(null); setCurrentTaskForm(defaultTaskFormState); setIsTaskFormDialogOpen(true); }}>
+                <PlusCircle className="mr-2 h-5 w-5" /> Add New Task
+            </Button>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto rounded-md border">
@@ -462,6 +397,70 @@ export default function EventTasksPage() {
             </div>
         </CardContent>
       </Card>
+      
+      <Dialog open={isTaskFormDialogOpen} onOpenChange={(isOpen) => {
+            setIsTaskFormDialogOpen(isOpen);
+            if (!isOpen) {
+                setEditingTaskId(null);
+                setCurrentTaskForm(defaultTaskFormState);
+            }
+        }}>
+            <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+                <DialogTitle>{editingTaskId ? 'Edit Task' : 'Create New Task'}</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+                <Input placeholder="Title" value={currentTaskForm.title} onChange={e => setCurrentTaskForm({ ...currentTaskForm, title: e.target.value })} />
+                <Textarea placeholder="Description" value={currentTaskForm.description} onChange={e => setCurrentTaskForm({ ...currentTaskForm, description: e.target.value })} />
+                <Popover>
+                    <PopoverTrigger asChild>
+                    <Button variant="outline" className={`justify-start text-left font-normal ${!currentTaskForm.dueDate && "text-muted-foreground"}`}>
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {currentTaskForm.dueDate ? format(currentTaskForm.dueDate, "PPP") : <span>Pick a due date</span>}
+                    </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar mode="single" selected={currentTaskForm.dueDate} onSelect={date => setCurrentTaskForm({ ...currentTaskForm, dueDate: date })} initialFocus />
+                    </PopoverContent>
+                </Popover>
+                <Select value={currentTaskForm.priority} onValueChange={v => setCurrentTaskForm({...currentTaskForm, priority: v})}>
+                    <SelectTrigger><SelectValue placeholder="Priority"/></SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="High">High</SelectItem>
+                        <SelectItem value="Medium">Medium</SelectItem>
+                        <SelectItem value="Low">Low</SelectItem>
+                    </SelectContent>
+                </Select>
+                 <Select value={currentTaskForm.eventSlug} onValueChange={v => setCurrentTaskForm({...currentTaskForm, eventSlug: v})}>
+                    <SelectTrigger><SelectValue placeholder="Assign to Event"/></SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="">General</SelectItem>
+                        {allEvents.map(e => <SelectItem key={e.id} value={e.slug}>{e.title}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="justify-between">
+                            {currentTaskForm.assignedTo.length > 0 ? `${currentTaskForm.assignedTo.length} users selected` : "Select Assignees"}
+                            <ChevronDown className="ml-2 h-4 w-4 opacity-50"/>
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                        {mockAssignableUsersForEvent.map(user => (
+                        <DropdownMenuCheckboxItem key={user} checked={currentTaskForm.assignedTo.includes(user)} onCheckedChange={checked => {
+                            const newAssigned = checked ? [...currentTaskForm.assignedTo, user] : currentTaskForm.assignedTo.filter((u:string) => u !== user);
+                            setCurrentTaskForm({...currentTaskForm, assignedTo: newAssigned});
+                        }}>{user}</DropdownMenuCheckboxItem>
+                        ))}
+                    </DropdownMenuContent>
+                </DropdownMenu>
+
+            </div>
+            <DialogFooter>
+                <Button onClick={handleTaskFormSubmit}>Save Task</Button>
+            </DialogFooter>
+            </DialogContent>
+        </Dialog>
       
       <AlertDialog open={isDeleteConfirmDialogOpen} onOpenChange={setIsDeleteConfirmDialogOpen}>
         <AlertDialogContent>

@@ -42,8 +42,8 @@ const defaultEventFormState: Omit<SubEvent, 'id' | 'slug' | 'mainImage' | 'organ
   mainImageAlt: '',
   mainImageAiHint: '',
   registrationLink: '',
-  deadline: undefined,
-  eventDate: undefined,
+  deadline: null,
+  eventDate: null,
   isTeamBased: false,
   minTeamMembers: 1,
   maxTeamMembers: 1,
@@ -742,11 +742,9 @@ export default function DashboardPage() {
                             <Button variant="ghost" size="icon" className="hover:bg-muted/50 h-8 w-8" onClick={() => openEditEventDialog(event)}>
                               <Pencil className="h-4 w-4" /> <span className="sr-only">Edit Event</span>
                             </Button>
-                             <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="hover:bg-destructive/10 h-8 w-8" onClick={() => setEventToDelete(event)}>
+                             <Button variant="ghost" size="icon" className="hover:bg-destructive/10 h-8 w-8" onClick={() => { setEventToDelete(event); setIsDeleteEventConfirmOpen(true); }}>
                                 <Trash2 className="h-4 w-4 text-destructive" /> <span className="sr-only">Delete Event</span>
-                              </Button>
-                            </AlertDialogTrigger>
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}
