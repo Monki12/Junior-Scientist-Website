@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import type { LoginFormData } from '@/types';
-import { Loader2, LogIn, ShieldKeyhole, Building } from 'lucide-react';
+import { Loader2, LogIn, ShieldKeyhole } from 'lucide-react';
 
 export default function OrgLoginPage() {
   const [isLoading, setIsLoading] = useState(false);
