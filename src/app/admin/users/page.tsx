@@ -3,15 +3,18 @@
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, ShieldAlert, ArrowLeft } from 'lucide-react';
+import { Users, ShieldAlert, ArrowLeft, PlusCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import CreateOrganizerForm from '@/components/admin/CreateOrganizerForm';
 
 export default function AdminUsersPage() {
   const router = useRouter();
   const { userProfile, loading } = useAuth();
+  const [isCreateOrganizerDialogOpen, setIsCreateOrganizerDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && userProfile && (userProfile.role !== 'admin' && userProfile.role !== 'overall_head')) {
@@ -38,6 +41,11 @@ export default function AdminUsersPage() {
     );
   }
 
+  const handleOrganizerCreationSuccess = () => {
+    setIsCreateOrganizerDialogOpen(false);
+    // You could add logic here to refresh a user list if one was displayed on this page
+  };
+
   return (
     <div className="flex flex-col items-center justify-center min-h-[calc(100vh-15rem)] animate-fade-in-up">
       <Card className="w-full max-w-2xl text-center shadow-xl">
@@ -45,15 +53,36 @@ export default function AdminUsersPage() {
           <Users className="mx-auto h-16 w-16 text-primary mb-4" />
           <CardTitle className="text-3xl font-headline text-primary">User Management</CardTitle>
           <CardDescription>
-            This section is for creating new organizational accounts (Organizers, Event Reps, Overall Heads) and managing user roles.
+            Create new organizational accounts (Organizers, Event Reps, Overall Heads) and manage user roles.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground mb-6">
-            Full user management capabilities, including role assignment and account creation by Admins/Overall Heads, are under development and would typically involve secure backend functions.
+        <CardContent className="space-y-6">
+          <p className="text-muted-foreground">
+            Use the button below to create a new staff account. Full user editing and role management capabilities will be available in the main dashboard.
           </p>
-          <p className="text-sm text-accent mb-4">
-            Currently, organizational roles are based on pre-defined mock profiles in the application.
+
+          <Dialog open={isCreateOrganizerDialogOpen} onOpenChange={setIsCreateOrganizerDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <PlusCircle className="mr-2 h-4 w-4" /> Create Staff Account
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Create New Staff Account</DialogTitle>
+                <DialogDescription>
+                  Fill in the details to create a new account for an organizer, representative, or admin.
+                </DialogDescription>
+              </DialogHeader>
+              <CreateOrganizerForm
+                currentAdminRole={userProfile.role as 'admin' | 'overall_head'}
+                onSuccess={handleOrganizerCreationSuccess}
+              />
+            </DialogContent>
+          </Dialog>
+
+          <p className="text-sm text-accent">
+            Currently, organizational roles are based on pre-defined mock profiles for dashboard testing. This form creates real users in Firebase.
           </p>
           <Button onClick={() => router.back()} variant="outline">
             <ArrowLeft className="mr-2 h-4 w-4" /> Go Back

@@ -55,8 +55,8 @@ export interface UserProfileData {
   email: string | null;
   fullName?: string;
   displayName?: string;
-  shortId?: string;
-  collegeRollNumber?: string | null;
+  shortId?: string | null; // Can be null for organizers
+  collegeRollNumber?: string | null; // For organizers/staff
   schoolName?: string;
   schoolId?: string | null;
   schoolVerifiedByOrganizer?: boolean;
@@ -64,7 +64,7 @@ export interface UserProfileData {
   division?: string | null;
   role: UserRole;
   photoURL?: string | null;
-  department?: string;
+  department?: string | null; // For organizers/staff
   assignedEventSlug?: string;
   assignedEventSlugs?: string[];
   subEventsManaged?: string[];
@@ -97,6 +97,7 @@ export interface SubEvent {
   minTeamMembers?: number;
   maxTeamMembers?: number;
   eventReps?: string[]; // Changed from organizerUids
+  organizerUids?: string[]; // Keep for backwards compatibility if needed, but prefer eventReps
   status?: EventStatus;
   venue?: string;
   registeredParticipantCount?: number;
