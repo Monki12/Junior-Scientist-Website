@@ -128,6 +128,12 @@ export default function DashboardPage() {
   const [allPlatformEvents, setAllPlatformEvents] = useState<SubEvent[]>(subEventsData); 
   const [eventSearchTerm, setEventSearchTerm] = useState('');
   const [eventStatusFilter, setEventStatusFilter] = useState<EventStatus | 'all'>('all');
+  const [eventCategoryFilter, setEventCategoryFilter] = useState('all');
+  
+  const [activeEventDynamicFilters, setActiveEventDynamicFilters] = useState<ActiveDynamicFilter[]>([]);
+  const [isAddEventFilterPopoverOpen, setIsAddEventFilterPopoverOpen] = useState(false);
+  const [newEventFilterColumn, setNewEventFilterColumn] = useState<{ id: string, name: string, isCustom: boolean } | null>(null);
+  const [newEventFilterValue, setNewEventFilterValue] = useState('');
   
   const [isEventFormDialogOpen, setIsEventFormDialogOpen] = useState(false);
   const [currentEventForm, setCurrentEventForm] = useState(defaultEventFormState);
@@ -516,6 +522,8 @@ export default function DashboardPage() {
     }
   };
 
+  const superpowerCategories = ['The Thinker', 'The Brainiac', 'The Strategist', 'The Innovator'];
+
   const filteredEventsForOverallHead = useMemo(() => {
     return allPlatformEvents.filter(event => {
       const searchTermLower = eventSearchTerm.toLowerCase();
@@ -523,13 +531,29 @@ export default function DashboardPage() {
         event.title.toLowerCase().includes(searchTermLower) ||
         (event.venue && event.venue.toLowerCase().includes(searchTermLower));
       const matchesStatus = eventStatusFilter === 'all' || event.status === eventStatusFilter;
-      return matchesSearch && matchesStatus;
+      const matchesCategory = eventCategoryFilter === 'all' || event.superpowerCategory === eventCategoryFilter;
+
+      let matchesDynamic = true;
+      if (activeEventDynamicFilters.length > 0) {
+        matchesDynamic = activeEventDynamicFilters.every(filter => {
+            const eventValue = (event as any)[filter.columnId];
+            if (eventValue === undefined || eventValue === null) {
+                if (typeof eventValue === 'boolean' && filter.value.toLowerCase() === 'false') return true;
+                return false;
+            }
+            const valueStr = String(eventValue).toLowerCase();
+            const filterValueStr = filter.value.toLowerCase();
+            if (typeof eventValue === 'boolean') {
+                return filterValueStr === valueStr;
+            }
+            return valueStr.includes(filterValueStr);
+        });
+      }
+
+      return matchesSearch && matchesStatus && matchesCategory && matchesDynamic;
     });
-  }, [allPlatformEvents, eventSearchTerm, eventStatusFilter]);
+  }, [allPlatformEvents, eventSearchTerm, eventStatusFilter, eventCategoryFilter, activeEventDynamicFilters]);
   
-  const superpowerCategories = ['The Thinker', 'The Brainiac', 'The Strategist', 'The Innovator'];
-
-
   const handleEventFormChange = (field: keyof typeof defaultEventFormState, value: any) => {
     setCurrentEventForm(prev => ({ ...prev, [field]: value }));
   };
@@ -537,7 +561,6 @@ export default function DashboardPage() {
   const handleEventFormDateChange = (field: 'eventDate' | 'deadline', date: Date | undefined) => {
     setCurrentEventForm(prev => ({ ...prev, [field]: date ? date.toISOString() : undefined }));
   };
-
 
   const handleEventFormSubmit = (e: FormEvent) => {
      e.preventDefault();
@@ -859,11 +882,49 @@ export default function DashboardPage() {
         ...activeGlobalStaticFiltersForDisplay.map(f => ({ ...f!, isDynamic: false, id: f!.label.toLowerCase()})),
         ...activeGlobalDynamicFilters.map(df => ({ label: df.columnName, value: df.value, id: df.id, isDynamic: true }))
     ];
-    
-    const allActiveEventFiltersForDisplay = [
+
+    const availableEventFilterColumns = useMemo(() => {
+        return [
+            { id: 'title', name: 'Title', isCustom: false },
+            { id: 'superpowerCategory', name: 'Category', isCustom: false },
+            { id: 'venue', name: 'Venue', isCustom: false },
+            { id: 'status', name: 'Status', isCustom: false },
+            { id: 'isTeamBased', name: 'Is Team Event', isCustom: false },
+        ];
+    }, []);
+
+    const handleAddEventDynamicFilter = () => {
+        if (newEventFilterColumn && newEventFilterValue.trim() !== '') {
+            const newFilter: ActiveDynamicFilter = {
+                id: Date.now().toString(),
+                columnId: newEventFilterColumn.id,
+                columnName: newEventFilterColumn.name,
+                value: newEventFilterValue,
+                isCustom: newEventFilterColumn.isCustom,
+            };
+            setActiveEventDynamicFilters(prev => [...prev, newFilter]);
+            setNewEventFilterColumn(null);
+            setNewEventFilterValue('');
+            setIsAddEventFilterPopoverOpen(false);
+        } else {
+            toast({ title: "Incomplete Filter", description: "Please select a column and enter a value.", variant: "destructive" });
+        }
+    };
+
+    const removeEventDynamicFilter = (filterId: string) => {
+        setActiveEventDynamicFilters(prev => prev.filter(f => f.id !== filterId));
+    };
+
+    const activeEventStaticFiltersForDisplay = [
         eventSearchTerm && { label: 'Search', value: eventSearchTerm },
         eventStatusFilter !== 'all' && { label: 'Status', value: eventStatusFilter },
+        eventCategoryFilter !== 'all' && { label: 'Category', value: eventCategoryFilter },
     ].filter(Boolean);
+    
+    const allActiveEventFiltersForDisplay = [
+        ...activeEventStaticFiltersForDisplay.map(f => ({ ...f!, isDynamic: false, id: f!.label.toLowerCase()})),
+        ...activeEventDynamicFilters.map(df => ({ label: df.columnName, value: df.value, id: df.id, isDynamic: true }))
+    ];
 
 
     return (
@@ -999,19 +1060,76 @@ export default function DashboardPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <Button variant="outline" disabled className="text-muted-foreground">Date Range Filter (Soon)</Button>
-                <Button variant="outline" disabled className="text-muted-foreground">Dynamic Event Filter (Soon)</Button>
+                <div>
+                  <Label htmlFor="event-category-filter">Category</Label>
+                  <Select value={eventCategoryFilter} onValueChange={setEventCategoryFilter}>
+                    <SelectTrigger id="event-category-filter"><SelectValue placeholder="Filter by category..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      {superpowerCategories.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Popover open={isAddEventFilterPopoverOpen} onOpenChange={setIsAddEventFilterPopoverOpen}>
+                    <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full hover:bg-accent/10">
+                            <Tag className="mr-2 h-4 w-4" /> Add Dynamic Filter
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80">
+                        <div className="grid gap-4">
+                            <div className="space-y-2">
+                                <h4 className="font-medium leading-none">Add Event Filter</h4>
+                                <p className="text-sm text-muted-foreground">Filter events by specific criteria.</p>
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="event-filter-column">Column</Label>
+                                <Select
+                                    value={newEventFilterColumn?.id}
+                                    onValueChange={(value) => {
+                                        const selected = availableEventFilterColumns.find(col => col.id === value);
+                                        if (selected) setNewEventFilterColumn(selected);
+                                    }}
+                                >
+                                    <SelectTrigger id="event-filter-column" className="h-8">
+                                        <SelectValue placeholder="Select column" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {availableEventFilterColumns.map(col => (
+                                            <SelectItem key={col.id} value={col.id}>{col.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Label htmlFor="event-filter-value">Value</Label>
+                                <Input
+                                    id="event-filter-value"
+                                    value={newEventFilterValue}
+                                    onChange={(e) => setNewEventFilterValue(e.target.value)}
+                                    className="h-8"
+                                    placeholder="Enter value (e.g., true)"
+                                />
+                            </div>
+                            <Button onClick={handleAddEventDynamicFilter}>Apply Filter</Button>
+                        </div>
+                    </PopoverContent>
+                </Popover>
               </div>
 
               {allActiveEventFiltersForDisplay.length > 0 && (
-                 <div className="text-xs text-muted-foreground mt-2 mb-2">
-                     <span className="font-medium">Active Event Filters:</span>
-                     {allActiveEventFiltersForDisplay.map((filter) => (
-                         <Badge key={filter!.label} variant="secondary" className="ml-1 text-xs py-0.5 px-1.5 rounded">
-                         {filter!.label}: &quot;{filter!.value}&quot;
-                         </Badge>
-                     ))}
-                 </div>
+                <div className="text-xs text-muted-foreground mt-2 mb-2 flex flex-wrap items-center gap-1.5">
+                    <span className="font-medium">Active Event Filters:</span>
+                    {allActiveEventFiltersForDisplay.map((filter) => (
+                        <Badge key={filter.id} variant="secondary" className="flex items-center gap-1 pr-1 text-xs py-0.5 px-1.5 rounded hover:bg-muted/80">
+                        {filter.label}: &quot;{String(filter.value)}&quot;
+                        {filter.isDynamic && (
+                            <button onClick={() => removeEventDynamicFilter(filter.id)} className="ml-1 rounded-full hover:bg-destructive/20 hover:text-destructive p-0.5">
+                                <XIcon className="h-2.5 w-2.5" />
+                                <span className="sr-only">Remove filter</span>
+                            </button>
+                        )}
+                        </Badge>
+                    ))}
+                </div>
               )}
 
               {filteredEventsForOverallHead.length > 0 ? (
@@ -1065,7 +1183,7 @@ export default function DashboardPage() {
                   <CalendarDays className="h-12 w-12 mx-auto mb-3 text-primary/30" />
                   <p>No events match the current filters.</p>
                    { (eventSearchTerm || eventStatusFilter !== 'all') &&
-                    <Button variant="link" onClick={() => { setEventSearchTerm(''); setEventStatusFilter('all');}} className="mt-2">
+                    <Button variant="link" onClick={() => { setEventSearchTerm(''); setEventStatusFilter('all'); setEventCategoryFilter('all'); setActiveEventDynamicFilters([]); }} className="mt-2">
                     Clear Event Filters
                     </Button>
                 }
@@ -1710,7 +1828,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
-
-    
