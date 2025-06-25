@@ -71,7 +71,7 @@ const defaultEventFormState: Omit<SubEvent, 'id' | 'slug' | 'mainImage'> & { mai
   maxTeamMembers: 1,
   status: 'Planning',
   venue: '',
-  organizerUids: [],
+  eventReps: [],
   registeredParticipantCount: 0,
   event_representatives_str: '',
   organizers_str: '',
@@ -169,14 +169,14 @@ export default function DashboardPage() {
         setLoadingStudentEvents(true);
         console.log("Fetching student registrations for UID:", authUser.uid);
         const fetchStudentRegistrations = async () => {
-          if (!authUser) {
+          if (!auth.currentUser) {
             console.log("Cannot fetch registrations: user not authenticated. Aborting fetch.");
             setLoadingStudentEvents(false);
             return;
           }
           try {
             const registrationsRef = collection(db, 'event_registrations');
-            const q = query(registrationsRef, where('userId', '==', authUser.uid), where('registrationStatus', '!=', 'cancelled'));
+            const q = query(registrationsRef, where('userId', '==', auth.currentUser.uid), where('registrationStatus', '!=', 'cancelled'));
             const querySnapshot = await getDocs(q);
             console.log(`Found ${querySnapshot.docs.length} registrations.`);
             
@@ -575,7 +575,7 @@ export default function DashboardPage() {
         maxTeamMembers: currentEventForm.maxTeamMembers,
         status: currentEventForm.status,
         venue: currentEventForm.venue,
-        organizerUids: currentEventForm.organizers_str.split(',').map(s => s.trim()).filter(Boolean),
+        eventReps: currentEventForm.organizers_str.split(',').map(s => s.trim()).filter(Boolean),
         registeredParticipantCount: currentEventForm.registeredParticipantCount || 0,
     };
 
@@ -625,8 +625,8 @@ export default function DashboardPage() {
         maxTeamMembers: event.maxTeamMembers || 1,
         status: event.status || 'Planning',
         venue: event.venue || '',
-        organizers_str: (event.organizerUids || []).join(', '),
-        event_representatives_str: '', // This might be part of organizerUids with specific role
+        organizers_str: (event.eventReps || []).join(', '),
+        event_representatives_str: '', // This might be part of eventReps with specific role
         registeredParticipantCount: event.registeredParticipantCount || 0,
     });
     setIsEventFormDialogOpen(true);
@@ -1053,10 +1053,10 @@ export default function DashboardPage() {
                           </TableCell>
                           <TableCell>{event.registeredParticipantCount || 0}</TableCell>
                           <TableCell className="text-xs max-w-[150px] truncate">
-                            {(event.organizerUids?.includes('mock-representative-uid') ? 'Test Event Rep Bob' : '') || <span className="text-muted-foreground italic">None</span>}
+                            {(event.eventReps?.includes('mock-representative-uid') ? 'Test Event Rep Bob' : '') || <span className="text-muted-foreground italic">None</span>}
                           </TableCell>
                            <TableCell className="text-xs max-w-[150px] truncate">
-                             {event.organizerUids && event.organizerUids.length > 0 ? event.organizerUids.map(uid => mockUserProfiles[userProfile?.role as UserRole || 'student']?.displayName || uid).join(', ') : <span className="text-muted-foreground italic">None</span>}
+                             {event.eventReps && event.eventReps.length > 0 ? event.eventReps.map(uid => mockUserProfiles[userProfile?.role as UserRole || 'student']?.displayName || uid).join(', ') : <span className="text-muted-foreground italic">None</span>}
                            </TableCell>
                           <TableCell className="text-right space-x-1">
                             <Button variant="ghost" size="icon" className="hover:bg-muted/50 h-8 w-8" onClick={() => openEditEventDialog(event)}>

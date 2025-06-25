@@ -1,4 +1,5 @@
 
+
 import type { User as FirebaseUser } from 'firebase/auth';
 
 export type UserRole =
@@ -20,7 +21,8 @@ export interface Task {
   id: string;
   title: string;
   description?: string;
-  assignedTo?: string[];
+  assignedTo?: string[]; // Names for display
+  assignedToUid?: string; // UID for assignment
   assignedByName?: string;
   assignedByUid?: string;
   eventSlug?: string;
@@ -74,7 +76,7 @@ export interface UserProfileData {
   registeredEventIds?: string[]; 
   teamIds?: string[];
   registeredEvents?: any[];
-  subEventsManaged?: any[];
+  subEventsManaged?: string[];
 }
 
 export interface SubEvent {
@@ -92,7 +94,7 @@ export interface SubEvent {
   isTeamBased: boolean; // CRITICAL for new logic
   minTeamMembers?: number;
   maxTeamMembers?: number;
-  organizerUids?: string[];
+  eventReps?: string[];
   status?: EventStatus;
   venue?: string;
   registeredParticipantCount?: number;
@@ -208,6 +210,18 @@ export type EventTeam = {
   createdAt: any; // Firestore Timestamp
   updatedAt: any; // Firestore Timestamp
 };
+
+export type StudentRegisteredEventDisplay = SubEvent & {
+  registrationId: string;
+  teamId?: string;
+  teamName?: string;
+  teamLeaderId?: string;
+  teamMembers?: string[];
+  teamMembersNames?: Record<string, string>;
+  admitCardUrl?: string | null;
+  registrationStatus?: RegistrationStatus;
+};
+
 
 // Form data for creating a new team
 export type CreateTeamFormData = {

@@ -21,7 +21,7 @@ export const subEventsData: SubEvent[] = [
     isTeamBased: false, // Individual event
     minTeamMembers: 1,
     maxTeamMembers: 1,
-    organizerUids: ['mock-organizer-uid', 'mock-overall-head-uid'],
+    eventReps: ['mock-organizer-uid', 'mock-overall-head-uid'],
     status: 'Planning' as EventStatus,
     venue: 'Main Auditorium Hall A',
     registeredParticipantCount: 120,
@@ -41,7 +41,7 @@ export const subEventsData: SubEvent[] = [
     isTeamBased: true, // Team event
     minTeamMembers: 2,
     maxTeamMembers: 4,
-    organizerUids: ['mock-representative-uid'],
+    eventReps: ['mock-representative-uid'],
     status: 'Planning' as EventStatus,
     venue: 'Seminar Hall 1',
     registeredParticipantCount: 75,
@@ -61,7 +61,7 @@ export const subEventsData: SubEvent[] = [
     isTeamBased: false, // Individual
     minTeamMembers: 1,
     maxTeamMembers: 1,
-    organizerUids: ['mock-organizer-uid'],
+    eventReps: ['mock-organizer-uid'],
     status: 'Active' as EventStatus,
     venue: 'Physics Lab Complex',
     registeredParticipantCount: 250,
@@ -81,7 +81,7 @@ export const subEventsData: SubEvent[] = [
     isTeamBased: true, // Can be individual or team, flexible
     minTeamMembers: 1, 
     maxTeamMembers: 3,
-    organizerUids: ['mock-organizer-uid', 'mock-representative-uid'],
+    eventReps: ['mock-organizer-uid', 'mock-representative-uid'],
     status: 'Active' as EventStatus,
     venue: 'Mathematics Department Wing',
     registeredParticipantCount: 90,
@@ -101,7 +101,7 @@ export const subEventsData: SubEvent[] = [
     isTeamBased: true, 
     minTeamMembers: 2,
     maxTeamMembers: 2,
-    organizerUids: ['mock-organizer-uid'],
+    eventReps: ['mock-organizer-uid'],
     status: 'Completed' as EventStatus,
     venue: 'Library Quiet Zone',
     registeredParticipantCount: 60,
@@ -120,7 +120,7 @@ export const subEventsData: SubEvent[] = [
     isTeamBased: true, 
     minTeamMembers: 2,
     maxTeamMembers: 5,
-    organizerUids: ['mock-organizer-uid', 'mock-overall-head-uid'],
+    eventReps: ['mock-organizer-uid', 'mock-overall-head-uid'],
     status: 'Planning' as EventStatus,
     venue: 'Workshop Hangar',
     registeredParticipantCount: 45,
