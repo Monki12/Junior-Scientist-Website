@@ -4,7 +4,6 @@
 import { useEffect, useState, useMemo, FormEvent } from 'react';
 import { useParams, useRouter, notFound } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
-import { subEventsData } from '@/data/subEvents';
 import type { SubEvent, EventParticipant, CustomColumnDefinition, EventRegistration, UserProfileData } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -81,14 +80,29 @@ export default function ManageParticipantsPage() {
 
   useEffect(() => {
     if (eventSlug) {
-      const foundEvent = subEventsData.find(e => e.slug === eventSlug);
-      if (foundEvent) {
-        setEvent(foundEvent);
-      } else {
-        notFound();
-      }
+      setLoadingEventData(true);
+      const fetchEvent = async () => {
+        const q = query(collection(db, 'subEvents'), where('slug', '==', eventSlug));
+        try {
+          const querySnapshot = await getDocs(q);
+          if (!querySnapshot.empty) {
+            const eventDoc = querySnapshot.docs[0];
+            setEvent({ id: eventDoc.id, ...eventDoc.data() } as SubEvent);
+          } else {
+            notFound();
+          }
+        } catch (error) {
+          console.error("Error fetching event data:", error);
+          notFound();
+        } finally {
+          setLoadingEventData(false);
+        }
+      };
+      fetchEvent();
+    } else {
+      setLoadingEventData(false);
+      notFound();
     }
-    setLoadingEventData(false);
   }, [eventSlug]);
 
   useEffect(() => {
@@ -99,7 +113,7 @@ export default function ManageParticipantsPage() {
         (organizerProfile.role === 'organizer' && event?.organizerUids?.includes(organizerProfile.uid)) ||
         (organizerProfile.role === 'event_representative' && organizerProfile.assignedEventSlug === eventSlug);
       
-      if (!canManageThisEvent) {
+      if (event && !canManageThisEvent) {
         toast({ title: "Access Denied", description: "You are not authorized for this event's participant list.", variant: "destructive"});
         router.push('/dashboard'); 
       }
