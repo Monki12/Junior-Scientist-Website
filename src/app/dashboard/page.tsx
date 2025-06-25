@@ -24,7 +24,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Calendar } from '@/components/ui/calendar';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 
 
 import { format, isToday, isPast, isThisWeek, startOfDay, parseISO, isValid } from 'date-fns';
@@ -37,6 +37,7 @@ interface StudentRegisteredEventDisplay extends SubEvent {
   registrationId: string;
   teamName?: string;
   teamId?: string;
+  teamLeaderId?: string;
   teamMembers?: string[]; // Changed to string[] for UIDs
   teamMembersNames?: Record<string, string>; // For fetched names
   admitCardUrl?: string | null;
@@ -102,6 +103,11 @@ export default function DashboardPage() {
   const [studentRegisteredFullEvents, setStudentRegisteredFullEvents] = useState<StudentRegisteredEventDisplay[]>([]);
   const [loadingStudentEvents, setLoadingStudentEvents] = useState(false);
 
+  // State for "Leave Team" functionality
+  const [isConfirmLeaveTeamOpen, setIsConfirmLeaveTeamOpen] = useState(false);
+  const [isLeavingTeam, setIsLeavingTeam] = useState(false);
+  const [selectedEventForLeave, setSelectedEventForLeave] = useState<StudentRegisteredEventDisplay | null>(null);
+
 
   const [globalParticipants, setGlobalParticipants] = useState<EventParticipant[]>([]);
   const [globalSearchTerm, setGlobalSearchTerm] = useState('');
@@ -150,7 +156,7 @@ export default function DashboardPage() {
         const fetchStudentRegistrations = async () => {
           try {
             const registrationsRef = collection(db, 'event_registrations');
-            const q = query(registrationsRef, where('userId', '==', authUser.uid));
+            const q = query(registrationsRef, where('userId', '==', authUser.uid), where('registrationStatus', '!=', 'cancelled'));
             const querySnapshot = await getDocs(q);
             
             const fetchedRegistrationsPromises = querySnapshot.docs.map(async (regDoc) => {
@@ -192,6 +198,7 @@ export default function DashboardPage() {
                   registrationId: regDoc.id,
                   teamId: teamDetails?.id,
                   teamName: teamDetails?.teamName,
+                  teamLeaderId: teamDetails?.teamLeaderId,
                   teamMembers: teamDetails?.memberUids,
                   teamMembersNames: teamMembersNames,
                   admitCardUrl: regData.admitCardUrl,
@@ -233,6 +240,64 @@ export default function DashboardPage() {
       if (!prevProfile) return null;
       return { ...prevProfile, tasks: updatedTasksForContext };
     });
+  };
+
+  const handleLeaveTeam = async () => {
+    if (!selectedEventForLeave || !authUser) {
+      toast({ title: "Error", description: "No event selected or user not authenticated.", variant: "destructive"});
+      return;
+    }
+    
+    setIsLeavingTeam(true);
+    const { teamId, registrationId } = selectedEventForLeave;
+
+    if (!teamId || !registrationId) {
+      toast({ title: "Error", description: "Missing team or registration ID.", variant: "destructive" });
+      setIsLeavingTeam(false);
+      return;
+    }
+
+    const teamRef = doc(db, 'event_teams', teamId);
+    const registrationRef = doc(db, 'event_registrations', registrationId);
+
+    try {
+      const teamDoc = await getDoc(teamRef);
+      if (!teamDoc.exists()) {
+        throw new Error("Team not found. It may have been disbanded.");
+      }
+
+      const currentTeamData = teamDoc.data() as EventTeam;
+      if (!currentTeamData.memberUids.includes(authUser.uid)) {
+         throw new Error("You are not a member of this team.");
+      }
+      
+      const newMemberUids = currentTeamData.memberUids.filter(uid => uid !== authUser.uid);
+
+      // Perform updates
+      await updateDoc(teamRef, {
+        memberUids: newMemberUids,
+        teamSize: newMemberUids.length,
+        updatedAt: serverTimestamp(),
+      });
+
+      await updateDoc(registrationRef, {
+        registrationStatus: 'cancelled',
+        lastUpdatedAt: serverTimestamp(),
+      });
+
+      toast({ title: "Success", description: "You have left the team. Your registration for this event is now cancelled." });
+
+      // Refresh UI by removing the event from the local state
+      setStudentRegisteredFullEvents(prev => prev.filter(event => event.registrationId !== registrationId));
+      
+    } catch (error: any) {
+      console.error("Error leaving team:", error);
+      toast({ title: "Failed to leave team", description: error.message || "An unknown error occurred.", variant: "destructive" });
+    } finally {
+      setIsLeavingTeam(false);
+      setIsConfirmLeaveTeamOpen(false);
+      setSelectedEventForLeave(null);
+    }
   };
 
   const myTasks = localUserProfileTasks; 
@@ -605,26 +670,30 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {studentRegisteredFullEvents.map(event => (
                 <Card key={event.registrationId} className="overflow-hidden shadow-soft hover:shadow-md-soft transition-shadow rounded-xl flex flex-col">
-                  <Link href={`/events/${event.slug}`} className="block group flex flex-col flex-grow">
-                    <div className="relative w-full h-40">
-                      <Image
-                        src={event.mainImage.src}
-                        alt={event.mainImage.alt}
-                        fill
-                        style={{ objectFit: 'cover' }}
-                        data-ai-hint={event.mainImage.dataAiHint}
-                        className="group-hover:scale-105 transition-transform duration-300"
-                      />
-                    </div>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-lg group-hover:text-primary">{event.title}</CardTitle>
-                      {event.eventDate && <CardDescription className="text-xs flex items-center gap-1"><CalendarDays className="h-3 w-3"/> {new Date(event.eventDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</CardDescription>}
-                      <Badge variant={event.registrationStatus === 'approved' ? 'default' : 'secondary'} className="mt-1 text-xs capitalize self-start">
-                        Status: {event.registrationStatus || 'N/A'}
-                      </Badge>
-                    </CardHeader>
-                    <CardContent className="pt-0 flex-grow">
-                      <p className="text-sm text-muted-foreground line-clamp-2 mb-2">{event.shortDescription}</p>
+                  <div className="flex flex-col flex-grow">
+                    <Link href={`/events/${event.slug}`} className="block group">
+                      <div className="relative w-full h-40">
+                        <Image
+                          src={event.mainImage.src}
+                          alt={event.mainImage.alt}
+                          fill
+                          style={{ objectFit: 'cover' }}
+                          data-ai-hint={event.mainImage.dataAiHint}
+                          className="group-hover:scale-105 transition-transform duration-300"
+                        />
+                      </div>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-lg group-hover:text-primary">{event.title}</CardTitle>
+                        {event.eventDate && <CardDescription className="text-xs flex items-center gap-1"><CalendarDays className="h-3 w-3"/> {new Date(event.eventDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</CardDescription>}
+                        <Badge variant={event.registrationStatus === 'approved' ? 'default' : 'secondary'} className="mt-1 text-xs capitalize self-start">
+                          Status: {event.registrationStatus || 'N/A'}
+                        </Badge>
+                      </CardHeader>
+                      <CardContent className="pt-0 flex-grow">
+                        <p className="text-sm text-muted-foreground line-clamp-2 mb-2">{event.shortDescription}</p>
+                      </CardContent>
+                    </Link>
+                    <CardContent className="pt-0">
                       {event.isTeamBased && event.teamName && (
                         <div className="mt-2">
                           <p className="text-xs text-accent font-semibold flex items-center gap-1"><Users className="h-4 w-4"/>Team: {event.teamName}</p>
@@ -633,14 +702,31 @@ export default function DashboardPage() {
                                 Members: {Object.values(event.teamMembersNames).join(', ') || 'No members listed'}
                             </div>
                           )}
-                           <Button variant="link" size="sm" className="text-xs h-auto p-0 mt-1 text-destructive/80 hover:text-destructive" onClick={(e) => {e.preventDefault(); alert("Leave Team functionality coming soon!")}}>Leave Team</Button>
+                           {authUser?.uid !== event.teamLeaderId && event.teamId && (
+                                <Button
+                                    variant="link"
+                                    size="sm"
+                                    className="text-xs h-auto p-0 mt-1 text-destructive/80 hover:text-destructive"
+                                    onClick={(e) => {
+                                    e.preventDefault();
+                                    setSelectedEventForLeave(event);
+                                    setIsConfirmLeaveTeamOpen(true);
+                                    }}
+                                    disabled={isLeavingTeam && selectedEventForLeave?.teamId === event.teamId}
+                                >
+                                    {isLeavingTeam && selectedEventForLeave?.teamId === event.teamId ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+                                    Leave Team
+                                </Button>
+                            )}
                         </div>
                       )}
                     </CardContent>
-                    <CardFooter>
-                       <Button variant="outline" size="sm" className="w-full rounded-md">View Details</Button>
+                    <CardFooter className="mt-auto">
+                       <Button variant="outline" size="sm" asChild className="w-full rounded-md">
+                         <Link href={`/events/${event.slug}`}>View Details</Link>
+                       </Button>
                     </CardFooter>
-                   </Link>
+                   </div>
                 </Card>
               ))}
             </div>
@@ -718,6 +804,25 @@ export default function DashboardPage() {
                 </CardContent>
             </Card>
         </section>
+        
+        <AlertDialog open={isConfirmLeaveTeamOpen} onOpenChange={setIsConfirmLeaveTeamOpen}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                <AlertDialogTitle>Are you sure you want to leave this team?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This action cannot be undone. You will no longer be part of this team, and your event registration will be cancelled.
+                </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                <AlertDialogCancel disabled={isLeavingTeam}>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleLeaveTeam} disabled={isLeavingTeam} className="bg-destructive hover:bg-destructive/90">
+                    {isLeavingTeam ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    {isLeavingTeam ? "Leaving..." : "Leave Team"}
+                </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+
       </div>
     );
   }
