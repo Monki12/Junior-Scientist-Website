@@ -7,7 +7,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/hooks/use-auth';
 import { subEventsData } from '@/data/subEvents';
-import type { UserRole, SubEvent, Task, UserProfileData, EventParticipant, CustomColumnDefinition, ActiveDynamicFilter, EventStatus, EventRegistration, EventTeam, RegisteredEventInfo } from '@/types';
+import type { UserRole, SubEvent, Task, UserProfileData, EventParticipant, CustomColumnDefinition, ActiveDynamicFilter, EventStatus, EventRegistration, EventTeam, RegisteredEventInfo, StudentRegisteredEventDisplay } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -32,67 +32,6 @@ import { useToast } from '@/hooks/use-toast';
 import {
   Loader2, BarChartBig, Edit, Users, FileScan, Settings, BookUser, ListChecks, CalendarDays, UserCircle, Bell, GraduationCap, School, Download, Info, Briefcase, Newspaper, Award, Star, CheckCircle, ClipboardList, TrendingUp, Building, Activity, ShieldCheck, ExternalLink, Home, Search, CalendarCheck, Ticket, Users2, Phone, Mail, Milestone, MapPin, Clock, UsersRound, CheckSquare, BarChartHorizontalBig, Rss, AlertTriangle, Filter as FilterIcon, PlusCircle, GanttChartSquare, Rows, Tag, XIcon, Pencil, Trash2, CalendarRange, LayoutDashboard, CalendarIcon
 } from 'lucide-react';
-
-interface StudentRegisteredEventDisplay extends SubEvent {
-  registrationId: string;
-  teamName?: string;
-  teamId?: string;
-  teamLeaderId?: string;
-  teamMembers?: string[]; // Changed to string[] for UIDs
-  teamMembersNames?: Record<string, string>; // For fetched names
-  admitCardUrl?: string | null;
-  registrationStatus?: EventRegistration['registrationStatus'];
-}
-
-
-const defaultEventFormState: Omit<SubEvent, 'id' | 'slug' | 'mainImage'> & { mainImageSrc: string; mainImageAlt: string; mainImageAiHint: string; event_representatives_str: string; organizers_str: string } = {
-  title: '',
-  superpowerCategory: 'The Thinker',
-  shortDescription: '',
-  detailedDescription: '',
-  mainImageSrc: '',
-  mainImageAlt: '',
-  mainImageAiHint: '',
-  registrationLink: '',
-  deadline: undefined,
-  eventDate: undefined,
-  isTeamBased: false,
-  minTeamMembers: 1,
-  maxTeamMembers: 1,
-  status: 'Planning',
-  venue: '',
-  organizerUids: [],
-  registeredParticipantCount: 0,
-  event_representatives_str: '',
-  organizers_str: '',
-};
-
-
-const getPriorityBadgeVariant = (priority: Task['priority']): "destructive" | "secondary" | "outline" => {
-  if (priority === 'High') return 'destructive';
-  if (priority === 'Medium') return 'secondary';
-  return 'outline';
-};
-
-const getStatusBadgeVariant = (status: Task['status']): { variant: "default" | "secondary" | "outline" | "destructive", colorClass: string } => {
-  switch (status) {
-    case 'Completed': return { variant: 'default', colorClass: 'bg-green-500/10 border-green-500/30 text-green-700 dark:bg-green-700/20 dark:text-green-300' };
-    case 'In Progress': return { variant: 'secondary', colorClass: 'bg-blue-500/10 border-blue-500/30 text-blue-700 dark:bg-blue-700/20 dark:text-blue-300' };
-    case 'Pending Review': return { variant: 'outline', colorClass: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-700 dark:bg-yellow-700/20 dark:text-yellow-300' };
-    case 'Not Started': return { variant: 'outline', colorClass: 'bg-slate-500/10 border-slate-500/30 text-slate-700 dark:bg-slate-700/20 dark:text-slate-300' };
-    default: return { variant: 'outline', colorClass: 'bg-muted text-muted-foreground border-border' };
-  }
-};
-
-const getEventStatusBadgeVariant = (status: EventStatus | undefined): "default" | "secondary" | "outline" | "destructive" => {
-    switch (status) {
-        case 'Active': case 'open': return 'default'; 
-        case 'Planning': return 'secondary';
-        case 'Completed': return 'outline'; 
-        case 'Cancelled': case 'closed': return 'destructive';
-        default: return 'outline';
-    }
-};
 
 const mockTasksData: Omit<Task, 'id' | 'assignedTo' | 'createdBy' | 'createdAt' | 'updatedAt' | 'customTaskData' >[] = [
   { title: 'Prepare MUN Delegate Handbook', description: 'Draft handbook including rules of procedure and country profiles.', status: 'Not Started', dueDate: '2024-10-15T00:00:00Z', points: 25, priority: 'High', eventSlug: 'model-united-nations', assignedByName: 'Overall Head Carol' },
@@ -173,6 +112,56 @@ const mockUserProfiles: Record<UserRole, UserProfileData> = {
     tasks: [ { ...createTaskObject(mockTasksData[1], 'task-test-1', ['Sam Williams (Test)'], 'Overall Head Carol'), title: 'Verify Quiz Task Functionality', eventSlug: 'ex-quiz-it', priority: 'Low' }
     ].filter(task => task.assignedTo?.includes('Sam Williams (Test)')), points: 50, credibilityScore: 60, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
   }
+};
+
+
+const defaultEventFormState: Omit<SubEvent, 'id' | 'slug' | 'mainImage'> & { mainImageSrc: string; mainImageAlt: string; mainImageAiHint: string; event_representatives_str: string; organizers_str: string } = {
+  title: '',
+  superpowerCategory: 'The Thinker',
+  shortDescription: '',
+  detailedDescription: '',
+  mainImageSrc: '',
+  mainImageAlt: '',
+  mainImageAiHint: '',
+  registrationLink: '',
+  deadline: undefined,
+  eventDate: undefined,
+  isTeamBased: false,
+  minTeamMembers: 1,
+  maxTeamMembers: 1,
+  status: 'Planning',
+  venue: '',
+  organizerUids: [],
+  registeredParticipantCount: 0,
+  event_representatives_str: '',
+  organizers_str: '',
+};
+
+
+const getPriorityBadgeVariant = (priority: Task['priority']): "destructive" | "secondary" | "outline" => {
+  if (priority === 'High') return 'destructive';
+  if (priority === 'Medium') return 'secondary';
+  return 'outline';
+};
+
+const getStatusBadgeVariant = (status: Task['status']): { variant: "default" | "secondary" | "outline" | "destructive", colorClass: string } => {
+  switch (status) {
+    case 'Completed': return { variant: 'default', colorClass: 'bg-green-500/10 border-green-500/30 text-green-700 dark:bg-green-700/20 dark:text-green-300' };
+    case 'In Progress': return { variant: 'secondary', colorClass: 'bg-blue-500/10 border-blue-500/30 text-blue-700 dark:bg-blue-700/20 dark:text-blue-300' };
+    case 'Pending Review': return { variant: 'outline', colorClass: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-700 dark:bg-yellow-700/20 dark:text-yellow-300' };
+    case 'Not Started': return { variant: 'outline', colorClass: 'bg-slate-500/10 border-slate-500/30 text-slate-700 dark:bg-slate-700/20 dark:text-slate-300' };
+    default: return { variant: 'outline', colorClass: 'bg-muted text-muted-foreground border-border' };
+  }
+};
+
+const getEventStatusBadgeVariant = (status: EventStatus | undefined): "default" | "secondary" | "outline" | "destructive" => {
+    switch (status) {
+        case 'Active': case 'open': return 'default'; 
+        case 'Planning': return 'secondary';
+        case 'Completed': return 'outline'; 
+        case 'Cancelled': case 'closed': return 'destructive';
+        default: return 'outline';
+    }
 };
 
 
@@ -297,8 +286,11 @@ export default function DashboardPage() {
             const resolvedRegistrations = (await Promise.all(fetchedRegistrationsPromises)).filter(Boolean) as StudentRegisteredEventDisplay[];
             setStudentRegisteredFullEvents(resolvedRegistrations);
           } catch (error) {
-            console.error("Error fetching student registrations:", error);
-            toast({ title: "Could not fetch events", description: "There was an issue loading your registered events. Please try again later.", variant: "destructive" });
+            // Only show toast if user is still logged in. This prevents errors on logout.
+            if (authUser) {
+              console.error("Error fetching student registrations:", error);
+              toast({ title: "Could not fetch events", description: "There was an issue loading your registered events. Please try again later.", variant: "destructive" });
+            }
           } finally {
             setLoadingStudentEvents(false);
           }
@@ -1536,183 +1528,6 @@ export default function DashboardPage() {
     );
   }
   
-  // Event Representative Dashboard
-  if (role === 'event_representative') {
-    const assignedEvent = userProfile.assignedEventSlug ? subEventsData.find(e => e.slug === userProfile.assignedEventSlug) : null;
-
-    return (
-      <div className="space-y-8 animate-fade-in-up">
-        <header className="flex flex-col md:flex-row justify-between items-start gap-4">
-          <div className="flex items-center gap-4">
-            <Avatar className="h-20 w-20 border-2 border-primary">
-              <AvatarImage src={userProfile.photoURL || undefined} alt={userProfile.displayName || 'User'} />
-              <AvatarFallback className="text-2xl bg-primary/10 text-primary">{(userProfile.displayName || userProfile.email || 'U')[0].toUpperCase()}</AvatarFallback>
-            </Avatar>
-            <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-primary">{userProfile.displayName || "Event Representative Dashboard"}</h1>
-              <p className="text-muted-foreground mt-1">{userProfile.email}</p>
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mt-1">
-                  <span className="flex items-center gap-1"><ShieldCheck className="h-4 w-4" /> Role: <Badge variant="secondary" className="capitalize text-xs">{userProfile.role.replace('_', ' ')}</Badge></span>
-                  {userProfile.department && <span className="flex items-center gap-1"><Building className="h-4 w-4" /> {userProfile.department}</span>}
-              </div>
-            </div>
-          </div>
-        </header>
-        
-        <Separator />
-
-        <section id="event-summary-cards">
-            <h2 className="text-2xl font-semibold text-primary mb-4">My Assigned Event Overview</h2>
-            {assignedEvent ? (
-                <Card className="shadow-md-soft rounded-xl overflow-hidden">
-                    <div className="md:flex">
-                        <div className="md:shrink-0">
-                             <Image 
-                                src={assignedEvent.mainImage.src} 
-                                alt={assignedEvent.mainImage.alt} 
-                                width={300} 
-                                height={200} 
-                                style={{objectFit: 'cover'}} 
-                                className="h-48 w-full md:h-full md:w-64"
-                                data-ai-hint={assignedEvent.mainImage.dataAiHint}
-                            />
-                        </div>
-                        <div className="p-6 flex-grow">
-                            <CardTitle className="text-2xl font-bold text-primary mb-1">{assignedEvent.title}</CardTitle>
-                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mb-3">
-                                {assignedEvent.eventDate && <span className="flex items-center"><CalendarDays className="mr-1.5 h-4 w-4" /> Date: {new Date(assignedEvent.eventDate).toLocaleDateString()}</span>}
-                                <span className="flex items-center"><Clock className="mr-1.5 h-4 w-4" /> Time: (Mock) 10:00 AM</span>
-                                <span className="flex items-center"><MapPin className="mr-1.5 h-4 w-4" /> Venue: {assignedEvent.venue || '(Mock) Main Auditorium'}</span>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mb-4">
-                                <span className="flex items-center"><UsersRound className="mr-1.5 h-4 w-4 text-accent" /> Registered: <span className="font-semibold ml-1">{assignedEvent.registeredParticipantCount || 0}</span></span>
-                                <span className="flex items-center"><ListChecks className="mr-1.5 h-4 w-4 text-accent" /> Pending Tasks: <span className="font-semibold ml-1">{myTasks.filter(t => t.status !== 'Completed').length}</span></span>
-                                <div className="flex items-center col-span-full text-sm"><Info className="mr-1.5 h-4 w-4 text-accent" /> Status: <Badge variant={getEventStatusBadgeVariant(assignedEvent.status)} className="ml-1 capitalize">{assignedEvent.status || 'Planning'}</Badge></div>
-                            </div>
-                            <div className="flex flex-wrap gap-2 mt-4">
-                                <Button asChild variant="outline" size="sm">
-                                    <Link href={`/events/${assignedEvent.slug}`}><Info className="mr-1.5 h-4 w-4" /> View Details</Link>
-                                </Button>
-                                <Button asChild variant="outline" size="sm">
-                                    <Link href={`/organizer/events/manage/${assignedEvent.slug}/participants`}><Users className="mr-1.5 h-4 w-4" /> Manage Participants</Link>
-                                </Button>
-                                <Button asChild variant="default" size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">
-                                    <Link href={`/organizer/event-tasks`}><CheckSquare className="mr-1.5 h-4 w-4" /> Manage Tasks</Link>
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-                </Card>
-            ) : (
-                <Card className="shadow-soft rounded-xl">
-                    <CardContent className="text-center py-10 text-muted-foreground">
-                        <Briefcase className="h-12 w-12 mx-auto mb-3 text-primary/50" />
-                        <p>No event assigned to you currently.</p>
-                    </CardContent>
-                </Card>
-            )}
-        </section>
-
-        <Separator />
-        
-        {myTasks.length > 0 && (
-             <section id="my-tasks">
-              <Card className="shadow-md-soft rounded-xl">
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="flex items-center gap-2 text-xl text-primary"><ClipboardList className="h-6 w-6"/>My Tasks</CardTitle>
-                      <CardDescription>Tasks assigned to you for your event.</CardDescription>
-                    </div>
-                     <Button asChild variant="outline" size="sm">
-                        <Link href="/organizer/event-tasks">View All My Tasks</Link>
-                    </Button>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm border-t pt-3">
-                    <span>Due Today: <Badge variant={tasksDueToday > 0 ? "default" : "outline"} className={`${tasksDueToday > 0 ? 'bg-blue-500/10 text-blue-700 border-blue-500/30' : 'text-muted-foreground'}`}>{tasksDueToday}</Badge></span>
-                    <span>Overdue: <Badge variant={overdueTasks > 0 ? "destructive" : "outline"} className={overdueTasks > 0 ? "" : "text-muted-foreground"}>{overdueTasks}</Badge></span>
-                    <span>This Week: <Badge variant={tasksThisWeek > 0 ? "secondary" : "outline"} className={`${tasksThisWeek > 0 ? 'bg-purple-500/10 text-purple-700 border-purple-500/30': 'text-muted-foreground'}`}>{tasksThisWeek}</Badge></span>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {myTasks.length > 0 ? (
-                    <div className="overflow-x-auto rounded-md border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-muted/20 hover:bg-muted/30">
-                            <TableHead className="w-[50px]"></TableHead>
-                            <TableHead>Task</TableHead>
-                            <TableHead>Due Date</TableHead>
-                            <TableHead>Priority</TableHead>
-                            <TableHead>Status</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {myTasks.slice(0, 5).map((task) => ( 
-                            <TableRow key={task.id} className={`hover:bg-muted/50 transition-colors duration-150 ${task.status === 'Completed' ? 'opacity-60' : ''}`}>
-                              <TableCell>
-                                <Checkbox
-                                  checked={task.status === 'Completed'}
-                                  onCheckedChange={() => handleTaskCompletionToggle(task.id)}
-                                  aria-label={`Mark task ${task.title} as ${task.status === 'Completed' ? 'incomplete' : 'complete'}`}
-                                />
-                              </TableCell>
-                              <TableCell className="font-medium max-w-xs truncate hover:underline">
-                                <Link href="/organizer/event-tasks" title={task.title}>{task.title}</Link>
-                              </TableCell>
-                              <TableCell className={`text-xs ${task.dueDate && isValid(parseISO(task.dueDate)) && isPast(startOfDay(parseISO(task.dueDate))) && task.status !== 'Completed' ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
-                                {task.dueDate && isValid(parseISO(task.dueDate)) ? format(parseISO(task.dueDate), 'MMM dd') : 'N/A'}
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant={getPriorityBadgeVariant(task.priority)} className="capitalize text-xs py-0.5 px-1.5">{task.priority}</Badge>
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant={getStatusBadgeVariant(task.status).variant} className={`capitalize text-xs py-0.5 px-1.5 ${getStatusBadgeVariant(task.status).colorClass}`}>{task.status.replace('-', ' ')}</Badge>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  ) : (
-                     <div className="text-center py-6 text-muted-foreground">
-                        <CheckSquare className="h-10 w-10 mx-auto mb-2 text-green-500" />
-                        <p>Great job! You have no tasks due.</p>
-                        <p className="text-xs">Check back later or view all event tasks.</p>
-                      </div>
-                  )}
-                </CardContent>
-              </Card>
-            </section>
-        )}
-
-        <Separator />
-
-        <section id="key-metrics">
-            <h2 className="text-2xl font-semibold text-primary mb-4">Key Metrics at a Glance</h2>
-             <Card className="shadow-soft rounded-xl">
-                <CardContent className="py-6 text-muted-foreground">
-                    <BarChartHorizontalBig className="h-10 w-10 mx-auto mb-3 text-primary/30" />
-                    <p className="text-center">Key metrics and statistics (e.g., total registrations, task completion rate, upcoming critical deadlines) related to your assigned event will be displayed here soon.</p>
-                </CardContent>
-            </Card>
-        </section>
-        
-        <Separator />
-
-        <section id="recent-activity">
-            <h2 className="text-2xl font-semibold text-primary mb-4">Recent Activity Feed</h2>
-             <Card className="shadow-soft rounded-xl">
-                <CardContent className="py-6 text-muted-foreground">
-                    <Rss className="h-10 w-10 mx-auto mb-3 text-primary/30" />
-                    <p className="text-center">A feed of recent activities (new registrations, task updates, comments) related to your event(s) will appear here.</p>
-                </CardContent>
-            </Card>
-        </section>
-      </div>
-    );
-  }
-  
   // Default/Organizer/Admin/Test Dashboard
   let dashboardTitle = "User Dashboard";
   let quickActions: Array<{ href: string; label: string; icon: React.ElementType; disabled?: boolean;}> = [];
@@ -1958,3 +1773,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
