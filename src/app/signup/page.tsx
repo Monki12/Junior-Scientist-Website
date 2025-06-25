@@ -10,12 +10,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import type { SignUpFormData, UserProfileData } from '@/types'; // UserProfileData might not be strictly needed here if constructing manually
+import type { SignUpFormData, UserProfileData } from '@/types';
 import { UserPlus, Loader2, LogIn, School as SchoolIconLucide } from 'lucide-react';
 
 import { auth, db } from '@/lib/firebase';
 import { createUserWithEmailAndPassword, type AuthError } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore'; // Import serverTimestamp
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { mockSchoolsData } from '@/data/mockSchools';
 
 const gradeLevels = Array.from({ length: 9 }, (_, i) => `${i + 4}`); // Grades 4 through 12
@@ -94,7 +94,7 @@ export default function SignUpPage() {
         console.log("School not found in mock data, will be marked for review:", formData.schoolName);
       }
       
-      const profileDataForFirestore: Omit<UserProfileData, 'uid'> = {
+      const profileDataForFirestore = {
           fullName: formData.fullName,
           email: formData.email,
           schoolName: formData.schoolName,
@@ -112,13 +112,6 @@ export default function SignUpPage() {
           subEventsManaged: [],
           points: 0,
           credibilityScore: 0,
-          department: undefined,
-          assignedEventSlug: undefined,
-          assignedEventSlugs: [],
-          tasks: [],
-          allPlatformParticipants: [],
-          registeredEventIds: [],
-          teamIds: []
       };
 
       console.log("Attempting to save profile to Firestore for UID:", uid);
@@ -290,3 +283,5 @@ export default function SignUpPage() {
     </div>
   );
 }
+
+    
