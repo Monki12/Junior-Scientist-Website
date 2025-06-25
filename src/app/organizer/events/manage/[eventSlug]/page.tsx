@@ -2,16 +2,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter, notFound } from 'next/navigation';
+import { useParams, useRouter, notFound, Link } from 'next/link';
 import Image from 'next/image';
-import Link from 'next/link';
 import { useAuth } from '@/hooks/use-auth';
 import type { SubEvent, EventStatus } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Settings, ArrowLeft, ShieldAlert, Info, CalendarDays, MapPin, Users, ListChecks, Edit, LayoutDashboard, Users2 } from 'lucide-react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
@@ -22,7 +21,7 @@ const getEventStatusBadgeVariant = (status: EventStatus | undefined): "default" 
         case 'Active': return 'default'; 
         case 'Planning': return 'secondary';
         case 'Completed': return 'outline'; 
-        case 'Cancelled': return 'destructive';
+        case 'Cancelled': case 'closed': return 'destructive';
         default: return 'outline';
     }
 };
@@ -38,7 +37,6 @@ export default function ManageEventDashboardPage() {
   const [loadingEvent, setLoadingEvent] = useState(true);
   const [activeTab, setActiveTab] = useState('participants');
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
-  const [isEditSettingsDialogOpen, setIsEditSettingsDialogOpen] = useState(false);
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -67,10 +65,12 @@ export default function ManageEventDashboardPage() {
   useEffect(() => {
     if (!authLoading && userProfile && event) { 
       const isOverallHead = userProfile.role === 'overall_head';
-      const isEventManagerForThisEvent = userProfile.role === 'event_representative' && userProfile.assignedEventSlug === eventSlug;
+      const isEventManagerForThisEvent = userProfile.role === 'event_representative' && (event.eventReps || []).includes(userProfile.uid);
       const isAdmin = userProfile.role === 'admin';
       
-      if (!isOverallHead && !isEventManagerForThisEvent && !isAdmin) {
+      const canAccess = isOverallHead || isAdmin || isEventManagerForThisEvent || (event.organizerUids || []).includes(userProfile.uid);
+      
+      if (!canAccess) {
         toast({ title: "Access Denied", description: "You are not authorized to manage this event.", variant: "destructive"});
         router.push('/dashboard'); 
       }
@@ -78,9 +78,6 @@ export default function ManageEventDashboardPage() {
       router.push(`/login?redirect=/organizer/events/manage/${eventSlug}`);
     }
   }, [userProfile, authLoading, router, eventSlug, event, toast]);
-
-  const mockPendingTasksCount = userProfile?.tasks?.filter(task => task.eventSlug === eventSlug && task.status !== 'Completed').length || 0;
-
 
   if (authLoading || loadingEvent || !userProfile || !event) {
     return (
@@ -91,6 +88,7 @@ export default function ManageEventDashboardPage() {
   }
   
   const canManageGlobally = userProfile.role === 'overall_head' || userProfile.role === 'admin';
+  const mockPendingTasksCount = 0; // Placeholder until tasks are fully integrated here
 
 
   return (
@@ -111,8 +109,10 @@ export default function ManageEventDashboardPage() {
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3">
                     <h1 className="text-3xl font-bold text-primary">Manage Event: {event.title}</h1>
                     {canManageGlobally && (
-                        <Button variant="outline" size="sm" onClick={() => setIsEditSettingsDialogOpen(true)}>
-                            <Edit className="mr-2 h-4 w-4" /> Edit Event Settings
+                        <Button variant="outline" size="sm" asChild>
+                           <Link href={`/organizer/events/manage/${eventSlug}/edit`}>
+                             <Edit className="mr-2 h-4 w-4" /> Edit Event Settings
+                           </Link>
                         </Button>
                     )}
                 </div>
@@ -207,28 +207,6 @@ export default function ManageEventDashboardPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {canManageGlobally && (
-        <AlertDialog open={isEditSettingsDialogOpen} onOpenChange={setIsEditSettingsDialogOpen}>
-            <AlertDialogContent>
-            <AlertDialogHeader>
-                <AlertDialogTitle>Edit Event Settings: {event.title}</AlertDialogTitle>
-                <AlertDialogDescription>
-                Overall Heads can modify event details, assign/unassign Event Representatives and Organizers, and manage other core settings here. Full form coming soon.
-                </AlertDialogDescription>
-            </AlertDialogHeader>
-            <div className="py-4 text-center text-muted-foreground">
-                <Settings className="h-12 w-12 mx-auto mb-3 text-primary/40" />
-                <p>Detailed event editing form, user assignment (ERs, Organizers), and delete options will be available here for Overall Heads in a future update.</p>
-            </div>
-            <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction disabled>Save Changes (Coming Soon)</AlertDialogAction>
-            </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-      )}
-
     </div>
   );
 }

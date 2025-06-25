@@ -9,6 +9,7 @@ export const Logo = ({ className }: { className?: string }) => {
         src="/logos/logo-black.png" 
         alt="Junior Scientist Logo" 
         fill
+        sizes="100vw"
         style={{ objectFit: 'contain' }}
         className="block dark:hidden"
         priority
@@ -17,6 +18,7 @@ export const Logo = ({ className }: { className?: string }) => {
         src="/logos/logo-white.png" 
         alt="Junior Scientist Logo" 
         fill
+        sizes="100vw"
         style={{ objectFit: 'contain' }}
         className="hidden dark:block"
         priority

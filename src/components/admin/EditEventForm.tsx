@@ -1,0 +1,257 @@
+
+'use client';
+
+import React, { useState, useEffect, FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
+import type { SubEvent, UserProfileData } from '@/types';
+import { db } from '@/lib/firebase';
+import { doc, updateDoc, deleteDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { format, parseISO, isValid } from 'date-fns';
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Loader2, Save, Trash2, CalendarIcon, ChevronDown } from 'lucide-react';
+
+interface EditEventFormProps {
+  event: SubEvent;
+}
+
+export function EditEventForm({ event }: EditEventFormProps) {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [formData, setFormData] = useState<any>({
+    ...event,
+    deadline: event.deadline && isValid(parseISO(event.deadline)) ? parseISO(event.deadline) : null,
+    eventDate: event.eventDate && isValid(parseISO(event.eventDate)) ? parseISO(event.eventDate) : null,
+    organizerUids: event.organizerUids || [],
+    eventReps: event.eventReps || [],
+  });
+  const [allStaff, setAllStaff] = useState<UserProfileData[]>([]);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+
+  useEffect(() => {
+    const fetchStaff = async () => {
+      const staffRoles = ['organizer', 'event_representative', 'overall_head', 'admin'];
+      const q = query(collection(db, 'users'), where('role', 'in', staffRoles));
+      const querySnapshot = await getDocs(q);
+      const staffList = querySnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfileData));
+      setAllStaff(staffList);
+    };
+    fetchStaff();
+  }, []);
+
+  const handleInputChange = (field: keyof SubEvent, value: any) => {
+    setFormData((prev: any) => ({ ...prev, [field]: value }));
+  };
+
+  const handleUpdate = async (e: FormEvent) => {
+    e.preventDefault();
+    setIsUpdating(true);
+
+    const dataToSave = {
+      ...formData,
+      deadline: formData.deadline ? formData.deadline.toISOString() : null,
+      eventDate: formData.eventDate ? formData.eventDate.toISOString() : null,
+      slug: formData.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, ''),
+    };
+
+    try {
+      const eventRef = doc(db, 'subEvents', event.id);
+      await updateDoc(eventRef, dataToSave);
+      toast({ title: "Event Updated", description: "Changes have been saved successfully." });
+      router.push(`/organizer/events/manage/${dataToSave.slug}`); // Navigate to new slug if title changed
+    } catch (error: any) {
+      console.error("Error updating event:", error);
+      toast({ title: "Update Failed", description: error.message || "Could not save changes.", variant: "destructive" });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setIsUpdating(true);
+    try {
+      await deleteDoc(doc(db, 'subEvents', event.id));
+      toast({ title: "Event Deleted", description: `"${event.title}" has been permanently deleted.` });
+      router.push('/dashboard');
+    } catch (error: any) {
+      console.error("Error deleting event:", error);
+      toast({ title: "Delete Failed", description: error.message, variant: "destructive" });
+      setIsUpdating(false);
+    }
+  };
+
+  return (
+    <>
+      <form onSubmit={handleUpdate}>
+        <Card className="shadow-lg">
+          <CardHeader>
+            <CardTitle>Core Details</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="title">Event Title</Label>
+              <Input id="title" value={formData.title} onChange={e => handleInputChange('title', e.target.value)} required />
+            </div>
+            <div>
+                <Label htmlFor="superpowerCategory">Superpower Category</Label>
+                <Select value={formData.superpowerCategory} onValueChange={val => handleInputChange('superpowerCategory', val)}>
+                    <SelectTrigger id="superpowerCategory"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="The Thinker">The Thinker</SelectItem>
+                        <SelectItem value="The Brainiac">The Brainiac</SelectItem>
+                        <SelectItem value="The Strategist">The Strategist</SelectItem>
+                        <SelectItem value="The Innovator">The Innovator</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+            <div>
+              <Label htmlFor="shortDescription">Short Description</Label>
+              <Textarea id="shortDescription" value={formData.shortDescription} onChange={e => handleInputChange('shortDescription', e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="detailedDescription">Detailed Description</Label>
+              <Textarea id="detailedDescription" rows={6} value={formData.detailedDescription} onChange={e => handleInputChange('detailedDescription', e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="venue">Venue</Label>
+              <Input id="venue" value={formData.venue} onChange={e => handleInputChange('venue', e.target.value)} />
+            </div>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <Label htmlFor="eventDate">Event Date</Label>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                        <Button id="eventDate" variant="outline" className={`w-full justify-start text-left font-normal ${!formData.eventDate && "text-muted-foreground"}`}>
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {formData.eventDate ? format(formData.eventDate, "PPP") : <span>Pick a date</span>}
+                        </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar mode="single" selected={formData.eventDate} onSelect={date => handleInputChange('eventDate', date)} initialFocus />
+                        </PopoverContent>
+                    </Popover>
+                </div>
+                <div>
+                    <Label htmlFor="deadline">Registration Deadline</Label>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                        <Button id="deadline" variant="outline" className={`w-full justify-start text-left font-normal ${!formData.deadline && "text-muted-foreground"}`}>
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {formData.deadline ? format(formData.deadline, "PPP") : <span>Pick a date</span>}
+                        </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                         <Calendar mode="single" selected={formData.deadline} onSelect={date => handleInputChange('deadline', date)} initialFocus />
+                        </PopoverContent>
+                    </Popover>
+                </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-lg mt-6">
+          <CardHeader>
+            <CardTitle>Structure & Role Management</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className='flex items-center space-x-2'>
+                <Checkbox id="isTeamBased" checked={formData.isTeamBased} onCheckedChange={checked => handleInputChange('isTeamBased', !!checked)} />
+                <Label htmlFor='isTeamBased' className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">This is a team-based event</Label>
+            </div>
+            {formData.isTeamBased && (
+                <div className='grid grid-cols-2 gap-4 pl-6'>
+                    <div>
+                        <Label htmlFor="minTeamMembers">Min Team Size</Label>
+                        <Input id="minTeamMembers" type="number" value={formData.minTeamMembers} onChange={e => handleInputChange('minTeamMembers', Number(e.target.value))} />
+                    </div>
+                    <div>
+                        <Label htmlFor="maxTeamMembers">Max Team Size</Label>
+                        <Input id="maxTeamMembers" type="number" value={formData.maxTeamMembers} onChange={e => handleInputChange('maxTeamMembers', Number(e.target.value))} />
+                    </div>
+                </div>
+            )}
+             <div>
+                <Label>Assign Organizers</Label>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="w-full justify-between">
+                            {formData.organizerUids.length > 0 ? `${formData.organizerUids.length} organizers selected` : "Select Organizers"}
+                            <ChevronDown className="ml-2 h-4 w-4 opacity-50"/>
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-full">
+                        {allStaff.map(user => (
+                        <DropdownMenuCheckboxItem key={user.uid} checked={formData.organizerUids.includes(user.uid)} onCheckedChange={checked => {
+                            const newUids = checked ? [...formData.organizerUids, user.uid] : formData.organizerUids.filter((uid:string) => uid !== user.uid);
+                            handleInputChange('organizerUids', newUids);
+                        }}>{user.fullName} ({user.role})</DropdownMenuCheckboxItem>
+                        ))}
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
+             <div>
+                <Label>Assign Event Representatives</Label>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="w-full justify-between">
+                            {formData.eventReps.length > 0 ? `${formData.eventReps.length} reps selected` : "Select Representatives"}
+                            <ChevronDown className="ml-2 h-4 w-4 opacity-50"/>
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-full">
+                        {allStaff.filter(u => u.role === 'event_representative').map(user => (
+                        <DropdownMenuCheckboxItem key={user.uid} checked={formData.eventReps.includes(user.uid)} onCheckedChange={checked => {
+                            const newUids = checked ? [...formData.eventReps, user.uid] : formData.eventReps.filter((uid:string) => uid !== user.uid);
+                            handleInputChange('eventReps', newUids);
+                        }}>{user.fullName}</DropdownMenuCheckboxItem>
+                        ))}
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="mt-6 flex justify-between items-center">
+            <Button type="button" variant="destructive" onClick={() => setIsDeleteDialogOpen(true)} disabled={isUpdating}>
+              <Trash2 className="mr-2" /> Delete Event
+            </Button>
+            <Button type="submit" disabled={isUpdating} className="bg-accent hover:bg-accent/90 text-accent-foreground">
+              {isUpdating ? <Loader2 className="mr-2 animate-spin" /> : <Save className="mr-2" />}
+              Save Changes
+            </Button>
+        </div>
+      </form>
+      
+       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the event
+                &quot;{event.title}&quot; and all associated data, including registrations.
+            </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+            <AlertDialogCancel disabled={isUpdating}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={isUpdating} className="bg-destructive hover:bg-destructive/90">
+                {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Yes, delete event
+            </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
