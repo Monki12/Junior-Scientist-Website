@@ -194,7 +194,6 @@ export default function EventTasksPage() {
     if (!userProfile) return;
 
     setLoadingData(true);
-    // Fetch all events to map slug to title
     const fetchEvents = async () => {
         const eventsQuery = query(collection(db, 'subEvents'));
         const eventsSnapshot = await getDocs(eventsQuery);
@@ -202,7 +201,6 @@ export default function EventTasksPage() {
         setAllEvents(eventsList);
     };
 
-    let tasksQuery;
     const canAccess = userProfile.role === 'event_representative' || userProfile.role === 'overall_head' || userProfile.role === 'admin' || userProfile.role === 'organizer' || userProfile.role === 'test';
     if (!canAccess) {
       toast({ title: "Access Denied", description: "You don't have permission to view this page.", variant: "destructive" });
@@ -210,11 +208,16 @@ export default function EventTasksPage() {
       return;
     }
 
+    let tasksQuery;
     if (userProfile.role === 'overall_head' || userProfile.role === 'admin') {
       tasksQuery = query(collection(db, 'tasks'));
-    } else {
-      // For organizers, reps, test users, fetch tasks assigned to them
+    } else if (userProfile.displayName) {
       tasksQuery = query(collection(db, 'tasks'), where('assignedTo', 'array-contains', userProfile.displayName));
+    } else {
+      setTasks([]);
+      setLoadingData(false);
+      fetchEvents();
+      return; 
     }
     
     const unsubscribe = onSnapshot(tasksQuery, (snapshot) => {
@@ -475,3 +478,5 @@ export default function EventTasksPage() {
     </div>
   );
 }
+
+    

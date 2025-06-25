@@ -33,7 +33,7 @@ import {
 } from 'lucide-react';
 
 
-const defaultEventFormState: Omit<SubEvent, 'id' | 'slug' | 'mainImage'> & { mainImageSrc: string; mainImageAlt: string; mainImageAiHint: string; event_representatives_str: string; organizers_str: string } = {
+const defaultEventFormState: Omit<SubEvent, 'id' | 'slug' | 'mainImage'> & { mainImageSrc: string; mainImageAlt: string; mainImageAiHint: string; eventReps: string; organizers_str: string } = {
   title: '',
   superpowerCategory: 'The Thinker',
   shortDescription: '',
@@ -51,7 +51,6 @@ const defaultEventFormState: Omit<SubEvent, 'id' | 'slug' | 'mainImage'> & { mai
   venue: '',
   eventReps: [],
   registeredParticipantCount: 0,
-  event_representatives_str: '',
   organizers_str: '',
 };
 
@@ -171,10 +170,14 @@ export default function DashboardPage() {
     if (authUser && userProfile) {
       // Fetch tasks assigned to the current user
       const fetchMyTasks = async () => {
-        const tasksQuery = query(collection(db, 'tasks'), where('assignedTo', 'array-contains', userProfile.displayName));
-        const tasksSnapshot = await getDocs(tasksQuery);
-        const tasksList = tasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
-        setTasks(tasksList);
+        if (userProfile.displayName) {
+          const tasksQuery = query(collection(db, 'tasks'), where('assignedTo', 'array-contains', userProfile.displayName));
+          const tasksSnapshot = await getDocs(tasksQuery);
+          const tasksList = tasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
+          setTasks(tasksList);
+        } else {
+          setTasks([]);
+        }
       };
       fetchMyTasks();
 
@@ -367,9 +370,10 @@ export default function DashboardPage() {
         maxTeamMembers: Number(currentEventForm.maxTeamMembers),
         status: currentEventForm.status,
         venue: currentEventForm.venue,
-        eventReps: currentEventForm.event_representatives_str.split(',').map(s => s.trim()).filter(Boolean),
+        eventReps: currentEventForm.eventReps.split(',').map(s => s.trim()).filter(Boolean),
         organizerUids: currentEventForm.organizers_str.split(',').map(s => s.trim()).filter(Boolean),
         registeredParticipantCount: currentEventForm.registeredParticipantCount || 0,
+        customData: currentEventForm.customData || {},
     };
     
     const slug = eventDataToSave.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
@@ -404,24 +408,13 @@ export default function DashboardPage() {
   const openEditEventDialog = (event: SubEvent) => {
     setEditingEventId(event.id);
     setCurrentEventForm({
-        title: event.title,
-        superpowerCategory: event.superpowerCategory,
-        shortDescription: event.shortDescription,
-        detailedDescription: event.detailedDescription,
+        ...defaultEventFormState,
+        ...event,
         mainImageSrc: event.mainImage.src,
         mainImageAlt: event.mainImage.alt,
         mainImageAiHint: event.mainImage.dataAiHint,
-        registrationLink: event.registrationLink,
-        deadline: event.deadline,
-        eventDate: event.eventDate,
-        isTeamBased: event.isTeamBased || false,
-        minTeamMembers: event.minTeamMembers || 1,
-        maxTeamMembers: event.maxTeamMembers || 1,
-        status: event.status || 'Planning',
-        venue: event.venue || '',
         organizers_str: (event.organizerUids || []).join(', '),
-        event_representatives_str: (event.eventReps || []).join(', '),
-        registeredParticipantCount: event.registeredParticipantCount || 0,
+        eventReps: (event.eventReps || []).join(', '),
     });
     setIsEventFormDialogOpen(true);
   };
@@ -780,7 +773,7 @@ export default function DashboardPage() {
                         </div>
                         <div>
                             <Label htmlFor="eventSuperpowerCategory">Superpower Category</Label>
-                            <Select value={currentEventForm.superpowerCategory} onValueChange={val => setCurrentEventForm(f => ({...f, superpowerCategory: val}))}>
+                            <Select value={currentEventForm.superpowerCategory} onValueChange={val => setCurrentEventForm(f => ({...f, superpowerCategory: val as any}))}>
                                 <SelectTrigger id="eventSuperpowerCategory"><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="The Thinker">The Thinker</SelectItem>
@@ -827,7 +820,7 @@ export default function DashboardPage() {
                     </div>
                     <div>
                         <Label htmlFor="eventReps">Event Representative UIDs (comma-separated)</Label>
-                        <Input id="eventReps" value={currentEventForm.event_representatives_str} onChange={e => setCurrentEventForm(f => ({...f, event_representatives_str: e.target.value}))} />
+                        <Input id="eventReps" value={currentEventForm.eventReps} onChange={e => setCurrentEventForm(f => ({...f, eventReps: e.target.value}))} />
                     </div>
                     <DialogFooter>
                         <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
@@ -839,3 +832,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
