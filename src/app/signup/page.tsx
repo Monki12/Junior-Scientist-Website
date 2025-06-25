@@ -33,6 +33,8 @@ export default function SignUpPage() {
     schoolName: '',
     standard: '',
     division: '',
+    phoneNumber: '',
+    additionalNumber: '',
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -53,8 +55,8 @@ export default function SignUpPage() {
       console.log("--- SIGN UP PROCESS ENDED (Password Mismatch) ---");
       return;
     }
-    if (!formData.email || !formData.password || !formData.fullName || !formData.schoolName || !formData.standard) {
-      toast({ title: 'Missing Fields', description: 'Full Name, Email, Password, School, and Standard are required.', variant: 'destructive' });
+    if (!formData.email || !formData.password || !formData.fullName || !formData.schoolName || !formData.standard || !formData.phoneNumber) {
+      toast({ title: 'Missing Fields', description: 'Full Name, Email, Password, School, Standard, and Primary Phone Number are required.', variant: 'destructive' });
       console.log("--- SIGN UP PROCESS ENDED (Missing Fields) ---");
       return;
     }
@@ -92,7 +94,7 @@ export default function SignUpPage() {
         console.log("School not found in mock data, will be marked for review:", formData.schoolName);
       }
       
-      const profileDataForFirestore = {
+      const profileDataForFirestore: Omit<UserProfileData, 'uid'> = {
           fullName: formData.fullName,
           email: formData.email,
           schoolName: formData.schoolName,
@@ -103,6 +105,20 @@ export default function SignUpPage() {
           role: 'student' as const,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
+          phoneNumbers: [formData.phoneNumber],
+          additionalNumber: formData.additionalNumber || null,
+          photoURL: null,
+          registeredEvents: [],
+          subEventsManaged: [],
+          points: 0,
+          credibilityScore: 0,
+          department: undefined,
+          assignedEventSlug: undefined,
+          assignedEventSlugs: [],
+          tasks: [],
+          allPlatformParticipants: [],
+          registeredEventIds: [],
+          teamIds: []
       };
 
       console.log("Attempting to save profile to Firestore for UID:", uid);
@@ -193,6 +209,14 @@ export default function SignUpPage() {
                 <Input id="confirmPassword" type="password" placeholder="••••••••" value={formData.confirmPassword} onChange={handleChange} required disabled={isLoading} />
               </div>
             </div>
+             <div>
+              <Label htmlFor="phoneNumber">Primary Phone Number <span className="text-destructive">*</span></Label>
+              <Input id="phoneNumber" type="tel" placeholder="e.g., +91 12345 67890" value={formData.phoneNumber} onChange={handleChange} required disabled={isLoading} />
+            </div>
+            <div>
+              <Label htmlFor="additionalNumber">Additional Phone Number (Optional)</Label>
+              <Input id="additionalNumber" type="tel" placeholder="e.g., +91 98765 43210" value={formData.additionalNumber || ''} onChange={handleChange} disabled={isLoading} />
+            </div>
             <div>
               <Label htmlFor="schoolName">School Name <span className="text-destructive">*</span></Label>
               <div className="relative">
@@ -223,6 +247,7 @@ export default function SignUpPage() {
                   value={formData.standard}
                   onValueChange={(value) => handleSelectChange('standard', value)}
                   disabled={isLoading}
+                  required
                 >
                   <SelectTrigger id="standard">
                     <SelectValue placeholder="Select your grade" />

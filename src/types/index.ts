@@ -62,15 +62,17 @@ export interface UserProfileData {
   assignedEventSlug?: string;
   assignedEventSlugs?: string[];
   phoneNumbers?: string[];
-  // registeredEvents?: RegisteredEventInfo[]; // This will be derived from event_registrations
+  additionalNumber?: string | null;
   tasks?: Task[];
   points?: number;
   credibilityScore?: number;
   allPlatformParticipants?: EventParticipant[];
-  createdAt?: any; // Firestore Timestamp or string/Date for client
-  updatedAt?: any; // Firestore Timestamp or string/Date for client
-  registeredEventIds?: string[]; // Array of event IDs
-  teamIds?: string[]; // Array of team IDs student is part of
+  createdAt?: any; 
+  updatedAt?: any; 
+  registeredEventIds?: string[]; 
+  teamIds?: string[];
+  registeredEvents?: any[];
+  subEventsManaged?: any[];
 }
 
 export interface SubEvent {
@@ -103,6 +105,8 @@ export interface SignUpFormData {
   schoolName: string;
   standard: string;
   division?: string | null;
+  phoneNumber: string;
+  additionalNumber?: string;
 }
 
 export interface LoginFormData {
@@ -174,7 +178,7 @@ export interface SchoolData {
 export type EventRegistration = {
   id?: string; // Document ID, optional as Firestore auto-generates
   userId: string;
-  eventId: string;
+  subEventId: string;
   registeredAt: any; // Firestore Timestamp
   registrationStatus: RegistrationStatus;
   isTeamRegistration: boolean;
@@ -183,6 +187,11 @@ export type EventRegistration = {
   presentee: boolean;
   submittedDocuments: string[] | null;
   lastUpdatedAt: any; // Firestore Timestamp
+  participantInfoSnapshot?: {
+    fullName: string;
+    email: string;
+    schoolName: string;
+  }
 };
 
 // For Firestore event_teams collection
@@ -208,5 +217,3 @@ export type CreateTeamFormData = {
 export type JoinTeamFormData = {
   teamCodeOrName: string; // User input to search for a team
 };
-
-    
