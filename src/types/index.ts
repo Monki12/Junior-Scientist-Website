@@ -51,6 +51,7 @@ export interface UserProfileData {
   uid: string;
   email: string | null;
   fullName?: string;
+  shortId?: string;
   schoolName?: string;
   schoolId?: string | null;
   schoolVerifiedByOrganizer?: boolean;
@@ -217,3 +218,5 @@ export type CreateTeamFormData = {
 export type JoinTeamFormData = {
   teamCodeOrName: string; // User input to search for a team
 };
+
+    

@@ -640,7 +640,7 @@ export default function DashboardPage() {
             <div className="space-y-1 text-center sm:text-left">
               <h1 className="text-2xl md:text-3xl font-bold text-primary">{userProfile.fullName || userProfile.displayName || 'Student Dashboard'}</h1>
               <p className="text-sm text-muted-foreground flex items-center justify-center sm:justify-start gap-1.5"><Mail className="h-4 w-4"/>{userProfile.email}</p>
-              <p className="text-sm text-muted-foreground flex items-center justify-center sm:justify-start gap-1.5"><ShieldCheck className="h-4 w-4"/>UID: {userProfile.uid}</p>
+              <p className="text-sm text-muted-foreground flex items-center justify-center sm:justify-start gap-1.5"><ShieldCheck className="h-4 w-4"/>ID: {userProfile.shortId || 'N/A'}</p>
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mt-1 justify-center sm:justify-start">
                 {userProfile.schoolName && ( <span className="flex items-center gap-1.5"><School className="h-4 w-4" /> {userProfile.schoolName} {userProfile.schoolVerifiedByOrganizer === false && <Badge variant="outline" className="text-xs text-yellow-600 border-yellow-400">Pending Review</Badge>} </span>)}
                 {userProfile.standard && ( <span className="flex items-center gap-1.5"><GraduationCap className="h-4 w-4" /> Grade {userProfile.standard} {userProfile.division && `(${userProfile.division})`}</span>)}
@@ -1868,3 +1868,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    

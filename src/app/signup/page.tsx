@@ -20,6 +20,16 @@ import { mockSchoolsData } from '@/data/mockSchools';
 
 const gradeLevels = Array.from({ length: 9 }, (_, i) => `${i + 4}`); // Grades 4 through 12
 
+function generateShortId(length: number = 5): string {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  const charactersLength = characters.length;
+  for (let i = 0; i < length; i++) {
+    result += characters.charAt(Math.floor(Math.random() * charactersLength));
+  }
+  return result;
+}
+
 export default function SignUpPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -94,7 +104,9 @@ export default function SignUpPage() {
         console.log("School not found in mock data, will be marked for review:", formData.schoolName);
       }
       
-      const profileDataForFirestore = {
+      const shortId = generateShortId();
+
+      const profileDataForFirestore: Omit<UserProfileData, 'uid'> = {
           fullName: formData.fullName,
           email: formData.email,
           schoolName: formData.schoolName,
@@ -109,9 +121,11 @@ export default function SignUpPage() {
           additionalNumber: formData.additionalNumber || null,
           photoURL: null,
           registeredEvents: [],
+          tasks: [],
           subEventsManaged: [],
           points: 0,
           credibilityScore: 0,
+          shortId: shortId,
       };
 
       console.log("Attempting to save profile to Firestore for UID:", uid);

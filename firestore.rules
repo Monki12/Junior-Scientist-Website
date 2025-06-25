@@ -1,21 +1,18 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     // --- Helper Functions for Roles & Permissions ---
 
-    // Checks if the user is authenticated (has a UID)
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    // Retrieves the authenticated user's role from their '/users/{uid}' document.
-    // This incurs a read cost.
     function getAuthUserRole() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
 
-    // Role-specific checks
     function isStudent() {
       return isAuthenticated() && getAuthUserRole() == 'student';
     }
@@ -28,168 +25,169 @@ service cloud.firestore {
     function isOverallHead() {
       return isAuthenticated() && getAuthUserRole() == 'overall_head';
     }
-    function isAdmin() { // Highest admin level
+    function isAdmin() { 
       return isAuthenticated() && getAuthUserRole() == 'admin';
     }
 
-    // Checks if the user is an Overall Head or Admin (top-tier roles)
     function isOverallOrAdmin() {
       return isAdmin() || isOverallHead();
     }
 
-    // Checks if the authenticated user is assigned to manage a specific sub-event.
-    // This requires the 'subEvents' collection to exist in Firestore with 'eventReps' array.
-    // IMPORTANT: If sub-event data is still local (e.g., src/data/subEvents.ts),
-    // this rule helper will not function correctly. Migrate sub-event data to Firestore.
     function isAssignedToSubEvent(subEventId) {
-      // This is a placeholder for actual Firestore data check
-      // For now, it might rely on denormalized roles in user profiles for broader access
       return isAuthenticated() && (
-        isOverallOrAdmin() || isEventRepresentative() || isOrganizer()
+        isOverallOrAdmin() ||
+        (isEventRepresentative() && get(/databases/$(database)/documents/subEvents/$(subEventId)).data.eventReps.hasAny([request.auth.uid])) ||
+        (isOrganizer() && get(/databases/$(database)/documents/subEvents/$(subEventId)).data.eventReps.hasAny([request.auth.uid]))
       );
     }
 
     // --- Users Collection Rules ---
-    // Stores user profiles (students, organizers, reps, overalls, admins)
     match /users/{userId} {
-      // Allow new student profile creation.
-      // Enforces strict data validation and type checking on creation.
       allow create: if isAuthenticated() &&
-                      request.auth.uid == userId && // User must create their own profile
-                      request.resource.data.role == 'student' && // Role must be 'student' for self-creation
-                      request.resource.data.email == request.auth.token.email && // Email must match authenticated token
-                      // All fields in the new document must be from the allowed set (mandatory + optional)
-                      request.resource.data.keys().hasAll([ // Ensure all mandatory fields are present
-                        'fullName', 'email', 'role', 'schoolName', 'standard', 'phoneNumbers',
-                        'createdAt', 'updatedAt', 'schoolId', 'schoolVerifiedByOrganizer',
-                        'division', 'additionalNumber', 'photoURL', 'registeredEvents',
-                        'subEventsManaged', 'points', 'credibilityScore'
-                      ]) &&
-                      request.resource.data.keys().hasOnly([ // Ensure no unauthorized/unexpected fields are present
-                        'fullName', 'email', 'role', 'schoolName', 'standard',
-                        'division', 'schoolId', 'schoolVerifiedByOrganizer',
-                        'phoneNumbers', 'photoURL', 'additionalNumber',
-                        'registeredEvents', 'subEventsManaged',
-                        'points', 'credibilityScore', 'createdAt', 'updatedAt'
-                      ]) &&
-                      // Mandatory fields and their types
+                      request.auth.uid == userId && 
+                      request.resource.data.role == 'student' && 
+                      request.resource.data.email == request.auth.token.email &&
                       request.resource.data.fullName is string &&
                       request.resource.data.email is string &&
                       request.resource.data.schoolName is string &&
                       request.resource.data.standard is string &&
-                      request.resource.data.standard.matches('^(4|5|6|7|8|9|10|11|12)$') && // Validate standard format
-                      request.resource.data.phoneNumbers is list && // Primary phone numbers list is mandatory
-                      request.resource.data.phoneNumbers.size() > 0 && // Must contain at least one phone number
+                      request.resource.data.standard.matches('^(4|5|6|7|8|9|10|11|12)$') &&
+                      request.resource.data.phoneNumbers is list &&
+                      request.resource.data.phoneNumbers.size() > 0 &&
+                      request.resource.data.shortId is string &&
                       request.resource.data.createdAt is timestamp &&
                       request.resource.data.updatedAt is timestamp &&
-                      // Ensure timestamps are set by the server (client uses serverTimestamp())
                       request.resource.data.createdAt == request.time &&
                       request.resource.data.updatedAt == request.time &&
-                      // Validate types for optional fields if they are present
+                      request.resource.data.keys().hasAll([
+                        'fullName', 'email', 'role', 'schoolName', 'standard', 'phoneNumbers',
+                        'createdAt', 'updatedAt', 'shortId'
+                      ]) &&
+                      request.resource.data.keys().hasOnly([
+                        'fullName', 'email', 'role', 'schoolName', 'standard',
+                        'division', 'schoolId', 'schoolVerifiedByOrganizer',
+                        'phoneNumbers', 'photoURL', 'additionalNumber', 'shortId', 'tasks',
+                        'registeredEvents', 'subEventsManaged',
+                        'points', 'credibilityScore', 'createdAt', 'updatedAt'
+                      ]) &&
                       (request.resource.data.division == null || request.resource.data.division is string) &&
                       (request.resource.data.schoolId == null || request.resource.data.schoolId is string) &&
-                      (request.resource.data.schoolVerifiedByOrganizer is bool) &&
+                      (request.resource.data.schoolVerifiedByOrganizer == null || request.resource.data.schoolVerifiedByOrganizer is bool) &&
                       (request.resource.data.photoURL == null || request.resource.data.photoURL is string) &&
                       (request.resource.data.additionalNumber == null || request.resource.data.additionalNumber is string) &&
-                      (request.resource.data.registeredEvents is list) &&
-                      (request.resource.data.subEventsManaged is list) &&
-                      (request.resource.data.points is number) &&
-                      (request.resource.data.credibilityScore is number);
+                      (request.resource.data.registeredEvents == null || request.resource.data.registeredEvents is list) &&
+                      (request.resource.data.subEventsManaged == null || request.resource.data.subEventsManaged is list) &&
+                      (request.resource.data.points == null || request.resource.data.points is number) &&
+                      (request.resource.data.tasks == null || request.resource.data.tasks is list) &&
+                      (request.resource.data.credibilityScore == null || request.resource.data.credibilityScore is number);
 
-      // Read permissions for user profiles
-      allow read: if isAuthenticated(); // Allow any authenticated user to read public profile info
+      allow read: if isAuthenticated();
 
-      // Update permissions for user profiles
       allow update: if isAuthenticated() && (
-        // Students can update specific fields on their own profile
         (request.auth.uid == userId &&
          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
            'fullName', 'schoolName', 'standard', 'division',
            'phoneNumbers', 'photoURL', 'additionalNumber',
-           'updatedAt'
+           'updatedAt', 'registeredEvents', 'teamId'
          ]) &&
-         request.resource.data.updatedAt == request.time // Enforce serverTimestamp for updatedAt
+         request.resource.data.updatedAt == request.time
         ) ||
-        // Overall Heads and Admins can update any user's profile, including roles and scores
         (isOverallOrAdmin() &&
          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
            'fullName', 'email', 'role', 'schoolName', 'standard', 'division', 'schoolId',
            'schoolVerifiedByOrganizer', 'phoneNumbers', 'photoURL', 'additionalNumber',
            'registeredEvents', 'subEventsManaged',
-           'points', 'credibilityScore', 'updatedAt'
+           'points', 'credibilityScore', 'updatedAt', 'teamId'
          ]) &&
-         request.resource.data.updatedAt == request.time && // Enforce serverTimestamp for updatedAt
-         request.resource.data.role in ['student', 'organizer', 'event_representative', 'overall_head', 'admin', 'test'] // Validate role changes
+         request.resource.data.updatedAt == request.time &&
+         request.resource.data.role in ['student', 'organizer', 'event_representative', 'overall_head', 'admin']
         )
       );
 
-      allow delete: if false; // No client-side deletion of user profiles
+      allow delete: if false; 
     }
 
     // --- Main Events Collection Rules ---
-    // (e.g., 'Junior Scientist' as the parent event)
     match /events/{eventId} {
-      allow read: if true; // Publicly readable for event overview
-      allow create, update, delete: if isOverallOrAdmin(); // Only Overall Heads/Admins manage top-level events
+      allow read: if true; 
+      allow create, update, delete: if isOverallOrAdmin(); 
     }
 
     // --- Sub-Events Collection Rules ---
-    // (Individual sub-events like 'Robotics Challenge')
     match /subEvents/{subEventId} {
-      allow read: if true; // Publicly readable for sub-event listings
-      allow create, update, delete: if isOverallOrAdmin();
+      allow read: if true; 
+      allow create: if isOverallOrAdmin() &&
+                      request.resource.data.keys().hasAll([
+                        'eventName', 'description', 'date', 'time', 'location',
+                        'eventReps', 'parentEventId', 'createdAt', 'updatedAt', 'status'
+                      ]) &&
+                      request.resource.data.eventName is string &&
+                      request.resource.data.description is string &&
+                      request.resource.data.date is timestamp &&
+                      request.resource.data.time is string &&
+                      request.resource.data.location is string &&
+                      request.resource.data.eventReps is list &&
+                      request.resource.data.parentEventId is string &&
+                      request.resource.data.createdAt is timestamp &&
+                      request.resource.data.updatedAt is timestamp &&
+                      request.resource.data.status is string &&
+                      request.resource.data.createdAt == request.time &&
+                      request.resource.data.updatedAt == request.time &&
+                      request.resource.data.keys().hasOnly([
+                        'eventName', 'description', 'date', 'time', 'location', 'eventReps',
+                        'parentEventId', 'createdAt', 'updatedAt', 'status',
+                        'maxParticipants', 'currentParticipantsCount'
+                      ]) &&
+                      (request.resource.data.maxParticipants == null || request.resource.data.maxParticipants is number) &&
+                      (request.resource.data.currentParticipantsCount == null || request.resource.data.currentParticipantsCount is number);
+
+      allow update, delete: if isAssignedToSubEvent(subEventId);
     }
 
     // --- Event Registrations Collection Rules ---
-    // Stores individual participant registrations for sub-events
     match /event_registrations/{registrationId} {
-      // Students can CREATE their own registration
       allow create: if isStudent() &&
-                      request.auth.uid == request.resource.data.userId && // Registration must be for themselves
+                      request.auth.uid == request.resource.data.userId &&
                       request.resource.data.userId is string &&
                       request.resource.data.subEventId is string &&
                       request.resource.data.registeredAt is timestamp &&
-                      request.resource.data.registrationStatus == 'pending' && // Initial status must be 'pending'
+                      request.resource.data.registrationStatus == 'pending' &&
                       request.resource.data.isTeamRegistration is bool &&
                       request.resource.data.lastUpdatedAt is timestamp &&
-                      request.resource.data.participantInfoSnapshot is map && // Denormalized student data
-                      request.resource.data.registeredAt == request.time && // Enforce serverTimestamp
-                      request.resource.data.lastUpdatedAt == request.time && // Enforce serverTimestamp
-                      request.resource.data.keys().hasAll([ // Mandatory fields
+                      request.resource.data.participantInfoSnapshot is map &&
+                      request.resource.data.registeredAt == request.time &&
+                      request.resource.data.lastUpdatedAt == request.time &&
+                      request.resource.data.keys().hasAll([
                         'userId', 'subEventId', 'registeredAt', 'registrationStatus',
                         'isTeamRegistration', 'lastUpdatedAt', 'participantInfoSnapshot'
                       ]) &&
-                      request.resource.data.keys().hasOnly([ // Allowed fields
+                      request.resource.data.keys().hasOnly([
                         'userId', 'subEventId', 'registeredAt', 'registrationStatus',
                         'isTeamRegistration', 'lastUpdatedAt', 'participantInfoSnapshot',
-                        'teamId', 'admitCardUrl', 'presentee', 'submittedDocuments' // Optional fields
+                        'teamId', 'admitCardUrl', 'presentee', 'submittedDocuments'
                       ]) &&
                       (request.resource.data.teamId == null || request.resource.data.teamId is string) &&
                       (request.resource.data.admitCardUrl == null || request.resource.data.admitCardUrl is string) &&
                       (request.resource.data.presentee == null || request.resource.data.presentee is bool) &&
                       (request.resource.data.submittedDocuments == null || request.resource.data.submittedDocuments is list);
 
-      // Read permissions for registrations
       allow read: if isAuthenticated() && (
-        request.auth.uid == resource.data.userId || // Students can read their own registrations
-        isOverallOrAdmin() || // Overall Heads/Admins can read all registrations
-        isAssignedToSubEvent(resource.data.subEventId) // Event Reps/Organizers can read registrations for their assigned sub-events
+        request.auth.uid == resource.data.userId ||
+        isOverallOrAdmin() || 
+        isAssignedToSubEvent(resource.data.subEventId)
       );
 
-      // Update permissions for registrations
       allow update: if isAuthenticated() && (
-        // Students can update their own registration status to 'cancelled'
         (request.auth.uid == resource.data.userId &&
          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['registrationStatus', 'lastUpdatedAt']) &&
          request.resource.data.registrationStatus == 'cancelled' &&
          request.resource.data.lastUpdatedAt == request.time)
         ||
-        // Overall Heads, Admins, Event Reps, and Organizers can update specific fields
         (isAssignedToSubEvent(resource.data.subEventId) &&
          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
            'admitCardUrl', 'presentee', 'registrationStatus', 'submittedDocuments', 'lastUpdatedAt'
          ]) &&
-         (request.resource.data.presentee == null || request.resource.data.presentee is bool) &&
+         request.resource.data.presentee is bool &&
          request.resource.data.registrationStatus in ['approved', 'declined', 'pending', 'cancelled', 'attended'] &&
          (request.resource.data.admitCardUrl == null || request.resource.data.admitCardUrl is string) &&
          (request.resource.data.submittedDocuments == null || request.resource.data.submittedDocuments is list) &&
@@ -197,15 +195,14 @@ service cloud.firestore {
         )
       );
 
-      allow delete: if false; // No client-side deletion of registrations
+      allow delete: if false; 
     }
 
     // --- Event Teams Collection Rules ---
     match /event_teams/{teamId} {
-      // Students (Team Leaders) can CREATE a new team
       allow create: if isStudent() &&
                       request.auth.uid == request.resource.data.teamLeaderId &&
-                      request.resource.data.keys().hasAll([ // Mandatory fields
+                      request.resource.data.keys().hasAll([
                         'eventId', 'teamName', 'teamLeaderId', 'memberUids', 'teamSize',
                         'status', 'createdAt', 'updatedAt'
                       ]) &&
@@ -213,73 +210,145 @@ service cloud.firestore {
                       request.resource.data.teamName is string &&
                       request.resource.data.teamLeaderId is string &&
                       request.resource.data.memberUids is list &&
-                      request.resource.data.memberUids.size() >= 1 && // Must have at least one member (the leader)
-                      request.resource.data.memberUids.hasAll([request.auth.uid]) && // Leader must be in members list
+                      request.resource.data.memberUids.size() >= 1 &&
+                      request.resource.data.memberUids.hasAll([request.auth.uid]) &&
                       request.resource.data.teamSize is number &&
-                      request.resource.data.teamSize == request.resource.data.memberUids.size() && // Ensure consistency
-                      request.resource.data.status == 'pending' && // Initial status
+                      request.resource.data.teamSize == request.resource.data.memberUids.size() &&
+                      request.resource.data.status == 'pending' &&
                       request.resource.data.createdAt is timestamp &&
                       request.resource.data.updatedAt is timestamp &&
-                      request.resource.data.createdAt == request.time && // Enforce serverTimestamp
-                      request.resource.data.updatedAt == request.time && // Enforce serverTimestamp
-                      request.resource.data.keys().hasOnly([ // Allowed fields
+                      request.resource.data.createdAt == request.time &&
+                      request.resource.data.updatedAt == request.time &&
+                      request.resource.data.keys().hasOnly([
                         'eventId', 'teamName', 'teamLeaderId', 'memberUids', 'teamSize',
                         'status', 'createdAt', 'updatedAt'
-                      ]); // No other optional fields for teams on create.
+                      ]);
 
-      // Read permissions for teams (BROADER for team search/joining)
       allow read: if isAuthenticated();
 
-      // Update permissions for teams
       allow update: if isAuthenticated() && (
-        // Team Leader can update team name
         (request.auth.uid == resource.data.teamLeaderId &&
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['teamName', 'updatedAt']) &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+           'teamName', 'memberUids', 'teamSize', 'updatedAt'
+         ]) &&
          request.resource.data.teamName is string &&
+         request.resource.data.memberUids is list &&
+         request.resource.data.memberUids.hasAll([request.auth.uid]) &&
+         request.resource.data.teamSize is number &&
+         request.resource.data.teamSize == resource.data.memberUids.size() &&
          request.resource.data.updatedAt == request.time
         ) ||
-        // Organizers can update team status
         (isAssignedToSubEvent(resource.data.eventId) &&
          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']) &&
          request.resource.data.status in ['approved', 'disqualified', 'pending'] &&
          request.resource.data.updatedAt == request.time
         ) ||
-        // Student joins an existing team:
         (isStudent() &&
          request.auth.uid != resource.data.teamLeaderId &&
-         !resource.data.memberUids.hasAny([request.auth.uid]) &&
+         resource.data.memberUids.hasAll([request.auth.uid]) == false &&
+         request.resource.data.memberUids.hasAll(resource.data.memberUids.concat([request.auth.uid])) &&
          request.resource.data.memberUids.size() == resource.data.memberUids.size() + 1 &&
-         request.resource.data.memberUids.hasAll(resource.data.memberUids) &&
-         request.resource.data.memberUids.hasAny([request.auth.uid]) &&
          request.resource.data.teamSize == resource.data.teamSize + 1 &&
          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberUids', 'teamSize', 'updatedAt']) &&
+         request.resource.data.memberUids is list &&
+         request.resource.data.teamSize is number &&
          request.resource.data.updatedAt == request.time
         ) ||
-        // Student leaves an existing team
         (isStudent() &&
          request.auth.uid != resource.data.teamLeaderId &&
-         resource.data.memberUids.hasAny([request.auth.uid]) &&
+         resource.data.memberUids.hasAll([request.auth.uid]) == true &&
+         request.resource.data.memberUids.hasAll(resource.data.memberUids.filter(uid => uid != request.auth.uid)) &&
          request.resource.data.memberUids.size() == resource.data.memberUids.size() - 1 &&
-         !request.resource.data.memberUids.hasAny([request.auth.uid]) &&
-         resource.data.memberUids.hasAll(request.resource.data.memberUids.concat([request.auth.uid])) &&
          request.resource.data.teamSize == resource.data.teamSize - 1 &&
          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberUids', 'teamSize', 'updatedAt']) &&
+         request.resource.data.memberUids is list &&
+         request.resource.data.teamSize is number &&
          request.resource.data.updatedAt == request.time
         )
       );
 
-      allow delete: if false; // No client-side deletion of teams
+      allow delete: if false; 
     }
 
     // --- Tasks Collection Rules ---
     match /tasks/{taskId} {
-      allow read, write: if isOverallOrAdmin();
+      allow create: if isOverallOrAdmin() &&
+                      request.resource.data.keys().hasAll([
+                        'title', 'description', 'assignedToUid', 'assignedByUid',
+                        'eventId', 'status', 'points', 'createdAt', 'updatedAt'
+                      ]) &&
+                      request.resource.data.title is string &&
+                      request.resource.data.description is string &&
+                      request.resource.data.assignedToUid is string &&
+                      request.resource.data.assignedByUid is string &&
+                      request.resource.data.eventId is string &&
+                      request.resource.data.status == 'pending' &&
+                      request.resource.data.points is number &&
+                      request.resource.data.createdAt is timestamp &&
+                      request.resource.data.updatedAt is timestamp &&
+                      request.resource.data.createdAt == request.time &&
+                      request.resource.data.updatedAt == request.time &&
+                      request.resource.data.keys().hasOnly([
+                        'title', 'description', 'assignedToUid', 'assignedByUid',
+                        'eventId', 'status', 'points', 'createdAt', 'updatedAt', 'completedAt'
+                      ]) &&
+                      (request.resource.data.completedAt == null || request.resource.data.completedAt is timestamp);
+
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.assignedToUid ||
+        request.auth.uid == resource.data.assignedByUid ||
+        isOverallOrAdmin() || 
+        isAssignedToSubEvent(resource.data.eventId)
+      );
+
+      allow update: if isAuthenticated() && (
+        (request.auth.uid == resource.data.assignedToUid &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'completedAt']) &&
+         request.resource.data.status in ['pending', 'in-progress', 'completed'] &&
+         request.resource.data.updatedAt == request.time &&
+         (request.resource.data.status == 'completed' ? request.resource.data.completedAt is timestamp : true)
+        ) ||
+        (isOverallOrAdmin() &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+           'title', 'description', 'assignedToUid', 'status', 'points', 'updatedAt', 'completedAt'
+         ]) &&
+         request.resource.data.assignedToUid is string &&
+         request.resource.data.status in ['pending', 'in-progress', 'completed'] &&
+         request.resource.data.points is number &&
+         request.resource.data.updatedAt == request.time &&
+         (request.resource.data.status == 'completed' ? request.resource.data.completedAt is timestamp : true)
+        ) ||
+        (request.auth.uid == resource.data.assignedByUid && !isOverallOrAdmin() &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+           'status', 'points', 'updatedAt', 'completedAt'
+         ]) &&
+         request.resource.data.status in ['pending', 'in-progress', 'completed'] &&
+         request.resource.data.points is number &&
+         request.resource.data.updatedAt == request.time &&
+         (request.resource.data.status == 'completed' ? request.resource.data.completedAt is timestamp : true)
+        )
+      );
+
+      allow delete: if isOverallOrAdmin();
     }
 
     // --- Schools Collection Rules ---
     match /schools/{schoolId} {
-      allow read: if true; // Publicly readable for lookup
-      allow create, update, delete: if isOverallOrAdmin();
+      allow read: if true; 
+      allow create: if isOverallOrAdmin() &&
+                      request.resource.data.keys().hasAll([
+                        'name', 'address', 'createdAt', 'updatedAt'
+                      ]) &&
+                      request.resource.data.name is string &&
+                      request.resource.data.address is string &&
+                      request.resource.data.createdAt is timestamp &&
+                      request.resource.data.updatedAt == request.time &&
+                      request.resource.data.keys().hasOnly([
+                        'name', 'address', 'createdAt', 'updatedAt'
+                      ]);
+      allow update, delete: if isOverallOrAdmin();
     }
   }
 }
+
+    
