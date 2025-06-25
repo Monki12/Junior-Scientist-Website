@@ -16,7 +16,6 @@ import { UserPlus, Loader2, LogIn, School as SchoolIconLucide } from 'lucide-rea
 import { auth, db } from '@/lib/firebase';
 import { createUserWithEmailAndPassword, type AuthError } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { mockSchoolsData } from '@/data/mockSchools';
 
 const gradeLevels = Array.from({ length: 9 }, (_, i) => `${i + 4}`); // Grades 4 through 12
 
@@ -86,22 +85,6 @@ export default function SignUpPage() {
       const uid = user.uid;
       console.log("Firebase Auth user created:", user.email, "UID:", uid);
 
-      let determinedSchoolId: string | null = null;
-      let determinedSchoolVerified = false;
-      const formSchoolNameLower = formData.schoolName.trim().toLowerCase();
-
-      const matchedSchool = mockSchoolsData.find(
-        (school) => school.name.trim().toLowerCase() === formSchoolNameLower
-      );
-
-      if (matchedSchool) {
-        determinedSchoolId = matchedSchool.id;
-        determinedSchoolVerified = true;
-        console.log("School found in mock data:", matchedSchool.name, "ID:", determinedSchoolId);
-      } else {
-        console.log("School not found in mock data, will be marked for review:", formData.schoolName);
-      }
-      
       const shortId = generateShortId();
 
       const profileDataForFirestore: Omit<UserProfileData, 'uid'> = {
@@ -110,8 +93,8 @@ export default function SignUpPage() {
           schoolName: formData.schoolName,
           standard: formData.standard,
           division: formData.division || null,
-          schoolId: determinedSchoolId, 
-          schoolVerifiedByOrganizer: determinedSchoolVerified,
+          schoolId: null, // School ID is no longer determined from mock data
+          schoolVerifiedByOrganizer: false, // All new schools are unverified
           role: 'student' as const,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
@@ -132,7 +115,6 @@ export default function SignUpPage() {
       await setDoc(userDocRef, profileDataForFirestore);
 
       console.log("Firestore document for UID", uid, "created successfully!");
-      console.log("Response from setDoc (implicitly void for success, but promise resolved): Promise fulfilled.");
 
       toast({
         title: 'Account created successfully!',
@@ -228,21 +210,15 @@ export default function SignUpPage() {
                 <Input
                   id="schoolName"
                   type="text"
-                  placeholder="Type or select your school"
+                  placeholder="Enter your school's full name"
                   value={formData.schoolName}
                   onChange={handleChange}
                   required
                   disabled={isLoading}
-                  list="schools-datalist"
                   className="pl-10"
                 />
-                <datalist id="schools-datalist">
-                  {mockSchoolsData.map(school => (
-                    <option key={school.id} value={school.name} />
-                  ))}
-                </datalist>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">If your school is not listed, please type its full name. It will be reviewed.</p>
+              <p className="text-xs text-muted-foreground mt-1">Your school will be reviewed and verified by an organizer.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>

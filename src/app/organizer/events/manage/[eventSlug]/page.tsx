@@ -6,7 +6,6 @@ import { useParams, useRouter, notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/use-auth';
-import { subEventsData } from '@/data/subEvents';
 import type { SubEvent, EventStatus } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,6 +14,8 @@ import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Settings, ArrowLeft, ShieldAlert, Info, CalendarDays, MapPin, Users, ListChecks, Edit, LayoutDashboard, Users2 } from 'lucide-react';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 const getEventStatusBadgeVariant = (status: EventStatus | undefined): "default" | "secondary" | "outline" | "destructive" => {
     switch (status) {
@@ -39,30 +40,36 @@ export default function ManageEventDashboardPage() {
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [isEditSettingsDialogOpen, setIsEditSettingsDialogOpen] = useState(false);
 
-  // TODO: For organizer permissions to work with the provided security rules,
-  // this event data must be fetched from a `/subEvents` collection in Firestore,
-  // not from the local `subEventsData.ts` file. The security rules function
-  // `isAssignedToSubEvent` performs a `get()` call on that collection.
   useEffect(() => {
-    if (eventSlug) {
-      const foundEvent = subEventsData.find(e => e.slug === eventSlug);
-      if (foundEvent) {
-        setEvent(foundEvent);
-      } else {
-        notFound();
+    const fetchEvent = async () => {
+      if (eventSlug) {
+        setLoadingEvent(true);
+        const q = query(collection(db, 'subEvents'), where('slug', '==', eventSlug));
+        try {
+          const querySnapshot = await getDocs(q);
+          if (!querySnapshot.empty) {
+            const eventDoc = querySnapshot.docs[0];
+            setEvent({ id: eventDoc.id, ...eventDoc.data() } as SubEvent);
+          } else {
+            notFound();
+          }
+        } catch (error) {
+          console.error("Error fetching event:", error);
+          notFound();
+        } finally {
+          setLoadingEvent(false);
+        }
       }
-    }
-    setLoadingEvent(false);
+    };
+    fetchEvent();
   }, [eventSlug]);
 
   useEffect(() => {
     if (!authLoading && userProfile && event) { 
       const isOverallHead = userProfile.role === 'overall_head';
       const isEventManagerForThisEvent = userProfile.role === 'event_representative' && userProfile.assignedEventSlug === eventSlug;
-      const isAdmin = userProfile.role === 'admin'; // Admins might also have access
+      const isAdmin = userProfile.role === 'admin';
       
-      // Note: The logic below relies on client-side data. For security rules to work,
-      // it needs to check against Firestore data, as noted in the TODO above.
       if (!isOverallHead && !isEventManagerForThisEvent && !isAdmin) {
         toast({ title: "Access Denied", description: "You are not authorized to manage this event.", variant: "destructive"});
         router.push('/dashboard'); 

@@ -5,7 +5,6 @@ import { useEffect, useState, FormEvent } from 'react';
 import { useParams, notFound, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { subEventsData } from '@/data/subEvents';
 import type { SubEvent, EventRegistration, EventTeam, UserProfileData, CreateTeamFormData, JoinTeamFormData } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -54,14 +53,20 @@ export default function SubEventDetailPage() {
 
   useEffect(() => {
     if (subEventSlug) {
-      const foundEvent = subEventsData.find(e => e.slug === subEventSlug);
-      if (foundEvent) {
-        setEvent(foundEvent);
-      } else {
-        notFound();
-      }
+      const fetchEvent = async () => {
+        setLoadingEvent(true);
+        const q = query(collection(db, 'subEvents'), where('slug', '==', subEventSlug));
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+          const eventDoc = querySnapshot.docs[0];
+          setEvent({ id: eventDoc.id, ...eventDoc.data() } as SubEvent);
+        } else {
+          notFound();
+        }
+        setLoadingEvent(false);
+      };
+      fetchEvent();
     }
-    setLoadingEvent(false); // Event data is from local, so not much loading
   }, [subEventSlug]);
 
   useEffect(() => {
@@ -73,8 +78,8 @@ export default function SubEventDetailPage() {
       return;
     }
     
-    setLoadingEvent(true); // Indicates checking registration
     const fetchRegistration = async () => {
+      setRegistrationStatus('loading');
       try {
         const q = query(
           collection(db, 'event_registrations'),
@@ -113,8 +118,6 @@ export default function SubEventDetailPage() {
         console.error("Error fetching registration:", error);
         toast({ title: 'Error loading registration status', variant: 'destructive' });
         setRegistrationStatus('not_registered');
-      } finally {
-        setLoadingEvent(false);
       }
     };
 
@@ -134,7 +137,7 @@ export default function SubEventDetailPage() {
 
     setLoadingAction(true);
     try {
-      const registrationData = {
+      const registrationData: Omit<EventRegistration, 'id'> = {
         userId: currentUserId,
         subEventId: event.id,
         registeredAt: serverTimestamp(),
@@ -147,7 +150,7 @@ export default function SubEventDetailPage() {
         lastUpdatedAt: serverTimestamp(),
         participantInfoSnapshot: {
           fullName: userProfile.fullName || userProfile.displayName || 'N/A',
-          email: userProfile.email,
+          email: userProfile.email!,
           schoolName: userProfile.schoolName || 'N/A',
         }
       };
@@ -186,7 +189,7 @@ export default function SubEventDetailPage() {
     setLoadingAction(true);
     try {
       const teamRef = doc(collection(db, 'event_teams'));
-      const teamData = {
+      const teamData: Omit<EventTeam, 'id'> = {
         eventId: event.id,
         teamName: createTeamFormData.teamName.trim(),
         teamLeaderId: currentUserId,
@@ -198,7 +201,7 @@ export default function SubEventDetailPage() {
       };
       await setDoc(teamRef, teamData);
 
-      const registrationData = {
+      const registrationData: Omit<EventRegistration, 'id'> = {
         userId: currentUserId,
         subEventId: event.id,
         registeredAt: serverTimestamp(),
@@ -211,7 +214,7 @@ export default function SubEventDetailPage() {
         lastUpdatedAt: serverTimestamp(),
         participantInfoSnapshot: {
           fullName: userProfile.fullName || userProfile.displayName || 'N/A',
-          email: userProfile.email,
+          email: userProfile.email!,
           schoolName: userProfile.schoolName || 'N/A',
         }
       };
@@ -285,7 +288,7 @@ export default function SubEventDetailPage() {
         updatedAt: serverTimestamp(),
       });
 
-      const registrationData = {
+      const registrationData: Omit<EventRegistration, 'id'> = {
         userId: currentUserId,
         subEventId: event.id,
         registeredAt: serverTimestamp(),
@@ -298,7 +301,7 @@ export default function SubEventDetailPage() {
         lastUpdatedAt: serverTimestamp(),
         participantInfoSnapshot: {
           fullName: userProfile.fullName || userProfile.displayName || 'N/A',
-          email: userProfile.email,
+          email: userProfile.email!,
           schoolName: userProfile.schoolName || 'N/A',
         }
       };
@@ -317,12 +320,8 @@ export default function SubEventDetailPage() {
     }
   };
 
-  if (authLoading || loadingEvent || !event && !notFound) { // Show loader if event is null initially and notFound hasn't been triggered
+  if (authLoading || loadingEvent || !event) {
     return <div className="flex justify-center items-center min-h-[calc(100vh-10rem)] text-xl text-muted-foreground"><Loader2 className="h-8 w-8 animate-spin mr-2" />Loading event details...</div>;
-  }
-  
-  if (!event) { // Should be caught by notFound earlier, but as a fallback
-    return <div className="text-center py-10">Event details could not be loaded or event not found.</div>;
   }
 
   return (
@@ -423,8 +422,7 @@ export default function SubEventDetailPage() {
                 {userTeam && (
                   <div className="mt-2">
                     <p className="text-sm text-muted-foreground">Team: <strong>{userTeam.teamName}</strong> ({registrationStatus === 'registered_team_leader' ? 'Leader' : 'Member'})</p>
-                    <p className="text-xs text-muted-foreground">Members ({userTeam.memberUids.length}): {userTeam.memberUids.join(', ')}</p>
-                    <p className="text-xs text-muted-foreground">(Full member names will be shown on your dashboard)</p>
+                    <p className="text-xs text-muted-foreground">Members ({userTeam.memberUids.length}): (Full member names are shown on your dashboard)</p>
                   </div>
                 )}
                  <Button variant="link" asChild className="mt-2 text-primary"><Link href="/dashboard">View in Dashboard</Link></Button>

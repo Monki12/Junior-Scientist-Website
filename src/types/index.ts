@@ -55,8 +55,8 @@ export interface UserProfileData {
   email: string | null;
   fullName?: string;
   displayName?: string;
-  shortId?: string | null; // Can be null for organizers
-  collegeRollNumber?: string | null; // For organizers/staff
+  shortId?: string | null; 
+  collegeRollNumber?: string | null; 
   schoolName?: string;
   schoolId?: string | null;
   schoolVerifiedByOrganizer?: boolean;
@@ -64,7 +64,7 @@ export interface UserProfileData {
   division?: string | null;
   role: UserRole;
   photoURL?: string | null;
-  department?: string | null; // For organizers/staff
+  department?: string | null; 
   assignedEventSlug?: string;
   assignedEventSlugs?: string[];
   subEventsManaged?: string[];
@@ -93,11 +93,11 @@ export interface SubEvent {
   registrationLink: string;
   deadline?: string; // ISO Date string
   eventDate?: string; // ISO Date string
-  isTeamBased: boolean; // CRITICAL for new logic
+  isTeamBased: boolean;
   minTeamMembers?: number;
   maxTeamMembers?: number;
-  eventReps?: string[]; // Changed from organizerUids
-  organizerUids?: string[]; // Keep for backwards compatibility if needed, but prefer eventReps
+  eventReps?: string[]; 
+  organizerUids?: string[];
   status?: EventStatus;
   venue?: string;
   registeredParticipantCount?: number;
@@ -230,10 +230,9 @@ export type StudentRegisteredEventDisplay = SubEvent & {
 // Form data for creating a new team
 export type CreateTeamFormData = {
   teamName: string;
-  // memberEmails?: string; // Future: for inviting members by email
 };
 
 // Form data for joining an existing team
 export type JoinTeamFormData = {
-  teamCodeOrName: string; // User input to search for a team
+  teamCodeOrName: string; 
 };

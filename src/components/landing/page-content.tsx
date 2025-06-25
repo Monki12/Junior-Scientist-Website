@@ -1,38 +1,44 @@
 
+'use client';
+
 import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { ShieldCheck, BookOpen, Users2, Phone, Mail, Instagram, Facebook, Twitter, Sparkles, Zap, Trophy, MessageSquare, Brain, Puzzle, Bot, Info } from 'lucide-react';
-import { subEventsData } from '@/data/subEvents';
+import { ShieldCheck, BookOpen, Users2, Phone, Mail, Instagram, Facebook, Twitter, Sparkles, Zap, Trophy, MessageSquare, Brain, Puzzle, Bot, Info, Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { collection, getDocs, query } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import type { SubEvent } from '@/types';
 
-const superpowerCategories = [
+
+const baseSuperpowerCategories = [
   {
     name: 'The Thinker',
     icon: <MessageSquare className="h-10 w-10 text-primary mb-3" />,
     description: 'Excel in debating, global affairs, and public speaking? Born diplomat!',
-    events: subEventsData.filter(event => event.superpowerCategory === 'The Thinker').map(e => ({ title: e.title, slug: e.slug })),
+    events: [],
     dataAiHint: 'thought bubble idea',
   },
   {
     name: 'The Brainiac',
     icon: <Brain className="h-10 w-10 text-primary mb-3" />,
     description: 'Obsessed with facts, quizzes, and science puzzles? You see the patterns others miss.',
-    events: subEventsData.filter(event => event.superpowerCategory === 'The Brainiac').map(e => ({ title: e.title, slug: e.slug })),
+    events: [],
     dataAiHint: 'glowing brain network',
   },
   {
     name: 'The Strategist',
     icon: <Puzzle className="h-10 w-10 text-primary mb-3" />,
     description: 'Enjoy solving math riddles and cracking logic games? Master of numbers and patterns.',
-    events: subEventsData.filter(event => event.superpowerCategory === 'The Strategist').map(e => ({ title: e.title, slug: e.slug })),
+    events: [],
     dataAiHint: 'chess strategy board',
   },
   {
     name: 'The Innovator',
     icon: <Bot className="h-10 w-10 text-primary mb-3" />,
     description: 'Love to design, build, and bring new ideas to life? Future tech pioneer!',
-    events: subEventsData.filter(event => event.superpowerCategory === 'The Innovator').map(e => ({ title: e.title, slug: e.slug })),
+    events: [],
     dataAiHint: 'robot gears innovation',
   },
 ];
@@ -57,7 +63,32 @@ const perks = [
 
 
 export default function PageContent() {
-    const featuredEvents = subEventsData.filter(event => event.isFeatured).slice(0, 3);
+    const [events, setEvents] = useState<SubEvent[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchEvents = async () => {
+            setLoading(true);
+            try {
+                const eventsCollection = collection(db, 'subEvents');
+                const eventSnapshot = await getDocs(eventsCollection);
+                const eventsList = eventSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SubEvent));
+                setEvents(eventsList);
+            } catch (error) {
+                console.error("Error fetching events for landing page:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchEvents();
+    }, []);
+
+    const superpowerCategories = baseSuperpowerCategories.map(category => ({
+        ...category,
+        events: events.filter(event => event.superpowerCategory === category.name).map(e => ({ title: e.title, slug: e.slug })),
+    }));
+
+    const featuredEvents = events.filter(event => event.isFeatured).slice(0, 3);
 
     return (
         <div className="animate-fade-in-up space-y-16 md:space-y-24 bg-background z-10 relative w-full">
@@ -69,6 +100,11 @@ export default function PageContent() {
                     <h2 className="text-3xl md:text-4xl font-bold text-primary">Discover Your Niche</h2>
                     <p className="text-lg text-muted-foreground mt-2 max-w-xl mx-auto">Find events tailored to your interests and talents.</p>
                 </div>
+                {loading ? (
+                    <div className="flex justify-center items-center h-48">
+                        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                    </div>
+                ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                     {superpowerCategories.map((category) => (
                     <Card key={category.name} className="bg-card shadow-soft hover:shadow-md-soft transition-all duration-300 flex flex-col text-center p-6 rounded-xl border border-border/30 hover:border-primary/50">
@@ -89,11 +125,13 @@ export default function PageContent() {
                             </Button>
                             </li>
                         ))}
+                         {category.events.length === 0 && <li className="text-xs text-muted-foreground">No events yet</li>}
                         </ul>
                         </CardFooter>
                     </Card>
                     ))}
                 </div>
+                )}
                 </div>
             </section>
             
@@ -128,7 +166,11 @@ export default function PageContent() {
                 <p className="text-lg text-muted-foreground mb-12 max-w-2xl mx-auto">
                     Explore a variety of challenges designed to spark curiosity and innovation.
                 </p>
-                {featuredEvents.length > 0 ? (
+                {loading ? (
+                    <div className="flex justify-center items-center h-60">
+                        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                    </div>
+                ) : featuredEvents.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     {featuredEvents.map((event) => (
                         <Link href={`/events/${event.slug}`} key={event.id} className="block group">

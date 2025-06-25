@@ -6,8 +6,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/hooks/use-auth';
-import { subEventsData } from '@/data/subEvents';
-import type { SubEvent, UserProfileData } from '@/types';
+import type { UserProfileData } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -20,10 +19,6 @@ import { Badge } from '@/components/ui/badge';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
-interface RegisteredEventDisplay extends SubEvent {
-  teamName?: string;
-}
-
 export default function ProfilePage() {
   const { authUser, userProfile, loading, logOut, setUserProfile } = useAuth();
   const router = useRouter();
@@ -33,7 +28,6 @@ export default function ProfilePage() {
   const [editableProfile, setEditableProfile] = useState<Partial<UserProfileData>>({});
   const [isUpdating, setIsUpdating] = useState(false);
   
-  const [studentRegisteredFullEvents, setStudentRegisteredFullEvents] = useState<RegisteredEventDisplay[]>([]);
 
   useEffect(() => {
     if (!loading && !authUser) {
@@ -51,19 +45,6 @@ export default function ProfilePage() {
         photoURL: userProfile.photoURL || '',
         department: userProfile.department || '',
       });
-
-      if ((userProfile.role === 'student' || userProfile.role === 'test') && userProfile.registeredEvents) {
-        const fullEvents = userProfile.registeredEvents
-          .map(registeredInfo => {
-            const eventDetail = subEventsData.find(event => event.slug === registeredInfo.eventSlug);
-            if (eventDetail) {
-              return { ...eventDetail, teamName: registeredInfo.teamName };
-            }
-            return null;
-          })
-          .filter(event => event !== null) as RegisteredEventDisplay[];
-        setStudentRegisteredFullEvents(fullEvents);
-      }
     }
   }, [authUser, userProfile, loading, router]);
   
@@ -99,7 +80,6 @@ export default function ProfilePage() {
       
       const userDocRef = doc(db, 'users', authUser.uid);
       
-      // Build update object based on what is editable for the role
       const updatesToSave: Partial<UserProfileData> = {
         phoneNumbers: (editableProfile.phoneNumbers || []).filter(Boolean),
         additionalNumber: editableProfile.additionalNumber || null,
@@ -121,7 +101,6 @@ export default function ProfilePage() {
 
       await updateDoc(userDocRef, updatesToSave);
 
-      // Optimistically update local context state
       setUserProfile(prev => prev ? { ...prev, ...updatesToSave, updatedAt: new Date().toISOString() } : null);
 
       toast({ title: 'Profile Updated', description: 'Your profile information has been successfully saved.' });
@@ -197,7 +176,6 @@ export default function ProfilePage() {
         </CardHeader>
         <CardContent className="space-y-6 pt-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-            {/* --- Non-Editable section --- */}
             <div className="space-y-1">
               <Label htmlFor="fullName">Full Name</Label>
               <Input id="fullName" value={userProfile.fullName || 'N/A'} disabled />
@@ -224,8 +202,6 @@ export default function ProfilePage() {
                  </div>
             )}
 
-
-            {/* --- Student-Specific Editable Section --- */}
             {isStudentRole && (
             <>
              <div className="space-y-1">
@@ -271,7 +247,6 @@ export default function ProfilePage() {
             </>
             )}
 
-            {/* --- Common Editable section --- */}
             <div className="space-y-1">
               <Label htmlFor="phoneNumber">Primary Phone Number</Label>
               {isEditing ? (
@@ -308,54 +283,6 @@ export default function ProfilePage() {
           </div>
         </CardContent>
       </Card>
-
-      {(userProfile.role === 'student' || userProfile.role === 'test') && (
-        <Card className="shadow-xl">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-primary" /> My Registered Events</CardTitle>
-            <CardDescription>Events you are currently registered for.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {studentRegisteredFullEvents.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {studentRegisteredFullEvents.map(event => (
-                  <Card key={event.id} className="overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                     <Link href={`/events/${event.slug}`} className="block group">
-                      <div className="relative w-full h-32">
-                        <Image
-                          src={event.mainImage.src}
-                          alt={event.mainImage.alt}
-                          fill
-                          style={{objectFit: 'cover'}}
-                          data-ai-hint={event.mainImage.dataAiHint}
-                          className="group-hover:scale-105 transition-transform"
-                        />
-                      </div>
-                      <CardHeader className="pb-1 pt-3 px-4">
-                        <CardTitle className="text-md group-hover:text-primary line-clamp-1">{event.title}</CardTitle>
-                         {event.teamName && (
-                          <p className="text-xs text-accent font-medium flex items-center">
-                            <Users className="mr-1 h-3 w-3"/> Team: {event.teamName}
-                          </p>
-                        )}
-                      </CardHeader>
-                      <CardFooter className="px-4 pb-3 pt-1">
-                         <Button variant="outline" size="sm" className="w-full text-xs">View Event Details</Button>
-                      </CardFooter>
-                     </Link>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-6 text-muted-foreground">
-                <Info className="h-8 w-8 mx-auto mb-2" />
-                <p>You haven&apos;t registered for any events yet.</p>
-                <Button variant="link" asChild className="mt-2 text-primary"><Link href="/events">Explore Events</Link></Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
       
       <div className="text-center pt-4">
         <Button variant="destructive" onClick={handleLogout} className="w-full sm:w-auto">

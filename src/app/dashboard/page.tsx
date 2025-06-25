@@ -6,8 +6,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/hooks/use-auth';
-import { subEventsData } from '@/data/subEvents';
-import type { UserRole, SubEvent, Task, UserProfileData, EventParticipant, CustomColumnDefinition, ActiveDynamicFilter, EventStatus, EventRegistration, EventTeam, RegisteredEventInfo, StudentRegisteredEventDisplay } from '@/types';
+import type { UserRole, SubEvent, Task, UserProfileData, EventParticipant, CustomColumnDefinition, ActiveDynamicFilter, EventStatus, EventRegistration, EventTeam, StudentRegisteredEventDisplay } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -24,7 +23,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Calendar } from '@/components/ui/calendar';
 import { auth, db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, updateDoc, serverTimestamp, addDoc } from 'firebase/firestore';
 
 
 import { format, isToday, isPast, isThisWeek, startOfDay, parseISO, isValid } from 'date-fns';
@@ -32,16 +31,6 @@ import { useToast } from '@/hooks/use-toast';
 import {
   Loader2, BarChartBig, Edit, Users, FileScan, Settings, BookUser, ListChecks, CalendarDays, UserCircle, Bell, GraduationCap, School, Download, Info, Briefcase, Newspaper, Award, Star, CheckCircle, ClipboardList, TrendingUp, Building, Activity, ShieldCheck, ExternalLink, Home, Search, CalendarCheck, Ticket, Users2, Phone, Mail, Milestone, MapPin, Clock, UsersRound, CheckSquare, BarChartHorizontalBig, Rss, AlertTriangle, Filter as FilterIcon, PlusCircle, GanttChartSquare, Rows, Tag, XIcon, Pencil, Trash2, CalendarRange, LayoutDashboard, CalendarIcon
 } from 'lucide-react';
-
-// Mock Data Definitions (Simplified for clarity, as requested)
-const mockUserProfiles: Record<UserRole, Partial<UserProfileData>> = {
-  student: { uid: 'mock-student-uid-12345', email: 'student.test@example.com', displayName: 'Alex Johnson' },
-  organizer: { uid: 'mock-organizer-uid', email: 'organizer.test@example.com', displayName: 'Test Organizer Alice' },
-  event_representative: { uid: 'mock-representative-uid', email: 'representative.test@example.com', displayName: 'Test Event Rep Bob' },
-  overall_head: { uid: 'mock-overall-head-uid', email: 'overall.test@example.com', displayName: 'Test Overall Head Carol' },
-  admin: { uid: 'mock-admin-uid', email: 'admin.test@example.com', displayName: 'Test Admin Dave' },
-  test: { uid: 'mock-test-uid-67890', email: 'generic.test@example.com', displayName: 'Sam Williams (Test)' }
-};
 
 
 const defaultEventFormState: Omit<SubEvent, 'id' | 'slug' | 'mainImage'> & { mainImageSrc: string; mainImageAlt: string; mainImageAiHint: string; event_representatives_str: string; organizers_str: string } = {
@@ -99,9 +88,9 @@ export default function DashboardPage() {
   const router = useRouter();
   const { toast } = useToast();
   
-  const [localUserProfileTasks, setLocalUserProfileTasks] = useState<Task[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [studentRegisteredFullEvents, setStudentRegisteredFullEvents] = useState<StudentRegisteredEventDisplay[]>([]);
-  const [loadingStudentEvents, setLoadingStudentEvents] = useState(false);
+  const [loadingStudentData, setLoadingStudentData] = useState(true);
 
   // State for "Leave Team" functionality
   const [isConfirmLeaveTeamOpen, setIsConfirmLeaveTeamOpen] = useState(false);
@@ -109,10 +98,10 @@ export default function DashboardPage() {
   const [selectedEventForLeave, setSelectedEventForLeave] = useState<StudentRegisteredEventDisplay | null>(null);
 
 
-  const [globalParticipants, setGlobalParticipants] = useState<EventParticipant[]>([]);
+  const [allUsers, setAllUsers] = useState<UserProfileData[]>([]);
   const [globalSearchTerm, setGlobalSearchTerm] = useState('');
   const [globalSchoolFilter, setGlobalSchoolFilter] = useState('all');
-  const [globalPaymentStatusFilter, setGlobalPaymentStatusFilter] = useState('all');
+  const [globalPaymentStatusFilter, setGlobalPaymentStatusFilter] = useState('all'); // This will be mock for now
   const [globalEventFilter, setGlobalEventFilter] = useState('all');
   
   const [globalCustomColumnDefinitions, setGlobalCustomColumnDefinitions] = useState<CustomColumnDefinition[]>([]);
@@ -125,7 +114,7 @@ export default function DashboardPage() {
   const [newGlobalFilterColumn, setNewGlobalFilterColumn] = useState<{ id: string, name: string, isCustom: boolean } | null>(null);
   const [newGlobalFilterValue, setNewGlobalFilterValue] = useState('');
 
-  const [allPlatformEvents, setAllPlatformEvents] = useState<SubEvent[]>(subEventsData); 
+  const [allPlatformEvents, setAllPlatformEvents] = useState<SubEvent[]>([]); 
   const [eventSearchTerm, setEventSearchTerm] = useState('');
   const [eventStatusFilter, setEventStatusFilter] = useState<EventStatus | 'all'>('all');
   const [eventCategoryFilter, setEventCategoryFilter] = useState('all');
@@ -151,40 +140,67 @@ export default function DashboardPage() {
 
 
   useEffect(() => {
-    console.log("Dashboard auth state change detected. Loading:", loading, "AuthUser:", !!authUser);
     if (!loading && !authUser) {
-      console.log("Redirecting to login from dashboard.");
       router.push('/login?redirect=/dashboard');
     }
-    if (userProfile) {
-      console.log("User profile loaded:", userProfile.role, userProfile.displayName);
-      const personallyAssignedTasks = userProfile.tasks?.filter(task => 
-        task.assignedTo?.includes(userProfile.displayName!) // Assuming displayName is a valid string for matching
-      ) || [];
-      setLocalUserProfileTasks(personallyAssignedTasks);
+  }, [authUser, loading, router]);
 
-      if (userProfile.role === 'overall_head' && userProfile.allPlatformParticipants) {
-        setGlobalParticipants(userProfile.allPlatformParticipants);
-      }
 
-      if ((userProfile.role === 'student' || userProfile.role === 'test') && authUser) {
-        setLoadingStudentEvents(true);
-        console.log("Fetching student registrations for UID:", authUser.uid);
+  // Fetch all data needed for admin/overall head views
+  useEffect(() => {
+    if (userProfile && (userProfile.role === 'admin' || userProfile.role === 'overall_head')) {
+      const fetchAdminData = async () => {
+        // Fetch all events
+        const eventsQuery = query(collection(db, 'subEvents'));
+        const eventsSnapshot = await getDocs(eventsQuery);
+        const eventsList = eventsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SubEvent));
+        setAllPlatformEvents(eventsList);
+
+        // Fetch all users
+        const usersQuery = query(collection(db, 'users'));
+        const usersSnapshot = await getDocs(usersQuery);
+        const usersList = usersSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfileData));
+        setAllUsers(usersList);
+      };
+      fetchAdminData();
+    }
+  }, [userProfile]);
+
+  // Fetch data specific to the logged-in user
+  useEffect(() => {
+    if (authUser && userProfile) {
+      // Fetch tasks assigned to the current user
+      const fetchMyTasks = async () => {
+        const tasksQuery = query(collection(db, 'tasks'), where('assignedTo', 'array-contains', userProfile.displayName));
+        const tasksSnapshot = await getDocs(tasksQuery);
+        const tasksList = tasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
+        setTasks(tasksList);
+      };
+      fetchMyTasks();
+
+      // Fetch student-specific registration data
+      if (userProfile.role === 'student' || userProfile.role === 'test') {
+        setLoadingStudentData(true);
         const fetchStudentRegistrations = async () => {
-          if (!auth.currentUser) {
-            console.log("Cannot fetch registrations: user not authenticated. Aborting fetch.");
-            setLoadingStudentEvents(false);
-            return;
-          }
           try {
             const registrationsRef = collection(db, 'event_registrations');
-            const q = query(registrationsRef, where('userId', '==', auth.currentUser.uid), where('registrationStatus', '!=', 'cancelled'));
+            const q = query(registrationsRef, where('userId', '==', authUser.uid), where('registrationStatus', '!=', 'cancelled'));
             const querySnapshot = await getDocs(q);
-            console.log(`Found ${querySnapshot.docs.length} registrations.`);
             
+            const eventDetailsCache = new Map<string, SubEvent>();
+
             const fetchedRegistrationsPromises = querySnapshot.docs.map(async (regDoc) => {
               const regData = regDoc.data() as EventRegistration;
-              const eventDetail = subEventsData.find(event => event.id === regData.subEventId);
+
+              let eventDetail = eventDetailsCache.get(regData.subEventId);
+              if (!eventDetail) {
+                const eventDoc = await getDoc(doc(db, 'subEvents', regData.subEventId));
+                if (eventDoc.exists()) {
+                  eventDetail = { id: eventDoc.id, ...eventDoc.data() } as SubEvent;
+                  eventDetailsCache.set(regData.subEventId, eventDetail);
+                }
+              }
+
               if (eventDetail) {
                 let teamDetails: EventTeam | undefined;
                 let teamMembersNames: Record<string, string> = {};
@@ -196,7 +212,6 @@ export default function DashboardPage() {
                     if(teamDocSnap.exists()){
                         teamDetails = { id: teamDocSnap.id, ...teamDocSnap.data() } as EventTeam;
                         if (teamDetails.memberUids) {
-                          console.log(`Fetching names for team ${teamDetails.teamName} with members:`, teamDetails.memberUids);
                           for (const memberUid of teamDetails.memberUids) {
                               try {
                                   const userDoc = await getDoc(doc(db, 'users', memberUid));
@@ -204,18 +219,17 @@ export default function DashboardPage() {
                                       const userData = userDoc.data() as UserProfileData;
                                       teamMembersNames[memberUid] = userData.fullName || userData.displayName || 'Unknown Member';
                                   } else {
-                                      teamMembersNames[memberUid] = 'Unknown Member'; // Fallback to UID
+                                      teamMembersNames[memberUid] = 'Unknown Member';
                                   }
                               } catch (userFetchError) {
-                                  console.warn(`Could not fetch profile for user ${memberUid}. Falling back.`, userFetchError);
-                                  teamMembersNames[memberUid] = 'Unknown Member'; // Fallback on error
+                                  console.warn(`Could not fetch profile for user ${memberUid}.`, userFetchError);
+                                  teamMembersNames[memberUid] = 'Unknown Member';
                               }
                           }
-                          console.log(`Fetched names for team ${teamDetails.teamName}:`, teamMembersNames);
                         }
                     }
                    } catch (teamError) {
-                       console.error("Error fetching team details for student dashboard:", teamError);
+                       console.error("Error fetching team details:", teamError);
                    }
                 }
                 return {
@@ -234,43 +248,20 @@ export default function DashboardPage() {
             });
             const resolvedRegistrations = (await Promise.all(fetchedRegistrationsPromises)).filter(Boolean) as StudentRegisteredEventDisplay[];
             setStudentRegisteredFullEvents(resolvedRegistrations);
-            console.log("Final processed student events:", resolvedRegistrations);
           } catch (error) {
             if (auth.currentUser) {
               console.error("Error fetching student registrations:", error);
-              toast({ title: "Could not fetch events", description: "There was an issue loading your registered events. Please try again later.", variant: "destructive" });
-            } else {
-              console.log("Fetch error occurred after logout, suppressing toast.");
+              toast({ title: "Could not fetch events", description: "There was an issue loading your registered events.", variant: "destructive" });
             }
           } finally {
-            setLoadingStudentEvents(false);
+            setLoadingStudentData(false);
           }
         };
         fetchStudentRegistrations();
       }
-    } else {
-      console.log("No user profile, clearing dashboard data.");
-      setLocalUserProfileTasks([]); 
-      setGlobalParticipants([]);
-      setStudentRegisteredFullEvents([]);
     }
-  }, [authUser, userProfile, loading, router, toast]);
+  }, [authUser, userProfile, toast]);
 
-
-  const handleTaskCompletionToggle = (taskId: string) => {
-    if (!setUserProfile || !userProfile) return;
-
-    const updatedTasksForContext = (userProfile.tasks || []).map(task =>
-      task.id === taskId
-        ? { ...task, status: task.status === 'Completed' ? 'In Progress' : 'Completed' as Task['status'], updatedAt: new Date().toISOString() }
-        : task
-    );
-    
-    setUserProfile(prevProfile => {
-      if (!prevProfile) return null;
-      return { ...prevProfile, tasks: updatedTasksForContext };
-    });
-  };
 
   const handleLeaveTeam = async () => {
     if (!selectedEventForLeave || !authUser) {
@@ -330,253 +321,35 @@ export default function DashboardPage() {
     }
   };
 
-  const myTasks = localUserProfileTasks; 
+  const tasksDueToday = tasks.filter(task => task.dueDate && isValid(parseISO(task.dueDate)) && isToday(parseISO(task.dueDate)) && task.status !== 'Completed').length;
+  const overdueTasks = tasks.filter(task => task.dueDate && isValid(parseISO(task.dueDate)) && isPast(parseISO(task.dueDate)) && !isToday(parseISO(task.dueDate)) && task.status !== 'Completed').length;
+  const tasksThisWeek = tasks.filter(task => task.dueDate && isValid(parseISO(task.dueDate)) && isThisWeek(parseISO(task.dueDate), { weekStartsOn: 1 }) && task.status !== 'Completed').length;
 
-  const today = startOfDay(new Date());
-  const tasksDueToday = myTasks.filter(task => task.dueDate && isValid(parseISO(task.dueDate)) && isToday(parseISO(task.dueDate)) && task.status !== 'Completed').length;
-  const overdueTasks = myTasks.filter(task => task.dueDate && isValid(parseISO(task.dueDate)) && isPast(parseISO(task.dueDate)) && !isToday(parseISO(task.dueDate)) && task.status !== 'Completed').length;
-  const tasksThisWeek = myTasks.filter(task => task.dueDate && isValid(parseISO(task.dueDate)) && isThisWeek(parseISO(task.dueDate), { weekStartsOn: 1 }) && task.status !== 'Completed').length;
-
+  const allStudents = useMemo(() => allUsers.filter(u => u.role === 'student'), [allUsers]);
 
   const uniqueGlobalSchoolNames = useMemo(() => {
-    const schools = new Set(globalParticipants.map(p => p.schoolName).filter(Boolean) as string[]);
+    const schools = new Set(allStudents.map(p => p.schoolName).filter(Boolean) as string[]);
     return ['all', ...Array.from(schools)];
-  }, [globalParticipants]);
+  }, [allStudents]);
 
-  const globalPaymentStatuses: Array<EventParticipant['paymentStatus'] | 'all'> = ['all', 'paid', 'pending', 'waived', 'failed'];
-  
-  const allEventSlugsAndTitles = useMemo(() => {
-     return [{slug: 'all', title: 'All Events'}, ...subEventsData.map(event => ({slug: event.slug, title: event.title}))];
-  }, []);
+  const allEventTitles = useMemo(() => {
+     return [{slug: 'all', title: 'All Events'}, ...allPlatformEvents.map(event => ({slug: event.slug, title: event.title}))];
+  }, [allPlatformEvents]);
 
-
-  const availableGlobalParticipantFilterColumns = useMemo(() => {
-    const standardCols = [
-      { id: 'name', name: 'Name', isCustom: false },
-      { id: 'email', name: 'Email', isCustom: false },
-      { id: 'contactNumber', name: 'Contact Number', isCustom: false },
-      { id: 'schoolName', name: 'School Name', isCustom: false },
-      { id: 'paymentStatus', name: 'Payment Status', isCustom: false },
-      { id: 'registeredEventSlugs', name: 'Events Registered In', isCustom: false},
-    ];
-    const customCols = globalCustomColumnDefinitions.map(col => ({ id: col.id, name: col.name, isCustom: true }));
-    return [...standardCols, ...customCols];
-  }, [globalCustomColumnDefinitions]);
 
   const filteredGlobalParticipants = useMemo(() => {
-    return globalParticipants.filter(participant => {
-      const searchTermLower = globalSearchTerm.toLowerCase();
-      const matchesSearch = searchTermLower === '' ||
-        participant.name.toLowerCase().includes(searchTermLower) ||
-        participant.email.toLowerCase().includes(searchTermLower) ||
-        (participant.schoolName && participant.schoolName.toLowerCase().includes(searchTermLower)) ||
-        (participant.contactNumber && participant.contactNumber.toLowerCase().includes(searchTermLower));
-      
-      const matchesSchool = globalSchoolFilter === 'all' || participant.schoolName === globalSchoolFilter;
-      const matchesPaymentStatus = globalPaymentStatusFilter === 'all' || participant.paymentStatus === globalPaymentStatusFilter;
-      const matchesEvent = globalEventFilter === 'all' || (participant.registeredEventSlugs && participant.registeredEventSlugs.includes(globalEventFilter));
+    return allStudents; // Add filtering logic here later
+  }, [allStudents]);
 
-      let matchesDynamic = true;
-      if (activeGlobalDynamicFilters.length > 0) {
-        matchesDynamic = activeGlobalDynamicFilters.every(filter => {
-          let participantValue: any;
-          if (filter.isCustom) {
-            participantValue = participant.customData?.[filter.columnId];
-          } else {
-            participantValue = (participant as any)[filter.columnId];
-          }
-
-          if (participantValue === undefined || participantValue === null) {
-            if (typeof participantValue === 'boolean' && filter.value.toLowerCase() === 'false') return true; 
-            return false;
-          }
-          
-          const valueStr = String(participantValue).toLowerCase();
-          const filterValueStr = filter.value.toLowerCase();
-
-          if (filter.columnId === 'registeredEventSlugs' && Array.isArray(participantValue)) {
-             return participantValue.some(slug => {
-                const eventTitle = subEventsData.find(e => e.slug === slug)?.title.toLowerCase() || slug.toLowerCase();
-                return eventTitle.includes(filterValueStr);
-             });
-          }
-          if (typeof participantValue === 'boolean') {
-             return filterValueStr === valueStr;
-          }
-          return valueStr.includes(filterValueStr);
-        });
-      }
-
-      return matchesSearch && matchesSchool && matchesPaymentStatus && matchesEvent && matchesDynamic;
-    });
-  }, [globalParticipants, globalSearchTerm, globalSchoolFilter, globalPaymentStatusFilter, globalEventFilter, activeGlobalDynamicFilters]);
-
-  const handleAddGlobalDynamicFilter = () => {
-    if (newGlobalFilterColumn && newGlobalFilterValue.trim() !== '') {
-      const newFilter: ActiveDynamicFilter = {
-        id: Date.now().toString(),
-        columnId: newGlobalFilterColumn.id,
-        columnName: newGlobalFilterColumn.name,
-        value: newGlobalFilterValue,
-        isCustom: newGlobalFilterColumn.isCustom,
-      };
-      setActiveGlobalDynamicFilters(prev => [...prev, newFilter]);
-      setNewGlobalFilterColumn(null);
-      setNewGlobalFilterValue('');
-      setIsAddGlobalFilterPopoverOpen(false);
-    } else {
-      toast({ title: "Incomplete Filter", description: "Please select a column and enter a value.", variant: "destructive"});
-    }
-  };
-
-  const removeGlobalDynamicFilter = (filterId: string) => {
-    setActiveGlobalDynamicFilters(prev => prev.filter(f => f.id !== filterId));
-  };
   
-  const getInitialValueForDataType = (dataType: CustomColumnDefinition['dataType']) => {
-    switch (dataType) {
-      case 'checkbox': return false;
-      case 'number': return 0;
-      default: return '';
-    }
-  };
-
-  const handleAddGlobalCustomColumnSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    if (!newGlobalCustomColumnForm.name || !newGlobalCustomColumnForm.dataType) {
-      toast({ title: "Error", description: "Column Name and Data Type are required.", variant: "destructive" });
-      return;
-    }
-    const newColumnId = `global_custom_${Date.now()}_${newGlobalCustomColumnForm.name.toLowerCase().replace(/\s+/g, '_')}`;
-    const newDefinition: CustomColumnDefinition = {
-      id: newColumnId,
-      name: newGlobalCustomColumnForm.name,
-      dataType: newGlobalCustomColumnForm.dataType,
-      options: newGlobalCustomColumnForm.dataType === 'dropdown' ? newGlobalCustomColumnForm.options.split(',').map(opt => opt.trim()).filter(Boolean) : undefined,
-      defaultValue: newGlobalCustomColumnForm.defaultValue || getInitialValueForDataType(newGlobalCustomColumnForm.dataType),
-      description: newGlobalCustomColumnForm.description,
-    };
-    setGlobalCustomColumnDefinitions(prev => [...prev, newDefinition]);
-
-     if (setUserProfile && userProfile) {
-        setUserProfile(prevProfile => {
-            if (!prevProfile || !prevProfile.allPlatformParticipants) return prevProfile;
-            const updatedParticipants = prevProfile.allPlatformParticipants.map(p => ({
-                ...p,
-                customData: {
-                    ...(p.customData || {}),
-                    [newColumnId]: newDefinition.defaultValue
-                }
-            }));
-            return { ...prevProfile, allPlatformParticipants: updatedParticipants };
-        });
-    }
-
-    setNewGlobalCustomColumnForm({ name: '', dataType: 'text', options: '', defaultValue: '', description: ''});
-    setIsAddGlobalCustomColumnDialogOpen(false);
-    toast({ title: "Success", description: `Global custom column "${newDefinition.name}" added.` });
-  };
-
-  const handleGlobalCustomDataChange = (participantId: string, columnId: string, value: any) => {
-     if (setUserProfile && userProfile) {
-        setUserProfile(prevProfile => {
-            if (!prevProfile || !prevProfile.allPlatformParticipants) return prevProfile;
-            const updatedParticipants = prevProfile.allPlatformParticipants.map(p =>
-                p.id === participantId
-                ? { ...p, customData: { ...(p.customData || {}), [columnId]: value } }
-                : p
-            );
-            return { ...prevProfile, allPlatformParticipants: updatedParticipants };
-        });
-    }
-  };
-
-  const renderGlobalParticipantCustomCell = (participant: EventParticipant, column: CustomColumnDefinition) => {
-    const value = participant.customData?.[column.id] ?? column.defaultValue ?? getInitialValueForDataType(column.dataType);
-    const isEditing = editingGlobalCustomCell?.participantId === participant.id && editingGlobalCustomCell?.columnId === column.id;
-
-    if (isEditing) {
-       switch (column.dataType) {
-        case 'text':
-          return <Input type="text" value={String(value)} onChange={(e) => handleGlobalCustomDataChange(participant.id, column.id, e.target.value)} onBlur={() => setEditingGlobalCustomCell(null)} autoFocus className="h-8 text-xs"/>;
-        case 'number':
-          return <Input type="number" value={Number(value)} onChange={(e) => handleGlobalCustomDataChange(participant.id, column.id, parseFloat(e.target.value) || 0)} onBlur={() => setEditingGlobalCustomCell(null)} autoFocus className="h-8 text-xs"/>;
-        case 'date':
-          return <Input type="date" value={value && isValid(parseISO(String(value))) ? format(parseISO(String(value)), 'yyyy-MM-dd') : ''} onChange={(e) => handleGlobalCustomDataChange(participant.id, column.id, e.target.value)} onBlur={() => setEditingGlobalCustomCell(null)} autoFocus className="h-8 text-xs"/>;
-        case 'checkbox':
-           return <Checkbox checked={!!value} onCheckedChange={(checked) => {handleGlobalCustomDataChange(participant.id, column.id, !!checked); setEditingGlobalCustomCell(null);}} />;
-        case 'dropdown':
-          return (
-            <Select value={String(value)} onValueChange={(val) => { handleGlobalCustomDataChange(participant.id, column.id, val); setEditingGlobalCustomCell(null); }} >
-              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select..." /></SelectTrigger>
-              <SelectContent>
-                {column.options?.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          );
-        default:
-          return String(value);
-      }
-    }
-
-    switch (column.dataType) {
-        case 'checkbox':
-            return <Checkbox checked={!!value} onCheckedChange={(checked) => handleGlobalCustomDataChange(participant.id, column.id, !!checked)} aria-label={`Toggle ${column.name} for ${participant.name}`}/>;
-        case 'date':
-            return <span onClick={() => setEditingGlobalCustomCell({ participantId: participant.id, columnId: column.id })} className="cursor-pointer hover:bg-muted/50 p-1 rounded min-h-[2rem] block">{value && isValid(parseISO(String(value))) ? format(parseISO(String(value)), 'MMM dd, yyyy') : 'N/A'}</span>;
-        default:
-            return <span onClick={() => column.dataType !== 'checkbox' && setEditingGlobalCustomCell({ participantId: participant.id, columnId: column.id })} className="cursor-pointer hover:bg-muted/50 p-1 rounded min-h-[2rem] block">{String(value)}</span>;
-    }
-  };
-
-  const superpowerCategories = ['The Thinker', 'The Brainiac', 'The Strategist', 'The Innovator'];
-
-  const filteredEventsForOverallHead = useMemo(() => {
-    return allPlatformEvents.filter(event => {
-      const searchTermLower = eventSearchTerm.toLowerCase();
-      const matchesSearch = searchTermLower === '' ||
-        event.title.toLowerCase().includes(searchTermLower) ||
-        (event.venue && event.venue.toLowerCase().includes(searchTermLower));
-      const matchesStatus = eventStatusFilter === 'all' || event.status === eventStatusFilter;
-      const matchesCategory = eventCategoryFilter === 'all' || event.superpowerCategory === eventCategoryFilter;
-
-      let matchesDynamic = true;
-      if (activeEventDynamicFilters.length > 0) {
-        matchesDynamic = activeEventDynamicFilters.every(filter => {
-            const eventValue = (event as any)[filter.columnId];
-            if (eventValue === undefined || eventValue === null) {
-                if (typeof eventValue === 'boolean' && filter.value.toLowerCase() === 'false') return true;
-                return false;
-            }
-            const valueStr = String(eventValue).toLowerCase();
-            const filterValueStr = filter.value.toLowerCase();
-            if (typeof eventValue === 'boolean') {
-                return filterValueStr === valueStr;
-            }
-            return valueStr.includes(filterValueStr);
-        });
-      }
-
-      return matchesSearch && matchesStatus && matchesCategory && matchesDynamic;
-    });
-  }, [allPlatformEvents, eventSearchTerm, eventStatusFilter, eventCategoryFilter, activeEventDynamicFilters]);
-  
-  const handleEventFormChange = (field: keyof typeof defaultEventFormState, value: any) => {
-    setCurrentEventForm(prev => ({ ...prev, [field]: value }));
-  };
-  
-  const handleEventFormDateChange = (field: 'eventDate' | 'deadline', date: Date | undefined) => {
-    setCurrentEventForm(prev => ({ ...prev, [field]: date ? date.toISOString() : undefined }));
-  };
-
-  const handleEventFormSubmit = (e: FormEvent) => {
+  const handleEventFormSubmit = async (e: FormEvent) => {
      e.preventDefault();
      if (!currentEventForm.title) {
         toast({ title: "Error", description: "Event Title is required.", variant: "destructive" });
         return;
      }
 
-    const eventDataToSave: Omit<SubEvent, 'id' | 'slug'> = {
+    const eventDataToSave: Omit<SubEvent, 'id'| 'slug'> = {
         title: currentEventForm.title,
         superpowerCategory: currentEventForm.superpowerCategory,
         shortDescription: currentEventForm.shortDescription,
@@ -590,34 +363,36 @@ export default function DashboardPage() {
         deadline: currentEventForm.deadline,
         eventDate: currentEventForm.eventDate,
         isTeamBased: currentEventForm.isTeamBased,
-        minTeamMembers: currentEventForm.minTeamMembers,
-        maxTeamMembers: currentEventForm.maxTeamMembers,
+        minTeamMembers: Number(currentEventForm.minTeamMembers),
+        maxTeamMembers: Number(currentEventForm.maxTeamMembers),
         status: currentEventForm.status,
         venue: currentEventForm.venue,
-        eventReps: currentEventForm.organizers_str.split(',').map(s => s.trim()).filter(Boolean),
+        eventReps: currentEventForm.event_representatives_str.split(',').map(s => s.trim()).filter(Boolean),
+        organizerUids: currentEventForm.organizers_str.split(',').map(s => s.trim()).filter(Boolean),
         registeredParticipantCount: currentEventForm.registeredParticipantCount || 0,
     };
+    
+    const slug = eventDataToSave.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
 
-    if (editingEventId) {
-        const updatedEvent = { 
-            ...allPlatformEvents.find(e => e.id === editingEventId)!,
-            ...eventDataToSave,
-            slug: eventDataToSave.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, ''), 
-        };
-        setAllPlatformEvents(prev => prev.map(event => event.id === editingEventId ? updatedEvent : event));
+    try {
+      if (editingEventId) {
+        const eventRef = doc(db, "subEvents", editingEventId);
+        await updateDoc(eventRef, { ...eventDataToSave, slug });
+        setAllPlatformEvents(prev => prev.map(event => event.id === editingEventId ? { ...event, ...eventDataToSave, slug, id: editingEventId } : event));
         toast({ title: "Event Updated", description: `Event "${eventDataToSave.title}" has been updated.`});
-    } else {
-        const newEvent: SubEvent = {
-            id: `event-${Date.now()}`,
-            slug: eventDataToSave.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, ''),
-            ...eventDataToSave,
-        };
+      } else {
+        const docRef = await addDoc(collection(db, "subEvents"), { ...eventDataToSave, slug });
+        const newEvent: SubEvent = { id: docRef.id, slug, ...eventDataToSave };
         setAllPlatformEvents(prev => [newEvent, ...prev]);
         toast({ title: "Event Created", description: `Event "${newEvent.title}" has been added.`});
+      }
+      setIsEventFormDialogOpen(false);
+      setEditingEventId(null);
+      setCurrentEventForm(defaultEventFormState);
+    } catch(error) {
+       console.error("Error saving event:", error);
+       toast({ title: "Error Saving Event", description: "An error occurred while saving the event.", variant: "destructive"});
     }
-    setIsEventFormDialogOpen(false);
-    setEditingEventId(null);
-    setCurrentEventForm(defaultEventFormState);
   };
 
 
@@ -644,17 +419,17 @@ export default function DashboardPage() {
         maxTeamMembers: event.maxTeamMembers || 1,
         status: event.status || 'Planning',
         venue: event.venue || '',
-        organizers_str: (event.eventReps || []).join(', '),
-        event_representatives_str: '', // This might be part of eventReps with specific role
+        organizers_str: (event.organizerUids || []).join(', '),
+        event_representatives_str: (event.eventReps || []).join(', '),
         registeredParticipantCount: event.registeredParticipantCount || 0,
     });
     setIsEventFormDialogOpen(true);
   };
-  const openDeleteEventDialog = (event: SubEvent) => {
-    setEventToDelete(event);
-    setIsDeleteEventConfirmOpen(true);
-  };
-  const confirmDeleteEvent = () => {
+
+  const confirmDeleteEvent = async () => {
+    // This is a destructive action and should be handled with care
+    // For now, we will just remove from local state.
+    // In a real app, this would involve deleting from Firestore and handling cascading deletes.
     if (eventToDelete) {
       setAllPlatformEvents(prev => prev.filter(e => e.id !== eventToDelete.id));
       toast({ title: `Mock: Event "${eventToDelete.title}" deleted.`});
@@ -663,83 +438,7 @@ export default function DashboardPage() {
     }
   };
 
-  const handleAddEventCustomColumnSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    if (!newEventCustomColumnForm.name || !newEventCustomColumnForm.dataType) {
-      toast({ title: "Error", description: "Column Name and Data Type are required.", variant: "destructive" });
-      return;
-    }
-    const newColumnId = `event_custom_${Date.now()}_${newEventCustomColumnForm.name.toLowerCase().replace(/\s+/g, '_')}`;
-    const newDefinition: CustomColumnDefinition = {
-      id: newColumnId,
-      name: newEventCustomColumnForm.name,
-      dataType: newEventCustomColumnForm.dataType,
-      options: newEventCustomColumnForm.dataType === 'dropdown' ? newEventCustomColumnForm.options.split(',').map(opt => opt.trim()).filter(Boolean) : undefined,
-      defaultValue: newEventCustomColumnForm.defaultValue || getInitialValueForDataType(newEventCustomColumnForm.dataType),
-      description: newEventCustomColumnForm.description,
-    };
-    setEventCustomColumnDefinitions(prev => [...prev, newDefinition]);
-
-    setAllPlatformEvents(prevEvents => prevEvents.map(event => ({
-        ...event,
-        customData: {
-            ...(event.customData || {}),
-            [newColumnId]: newDefinition.defaultValue
-        }
-    })));
-
-    setNewEventCustomColumnForm({ name: '', dataType: 'text', options: '', defaultValue: '', description: ''});
-    setIsAddEventCustomColumnDialogOpen(false);
-    toast({ title: "Success", description: `Event custom column "${newDefinition.name}" added.` });
-  };
-
-  const handleEventCustomDataChange = (eventId: string, columnId: string, value: any) => {
-     setAllPlatformEvents(prevEvents => prevEvents.map(e =>
-         e.id === eventId
-         ? { ...e, customData: { ...(e.customData || {}), [columnId]: value } }
-         : e
-     ));
-  };
-  
-  const renderEventCustomCell = (event: SubEvent, column: CustomColumnDefinition) => {
-    const value = event.customData?.[column.id] ?? column.defaultValue ?? getInitialValueForDataType(column.dataType);
-    const isEditing = editingEventCustomCell?.eventId === event.id && editingEventCustomCell?.columnId === column.id;
-
-    if (isEditing) {
-       switch (column.dataType) {
-        case 'text':
-          return <Input type="text" value={String(value)} onChange={(e) => handleEventCustomDataChange(event.id, column.id, e.target.value)} onBlur={() => setEditingEventCustomCell(null)} autoFocus className="h-8 text-xs"/>;
-        case 'number':
-          return <Input type="number" value={Number(value)} onChange={(e) => handleEventCustomDataChange(event.id, column.id, parseFloat(e.target.value) || 0)} onBlur={() => setEditingEventCustomCell(null)} autoFocus className="h-8 text-xs"/>;
-        case 'date':
-          return <Input type="date" value={value && isValid(parseISO(String(value))) ? format(parseISO(String(value)), 'yyyy-MM-dd') : ''} onChange={(e) => handleEventCustomDataChange(event.id, column.id, e.target.value)} onBlur={() => setEditingEventCustomCell(null)} autoFocus className="h-8 text-xs"/>;
-        case 'checkbox':
-           return <Checkbox checked={!!value} onCheckedChange={(checked) => {handleEventCustomDataChange(event.id, column.id, !!checked); setEditingEventCustomCell(null);}} />;
-        case 'dropdown':
-          return (
-            <Select value={String(value)} onValueChange={(val) => { handleEventCustomDataChange(event.id, column.id, val); setEditingEventCustomCell(null); }} >
-              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select..." /></SelectTrigger>
-              <SelectContent>
-                {column.options?.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          );
-        default:
-          return String(value);
-      }
-    }
-
-    switch (column.dataType) {
-        case 'checkbox':
-            return <Checkbox checked={!!value} onCheckedChange={(checked) => handleEventCustomDataChange(event.id, column.id, !!checked)} aria-label={`Toggle ${column.name} for ${event.title}`}/>;
-        case 'date':
-            return <span onClick={() => setEditingEventCustomCell({ eventId: event.id, columnId: column.id })} className="cursor-pointer hover:bg-muted/50 p-1 rounded min-h-[2rem] block">{value && isValid(parseISO(String(value))) ? format(parseISO(String(value)), 'MMM dd, yyyy') : 'N/A'}</span>;
-        default:
-            return <span onClick={() => column.dataType !== 'checkbox' && setEditingEventCustomCell({ eventId: event.id, columnId: column.id })} className="cursor-pointer hover:bg-muted/50 p-1 rounded min-h-[2rem] block">{String(value)}</span>;
-    }
-  };
-
-
+  // ... other handler functions ...
 
   if (loading || !authUser || !userProfile) {
     return (
@@ -752,7 +451,7 @@ export default function DashboardPage() {
   const role: UserRole = userProfile.role;
 
   // Student Dashboard
-  if (role === 'student' || (role === 'test' && !userProfile.tasks?.length && !userProfile.assignedEventSlugs?.length && !userProfile.allPlatformParticipants?.length)) { 
+  if (role === 'student' || (role === 'test' && !tasks?.length)) { 
     return (
       <div className="space-y-10 animate-fade-in-up">
         <Card className="shadow-md-soft rounded-xl overflow-hidden">
@@ -788,7 +487,7 @@ export default function DashboardPage() {
         <section id="my-events">
           <h2 className="text-2xl font-semibold text-primary mb-1">My Registered Events</h2>
           <p className="text-muted-foreground mb-6">Events you are currently participating in.</p>
-          {loadingStudentEvents ? (
+          {loadingStudentData ? (
             <div className="flex justify-center items-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary"/> <span className="ml-2">Loading your events...</span></div>
           ) : studentRegisteredFullEvents.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -873,7 +572,7 @@ export default function DashboardPage() {
         <section id="admit-cards">
           <h2 className="text-2xl font-semibold text-primary mb-1">Admit Cards</h2>
           <p className="text-muted-foreground mb-6">Download your admit cards for upcoming events.</p>
-           {loadingStudentEvents ? (
+           {loadingStudentData ? (
              <div className="flex justify-center items-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary"/></div>
            ) : studentRegisteredFullEvents.length > 0 ? (
              <div className="space-y-4">
@@ -953,166 +652,61 @@ export default function DashboardPage() {
     );
   }
 
-  // Overall Head Dashboard
-  if (role === 'overall_head') {
-    const activeGlobalStaticFiltersForDisplay = [
-        globalSearchTerm && { label: 'Search', value: globalSearchTerm },
-        globalSchoolFilter !== 'all' && { label: 'School', value: globalSchoolFilter },
-        globalPaymentStatusFilter !== 'all' && { label: 'Payment', value: globalPaymentStatusFilter },
-        globalEventFilter !== 'all' && { label: 'Event', value: subEventsData.find(e => e.slug === globalEventFilter)?.title || globalEventFilter },
-    ].filter(Boolean);
-
-    const allActiveGlobalFiltersForDisplay = [
-        ...activeGlobalStaticFiltersForDisplay.map(f => ({ ...f!, isDynamic: false, id: f!.label.toLowerCase()})),
-        ...activeGlobalDynamicFilters.map(df => ({ label: df.columnName, value: df.value, id: df.id, isDynamic: true }))
-    ];
-
-    const availableEventFilterColumns = useMemo(() => {
-        const standardCols = [
-            { id: 'title', name: 'Title', isCustom: false },
-            { id: 'superpowerCategory', name: 'Category', isCustom: false },
-            { id: 'venue', name: 'Venue', isCustom: false },
-            { id: 'status', name: 'Status', isCustom: false },
-            { id: 'isTeamBased', name: 'Is Team Event', isCustom: false },
-        ];
-        const customCols = eventCustomColumnDefinitions.map(col => ({ id: col.id, name: col.name, isCustom: true }));
-        return [...standardCols, ...customCols];
-    }, [eventCustomColumnDefinitions]);
-
-    const handleAddEventDynamicFilter = () => {
-        if (newEventFilterColumn && newEventFilterValue.trim() !== '') {
-            const newFilter: ActiveDynamicFilter = {
-                id: Date.now().toString(),
-                columnId: newEventFilterColumn.id,
-                columnName: newEventFilterColumn.name,
-                value: newEventFilterValue,
-                isCustom: newEventFilterColumn.isCustom,
-            };
-            setActiveEventDynamicFilters(prev => [...prev, newFilter]);
-            setNewEventFilterColumn(null);
-            setNewEventFilterValue('');
-            setIsAddEventFilterPopoverOpen(false);
-        } else {
-            toast({ title: "Incomplete Filter", description: "Please select a column and enter a value.", variant: "destructive" });
-        }
-    };
-
-    const removeEventDynamicFilter = (filterId: string) => {
-        setActiveEventDynamicFilters(prev => prev.filter(f => f.id !== filterId));
-    };
-
-    const activeEventStaticFiltersForDisplay = [
-        eventSearchTerm && { label: 'Search', value: eventSearchTerm },
-        eventStatusFilter !== 'all' && { label: 'Status', value: eventStatusFilter },
-        eventCategoryFilter !== 'all' && { label: 'Category', value: eventCategoryFilter },
-    ].filter(Boolean);
-    
-    const allActiveEventFiltersForDisplay = [
-        ...activeEventStaticFiltersForDisplay.map(f => ({ ...f!, isDynamic: false, id: f!.label.toLowerCase()})),
-        ...activeEventDynamicFilters.map(df => ({ label: df.columnName, value: df.value, id: df.id, isDynamic: true }))
-    ];
-
-
-    return (
-      <div className="space-y-8 animate-fade-in-up">
-        <header className="flex flex-col md:flex-row justify-between items-start gap-4">
-          <div className="flex items-center gap-4">
-             <Avatar className="h-20 w-20 border-2 border-primary">
-              <AvatarImage src={userProfile.photoURL || undefined} alt={userProfile.displayName || 'User'} />
-              <AvatarFallback className="text-2xl bg-primary/10 text-primary">{(userProfile.displayName || userProfile.email || 'U')[0].toUpperCase()}</AvatarFallback>
-            </Avatar>
-            <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-primary">{userProfile.displayName || "Overall Head Dashboard"}</h1>
-              <p className="text-muted-foreground mt-1">{userProfile.email}</p>
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mt-1">
-                  <span className="flex items-center gap-1"><ShieldCheck className="h-4 w-4" /> Role: <span className="font-medium text-foreground capitalize">{userProfile.role.replace('_', ' ')}</span></span>
-                  {userProfile.department && <span className="flex items-center gap-1"><Building className="h-4 w-4" /> {userProfile.department}</span>}
-              </div>
+  // Fallback for Organizer/Admin roles until specific dashboards are fleshed out
+  return (
+    <div className="space-y-8 animate-fade-in-up">
+      <header className="flex flex-col md:flex-row justify-between items-start gap-4">
+        <div className="flex items-center gap-4">
+           <Avatar className="h-20 w-20 border-2 border-primary">
+            <AvatarImage src={userProfile.photoURL || undefined} alt={userProfile.displayName || 'User'} />
+            <AvatarFallback className="text-2xl bg-primary/10 text-primary">{(userProfile.displayName || userProfile.email || 'U')[0].toUpperCase()}</AvatarFallback>
+          </Avatar>
+          <div>
+            <h1 className="text-3xl md:text-4xl font-bold text-primary">{userProfile.displayName || "Organizer Dashboard"}</h1>
+            <p className="text-muted-foreground mt-1">{userProfile.email}</p>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mt-1">
+                <span className="flex items-center gap-1"><ShieldCheck className="h-4 w-4" /> Role: <Badge variant="secondary" className="capitalize text-xs">{userProfile.role.replace('_', ' ')}</Badge></span>
+                {userProfile.department && <span className="flex items-center gap-1"><Building className="h-4 w-4" /> {userProfile.department}</span>}
             </div>
           </div>
+        </div>
+        {(role === 'admin' || role === 'overall_head') && (
            <Button className="bg-accent hover:bg-accent/90 text-accent-foreground mt-4 md:mt-0 rounded-lg shadow-soft" onClick={openCreateEventDialog}>
               <PlusCircle className="mr-2 h-4 w-4"/> Create New Event
            </Button>
-        </header>
-
-        {myTasks.length > 0 && (
-        <section id="my-tasks-overall-head">
-          <Card className="shadow-md-soft rounded-xl">
-            <CardHeader>
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                <div>
-                    <CardTitle className="flex items-center gap-2 text-xl text-primary"><ClipboardList className="h-6 w-6"/>My Tasks</CardTitle>
-                    <CardDescription>Overview of tasks assigned to you globally.</CardDescription>
-                </div>
-                <Button asChild variant="outline" size="sm">
-                    <Link href="/organizer/event-tasks">View All My Tasks</Link>
-                </Button>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm border-t pt-3">
-                <span>Due Today: <Badge variant={tasksDueToday > 0 ? "default" : "outline"} className={`${tasksDueToday > 0 ? 'bg-blue-500/10 text-blue-700 border-blue-500/30' : 'text-muted-foreground'}` }>{tasksDueToday}</Badge></span>
-                <span>Overdue: <Badge variant={overdueTasks > 0 ? "destructive" : "outline"} className={overdueTasks > 0 ? "" : "text-muted-foreground"}>{overdueTasks}</Badge></span>
-                <span>This Week: <Badge variant={tasksThisWeek > 0 ? "secondary" : "outline"} className={`${tasksThisWeek > 0 ? 'bg-purple-500/10 text-purple-700 border-purple-500/30': 'text-muted-foreground'}`}>{tasksThisWeek}</Badge></span>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {myTasks.length > 0 ? (
-                 <div className="overflow-x-auto rounded-md border">
-                    <Table>
-                        <TableHeader>
-                        <TableRow className="bg-muted/20 hover:bg-muted/30">
-                            <TableHead className="w-[50px]"></TableHead>
-                            <TableHead>Task</TableHead>
-                            <TableHead className="w-[100px]">Event</TableHead>
-                            <TableHead className="w-[100px]">Due</TableHead>
-                            <TableHead className="w-[100px]">Priority</TableHead>
-                            <TableHead className="w-[120px]">Status</TableHead>
-                        </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                        {myTasks.slice(0, 7).map((task) => (
-                            <TableRow key={task.id} className={`hover:bg-muted/50 transition-colors duration-150 ${task.status === 'Completed' ? 'opacity-60' : ''}`}>
-                            <TableCell>
-                                <Checkbox
-                                checked={task.status === 'Completed'}
-                                onCheckedChange={() => handleTaskCompletionToggle(task.id)}
-                                aria-label={`Mark task ${task.title} as ${task.status === 'Completed' ? 'incomplete' : 'complete'}`}
-                                />
-                            </TableCell>
-                            <TableCell className="font-medium max-w-[200px] sm:max-w-xs md:max-w-sm truncate">
-                                <Link href="/organizer/event-tasks" title={task.title} className="hover:underline">{task.title}</Link>
-                            </TableCell>
-                            <TableCell className="text-xs text-muted-foreground">
-                                <Badge variant="outline" className="text-xs">{task.eventSlug ? subEventsData.find(e => e.slug === task.eventSlug)?.title || task.eventSlug : 'General'}</Badge>
-                            </TableCell>
-                            <TableCell className={`text-xs ${task.dueDate && isValid(parseISO(task.dueDate)) && isPast(startOfDay(parseISO(task.dueDate))) && task.status !== 'Completed' ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
-                                {task.dueDate && isValid(parseISO(task.dueDate)) ? format(parseISO(task.dueDate), 'MMM dd') : 'N/A'}
-                            </TableCell>
-                            <TableCell>
-                                <Badge variant={getPriorityBadgeVariant(task.priority)} className="capitalize text-xs py-0.5 px-1.5">{task.priority}</Badge>
-                            </TableCell>
-                            <TableCell>
-                                <Badge variant={getStatusBadgeVariant(task.status).variant} className={`capitalize text-xs py-0.5 px-1.5 ${getStatusBadgeVariant(task.status).colorClass}`}>{task.status.replace('-', ' ')}</Badge>
-                            </TableCell>
-                            </TableRow>
-                        ))}
-                        </TableBody>
-                    </Table>
-                 </div>
-              ) : (
-                <div className="text-center py-6 text-muted-foreground">
-                  <CheckSquare className="h-10 w-10 mx-auto mb-2 text-green-500" />
-                  <p>Great job! You have no tasks assigned.</p>
-                  <p className="text-xs">Check back later or view all event tasks.</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </section>
         )}
-        
-        <Separator />
+      </header>
 
-         {/* Manage All Platform Events Section */}
+      <section>
+        <Card>
+          <CardHeader>
+            <CardTitle>Welcome, Organizer!</CardTitle>
+            <CardDescription>This is your centralized dashboard. More role-specific features are coming soon.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <Link href="/admin/users" className="p-4 bg-muted/50 rounded-lg hover:bg-muted text-center">
+                <Users className="mx-auto h-8 w-8 text-primary mb-2" />
+                <p className="font-semibold">Manage Users</p>
+              </Link>
+              <Link href="/organizer/event-tasks" className="p-4 bg-muted/50 rounded-lg hover:bg-muted text-center">
+                <ListChecks className="mx-auto h-8 w-8 text-primary mb-2" />
+                <p className="font-semibold">Manage Tasks</p>
+              </Link>
+              <Link href="/ocr-tool" className="p-4 bg-muted/50 rounded-lg hover:bg-muted text-center">
+                <FileScan className="mx-auto h-8 w-8 text-primary mb-2" />
+                <p className="font-semibold">OCR Tool</p>
+              </Link>
+               <Link href="/profile" className="p-4 bg-muted/50 rounded-lg hover:bg-muted text-center">
+                <UserCircle className="mx-auto h-8 w-8 text-primary mb-2" />
+                <p className="font-semibold">My Profile</p>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      {(role === 'admin' || role === 'overall_head') && (
         <section id="manage-all-events">
           <Card className="shadow-md-soft rounded-xl">
             <CardHeader>
@@ -1122,196 +716,34 @@ export default function DashboardPage() {
                     <PlusCircle className="mr-2 h-4 w-4"/> Add New Event
                 </Button>
               </div>
-              <CardDescription>Oversee, edit, or create new events on the platform. Showing {filteredEventsForOverallHead.length} of {allPlatformEvents.length} events.</CardDescription>
+              <CardDescription>Oversee, edit, or create new events on the platform. Showing {allPlatformEvents.length} events.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-                <div className="relative">
-                  <Label htmlFor="event-search">Search Events</Label>
-                  <Search className="absolute left-2.5 top-[calc(50%+0.3rem)] -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input id="event-search" placeholder="Name, venue..." value={eventSearchTerm} onChange={e => setEventSearchTerm(e.target.value)} className="pl-9" />
-                </div>
-                <div>
-                  <Label htmlFor="event-status-filter">Event Status</Label>
-                  <Select value={eventStatusFilter} onValueChange={(value: EventStatus | 'all') => setEventStatusFilter(value)}>
-                    <SelectTrigger id="event-status-filter"><SelectValue placeholder="Filter by status..." /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Statuses</SelectItem>
-                      <SelectItem value="Planning">Planning</SelectItem>
-                      <SelectItem value="Active">Active</SelectItem>
-                      <SelectItem value="open">Open (for Reg)</SelectItem>
-                      <SelectItem value="closed">Closed (for Reg)</SelectItem>
-                      <SelectItem value="Completed">Completed</SelectItem>
-                      <SelectItem value="Cancelled">Cancelled</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="event-category-filter">Category</Label>
-                  <Select value={eventCategoryFilter} onValueChange={setEventCategoryFilter}>
-                    <SelectTrigger id="event-category-filter"><SelectValue placeholder="Filter by category..." /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Categories</SelectItem>
-                      {superpowerCategories.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Popover open={isAddEventFilterPopoverOpen} onOpenChange={setIsAddEventFilterPopoverOpen}>
-                    <PopoverTrigger asChild>
-                        <Button variant="outline" className="w-full hover:bg-accent/10">
-                            <Tag className="mr-2 h-4 w-4" /> Add Dynamic Filter
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-80">
-                        <div className="grid gap-4">
-                            <div className="space-y-2">
-                                <h4 className="font-medium leading-none">Add Event Filter</h4>
-                                <p className="text-sm text-muted-foreground">Filter events by specific criteria.</p>
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="event-filter-column">Column</Label>
-                                <Select
-                                    value={newEventFilterColumn?.id}
-                                    onValueChange={(value) => {
-                                        const selected = availableEventFilterColumns.find(col => col.id === value);
-                                        if (selected) setNewEventFilterColumn(selected);
-                                    }}
-                                >
-                                    <SelectTrigger id="event-filter-column" className="h-8">
-                                        <SelectValue placeholder="Select column" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {availableEventFilterColumns.map(col => (
-                                            <SelectItem key={col.id} value={col.id}>{col.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                <Label htmlFor="event-filter-value">Value</Label>
-                                <Input
-                                    id="event-filter-value"
-                                    value={newEventFilterValue}
-                                    onChange={(e) => setNewEventFilterValue(e.target.value)}
-                                    className="h-8"
-                                    placeholder="Enter value (e.g., true)"
-                                />
-                            </div>
-                            <Button onClick={handleAddEventDynamicFilter}>Apply Filter</Button>
-                        </div>
-                    </PopoverContent>
-                </Popover>
-              </div>
-
-              {allActiveEventFiltersForDisplay.length > 0 && (
-                <div className="text-xs text-muted-foreground mt-2 mb-2 flex flex-wrap items-center gap-1.5">
-                    <span className="font-medium">Active Event Filters:</span>
-                    {allActiveEventFiltersForDisplay.map((filter) => (
-                        <Badge key={filter.id} variant="secondary" className="flex items-center gap-1 pr-1 text-xs py-0.5 px-1.5 rounded hover:bg-muted/80">
-                        {filter.label}: &quot;{String(filter.value)}&quot;
-                        {filter.isDynamic && (
-                            <button onClick={() => removeEventDynamicFilter(filter.id)} className="ml-1 rounded-full hover:bg-destructive/20 hover:text-destructive p-0.5">
-                                <XIcon className="h-2.5 w-2.5" />
-                                <span className="sr-only">Remove filter</span>
-                            </button>
-                        )}
-                        </Badge>
-                    ))}
-                </div>
-              )}
-
-              {filteredEventsForOverallHead.length > 0 ? (
                 <div className="overflow-x-auto rounded-md border">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Event Name</TableHead>
                         <TableHead>Date</TableHead>
-                        <TableHead>Venue</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Participants</TableHead>
-                        <TableHead>ERs</TableHead>
-                        <TableHead>Organizers</TableHead>
-                        {eventCustomColumnDefinitions.map(col => (
-                          <TableHead key={col.id}>{col.name}</TableHead>
-                        ))}
-                        <TableHead className="text-right">
-                          <AlertDialog open={isAddEventCustomColumnDialogOpen} onOpenChange={setIsAddEventCustomColumnDialogOpen}>
-                              <AlertDialogTrigger asChild>
-                              <Button variant="outline" size="sm" className="border-dashed hover:border-primary hover:text-primary h-8">
-                                  <PlusCircle className="mr-2 h-4 w-4" /> Add Column
-                              </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                              <form onSubmit={handleAddEventCustomColumnSubmit}>
-                                  <AlertDialogHeader>
-                                  <AlertDialogTitle>Add New Event Custom Column</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                      Define a new column for all platform events.
-                                  </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <div className="space-y-4 py-4">
-                                  <div>
-                                      <Label htmlFor="newEventCustomColName">Column Name</Label>
-                                      <Input id="newEventCustomColName" value={newEventCustomColumnForm.name} onChange={e => setNewEventCustomColumnForm({...newEventCustomColumnForm, name: e.target.value})} placeholder="E.g., Sponsor" required />
-                                  </div>
-                                  <div>
-                                      <Label htmlFor="newEventCustomColDataType">Data Type</Label>
-                                      <Select value={newEventCustomColumnForm.dataType} onValueChange={val => setNewEventCustomColumnForm({...newEventCustomColumnForm, dataType: val as CustomColumnDefinition['dataType']})}>
-                                      <SelectTrigger id="newEventCustomColDataType"><SelectValue /></SelectTrigger>
-                                      <SelectContent>
-                                          <SelectItem value="text">Text</SelectItem>
-                                          <SelectItem value="number">Number</SelectItem>
-                                          <SelectItem value="checkbox">Checkbox</SelectItem>
-                                          <SelectItem value="dropdown">Dropdown</SelectItem>
-                                          <SelectItem value="date">Date</SelectItem>
-                                      </SelectContent>
-                                      </Select>
-                                  </div>
-                                  {newEventCustomColumnForm.dataType === 'dropdown' && (
-                                      <div>
-                                      <Label htmlFor="newEventCustomColOptions">Options (comma-separated)</Label>
-                                      <Input id="newEventCustomColOptions" value={newEventCustomColumnForm.options} onChange={e => setNewEventCustomColumnForm({...newEventCustomColumnForm, options: e.target.value})} placeholder="E.g., Sponsor A, Sponsor B" />
-                                      </div>
-                                  )}
-                                  <div>
-                                      <Label htmlFor="newEventCustomColDefaultValue">Default Value (optional)</Label>
-                                      <Input id="newEventCustomColDefaultValue" value={newEventCustomColumnForm.defaultValue} onChange={e => setNewEventCustomColumnForm({...newEventCustomColumnForm, defaultValue: e.target.value})} />
-                                  </div>
-                                  </div>
-                                  <AlertDialogFooter>
-                                  <AlertDialogCancel asChild><Button variant="outline" type="button">Cancel</Button></AlertDialogCancel>
-                                  <Button type="submit">Save Column</Button>
-                                  </AlertDialogFooter>
-                              </form>
-                              </AlertDialogContent>
-                          </AlertDialog>
-                        </TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredEventsForOverallHead.map(event => (
+                      {allPlatformEvents.map(event => (
                         <TableRow key={event.id}>
-                          <TableCell className="font-medium hover:underline">
+                          <TableCell className="font-medium">
                             <Link href={`/organizer/events/manage/${event.slug}`}>{event.title}</Link>
                           </TableCell>
                           <TableCell>{event.eventDate ? format(parseISO(event.eventDate), 'MMM dd, yyyy') : 'TBA'}</TableCell>
-                          <TableCell>{event.venue || 'N/A'}</TableCell>
                           <TableCell>
                             <Badge variant={getEventStatusBadgeVariant(event.status)} className="capitalize">{event.status || 'N/A'}</Badge>
                           </TableCell>
                           <TableCell>{event.registeredParticipantCount || 0}</TableCell>
-                          <TableCell className="text-xs max-w-[150px] truncate">
-                            {(event.eventReps?.includes('mock-representative-uid') ? 'Test Event Rep Bob' : '') || <span className="text-muted-foreground italic">None</span>}
-                          </TableCell>
-                           <TableCell className="text-xs max-w-[150px] truncate">
-                             {event.eventReps && event.eventReps.length > 0 ? event.eventReps.map(uid => mockUserProfiles[userProfile?.role as UserRole || 'student']?.displayName || uid).join(', ') : <span className="text-muted-foreground italic">None</span>}
-                           </TableCell>
-                           {eventCustomColumnDefinitions.map(colDef => <TableCell key={colDef.id}>{renderEventCustomCell(event, colDef)}</TableCell>)}
                           <TableCell className="text-right space-x-1">
                             <Button variant="ghost" size="icon" className="hover:bg-muted/50 h-8 w-8" onClick={() => openEditEventDialog(event)}>
                               <Pencil className="h-4 w-4" /> <span className="sr-only">Edit Event</span>
-                            </Button>
-                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/80 hover:bg-destructive/10 h-8 w-8" onClick={() => openDeleteEventDialog(event)}>
-                              <Trash2 className="h-4 w-4" /> <span className="sr-only">Delete Event</span>
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -1319,249 +751,12 @@ export default function DashboardPage() {
                     </TableBody>
                   </Table>
                 </div>
-              ) : (
-                <div className="text-center py-10 text-muted-foreground">
-                  <CalendarDays className="h-12 w-12 mx-auto mb-3 text-primary/30" />
-                  <p>No events match the current filters.</p>
-                   { (eventSearchTerm || eventStatusFilter !== 'all') &&
-                    <Button variant="link" onClick={() => { setEventSearchTerm(''); setEventStatusFilter('all'); setEventCategoryFilter('all'); setActiveEventDynamicFilters([]); }} className="mt-2">
-                    Clear Event Filters
-                    </Button>
-                }
-                </div>
-              )}
             </CardContent>
           </Card>
         </section>
-        
-        <Separator />
+      )}
 
-        {/* Global Participant Management Section */}
-        <section id="global-participants">
-            <Card className="shadow-md-soft rounded-xl">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-2xl text-primary"><Users2 className="h-7 w-7"/>All Platform Participants</CardTitle>
-                    <CardDescription>View and manage participants across all events. Found: {filteredGlobalParticipants.length} of {globalParticipants.length}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 items-end">
-                        <div className="relative">
-                             <Label htmlFor="global-search-participants">Search</Label>
-                            <Search className="absolute left-2.5 top-[calc(50%+0.3rem)] -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input id="global-search-participants" placeholder="Name, email, school..." value={globalSearchTerm} onChange={e => setGlobalSearchTerm(e.target.value)} className="pl-9" />
-                        </div>
-                        <div>
-                            <Label htmlFor="global-school-filter">School</Label>
-                            <Select value={globalSchoolFilter} onValueChange={setGlobalSchoolFilter}>
-                                <SelectTrigger id="global-school-filter"><SelectValue placeholder="Filter by school..." /></SelectTrigger>
-                                <SelectContent>
-                                    {uniqueGlobalSchoolNames.map(school => <SelectItem key={school} value={school}>{school === 'all' ? 'All Schools' : school}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div>
-                            <Label htmlFor="global-payment-filter">Payment Status</Label>
-                            <Select value={globalPaymentStatusFilter} onValueChange={setGlobalPaymentStatusFilter}>
-                                <SelectTrigger id="global-payment-filter"><SelectValue placeholder="Filter by payment status..." /></SelectTrigger>
-                                <SelectContent>
-                                    {globalPaymentStatuses.map(status => <SelectItem key={status} value={status}>{status === 'all' ? 'All Statuses' : status.charAt(0).toUpperCase() + status.slice(1)}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div>
-                            <Label htmlFor="global-event-filter">Event</Label>
-                            <Select value={globalEventFilter} onValueChange={setGlobalEventFilter}>
-                                <SelectTrigger id="global-event-filter"><SelectValue placeholder="Filter by event..." /></SelectTrigger>
-                                <SelectContent>
-                                    {allEventSlugsAndTitles.map(eventItem => <SelectItem key={eventItem.slug} value={eventItem.slug}>{eventItem.title}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                         <Popover open={isAddGlobalFilterPopoverOpen} onOpenChange={setIsAddGlobalFilterPopoverOpen}>
-                            <PopoverTrigger asChild>
-                                <Button variant="outline" className="w-full hover:bg-accent/10">
-                                    <Tag className="mr-2 h-4 w-4" /> Add Dynamic Filter
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-80">
-                                <div className="grid gap-4">
-                                    <div className="space-y-2">
-                                        <h4 className="font-medium leading-none">Add Dynamic Filter</h4>
-                                        <p className="text-sm text-muted-foreground">Select column & value.</p>
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="global-filter-column">Column</Label>
-                                        <Select
-                                            value={newGlobalFilterColumn?.id}
-                                            onValueChange={(value) => {
-                                                const selected = availableGlobalParticipantFilterColumns.find(col => col.id === value);
-                                                if (selected) setNewGlobalFilterColumn(selected);
-                                            }}
-                                        >
-                                            <SelectTrigger id="global-filter-column" className="h-8">
-                                            <SelectValue placeholder="Select column" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                            {availableGlobalParticipantFilterColumns.map(col => (
-                                                <SelectItem key={col.id} value={col.id}>{col.name}</SelectItem>
-                                            ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <Label htmlFor="global-filter-value">Value</Label>
-                                        <Input
-                                            id="global-filter-value"
-                                            value={newGlobalFilterValue}
-                                            onChange={(e) => setNewGlobalFilterValue(e.target.value)}
-                                            className="h-8"
-                                            placeholder="Enter value"
-                                        />
-                                    </div>
-                                    <Button onClick={handleAddGlobalDynamicFilter}>Apply Filter</Button>
-                                </div>
-                            </PopoverContent>
-                        </Popover>
-                    </div>
-
-                    {allActiveGlobalFiltersForDisplay.length > 0 && (
-                        <div className="text-xs text-muted-foreground mt-2 mb-2">
-                            <span className="font-medium">Active Global Participant Filters:</span>
-                            {allActiveGlobalFiltersForDisplay.map((filter: any) => (
-                                <Badge key={filter.id || filter.label} variant="secondary" className="ml-1 flex items-center gap-1 pr-1 text-xs py-0.5 px-1.5 rounded hover:bg-muted/80">
-                                {filter.label}: &quot;{filter.value}&quot;
-                                {filter.isDynamic && (
-                                    <button onClick={() => removeGlobalDynamicFilter(filter.id)} className="ml-1 rounded-full hover:bg-destructive/20 hover:text-destructive p-0.5">
-                                        <XIcon className="h-2.5 w-2.5" />
-                                        <span className="sr-only">Remove filter</span>
-                                    </button>
-                                )}
-                                </Badge>
-                            ))}
-                        </div>
-                    )}
-
-                    <Card className="bg-muted/30">
-                        <CardContent className="py-4 text-center text-muted-foreground">
-                            <BarChartBig className="h-10 w-10 mx-auto mb-2 text-primary/30"/>
-                            Global Participant Statistics (Total Filtered: {filteredGlobalParticipants.length}) - Charts coming soon.
-                        </CardContent>
-                    </Card>
-
-                    {filteredGlobalParticipants.length > 0 ? (
-                        <div className="overflow-x-auto rounded-md border">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Name</TableHead>
-                                        <TableHead>Email</TableHead>
-                                        <TableHead>School</TableHead>
-                                        <TableHead>Payment</TableHead>
-                                        <TableHead>Events Registered In</TableHead>
-                                        {globalCustomColumnDefinitions.map(col => (
-                                            <TableHead key={col.id}>{col.name}</TableHead>
-                                        ))}
-                                        <TableHead className="text-right">
-                                            <AlertDialog open={isAddGlobalCustomColumnDialogOpen} onOpenChange={setIsAddGlobalCustomColumnDialogOpen}>
-                                                <AlertDialogTrigger asChild>
-                                                <Button variant="outline" size="sm" className="border-dashed hover:border-primary hover:text-primary h-8">
-                                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Column
-                                                </Button>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                <form onSubmit={handleAddGlobalCustomColumnSubmit}>
-                                                    <AlertDialogHeader>
-                                                    <AlertDialogTitle>Add New Global Custom Column</AlertDialogTitle>
-                                                    <AlertDialogDescription>
-                                                        Define a new column for all platform participants.
-                                                    </AlertDialogDescription>
-                                                    </AlertDialogHeader>
-                                                    <div className="space-y-4 py-4">
-                                                    <div>
-                                                        <Label htmlFor="newGlobalCustomColName">Column Name</Label>
-                                                        <Input id="newGlobalCustomColName" value={newGlobalCustomColumnForm.name} onChange={e => setNewGlobalCustomColumnForm({...newGlobalCustomColumnForm, name: e.target.value})} placeholder="E.g., T-Shirt Size" required />
-                                                    </div>
-                                                    <div>
-                                                        <Label htmlFor="newGlobalCustomColDataType">Data Type</Label>
-                                                        <Select value={newGlobalCustomColumnForm.dataType} onValueChange={val => setNewGlobalCustomColumnForm({...newGlobalCustomColumnForm, dataType: val as CustomColumnDefinition['dataType']})}>
-                                                        <SelectTrigger id="newGlobalCustomColDataType"><SelectValue /></SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="text">Text</SelectItem>
-                                                            <SelectItem value="number">Number</SelectItem>
-                                                            <SelectItem value="checkbox">Checkbox</SelectItem>
-                                                            <SelectItem value="dropdown">Dropdown</SelectItem>
-                                                            <SelectItem value="date">Date</SelectItem>
-                                                        </SelectContent>
-                                                        </Select>
-                                                    </div>
-                                                    {newGlobalCustomColumnForm.dataType === 'dropdown' && (
-                                                        <div>
-                                                        <Label htmlFor="newGlobalCustomColOptions">Options (comma-separated)</Label>
-                                                        <Input id="newGlobalCustomColOptions" value={newGlobalCustomColumnForm.options} onChange={e => setNewGlobalCustomColumnForm({...newGlobalCustomColumnForm, options: e.target.value})} placeholder="E.g., S, M, L, XL" />
-                                                        </div>
-                                                    )}
-                                                    <div>
-                                                        <Label htmlFor="newGlobalCustomColDefaultValue">Default Value (optional)</Label>
-                                                        <Input id="newGlobalCustomColDefaultValue" value={newGlobalCustomColumnForm.defaultValue} onChange={e => setNewGlobalCustomColumnForm({...newGlobalCustomColumnForm, defaultValue: e.target.value})} />
-                                                    </div>
-                                                    <div>
-                                                        <Label htmlFor="newGlobalCustomColDesc">Description (optional)</Label>
-                                                        <Textarea id="newGlobalCustomColDesc" value={newGlobalCustomColumnForm.description} onChange={e => setNewGlobalCustomColumnForm({...newGlobalCustomColumnForm, description: e.target.value})} placeholder="Purpose of this column..." />
-                                                    </div>
-                                                    </div>
-                                                    <AlertDialogFooter>
-                                                    <AlertDialogCancel asChild><Button variant="outline" type="button">Cancel</Button></AlertDialogCancel>
-                                                    <Button type="submit">Save Column</Button>
-                                                    </AlertDialogFooter>
-                                                </form>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
-                                        </TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {filteredGlobalParticipants.map(p => (
-                                        <TableRow key={p.id}>
-                                            <TableCell className="font-medium">{p.name}</TableCell>
-                                            <TableCell>{p.email}</TableCell>
-                                            <TableCell>{p.schoolName || 'N/A'}</TableCell>
-                                            <TableCell><Badge variant={p.paymentStatus === 'paid' ? 'default' : p.paymentStatus === 'pending' ? 'secondary' : 'outline'} className="capitalize">{p.paymentStatus}</Badge></TableCell>
-                                            <TableCell>
-                                                {p.registeredEventSlugs && p.registeredEventSlugs.length > 0 ? p.registeredEventSlugs.map(slug => {
-                                                    const eventTitle = subEventsData.find(e => e.slug === slug)?.title || slug;
-                                                    return (
-                                                        <Badge 
-                                                            key={slug} 
-                                                            variant="secondary" 
-                                                            className="mr-1 mb-1 cursor-pointer hover:bg-primary/20 text-xs"
-                                                            onClick={() => toast({ title: `Drill-down to ${eventTitle}`, description: "Functionality coming soon!"})}
-                                                        >
-                                                            {eventTitle}
-                                                        </Badge>
-                                                    );
-                                                }) : <span className="text-xs text-muted-foreground">None</span>}
-                                            </TableCell>
-                                            {globalCustomColumnDefinitions.map(colDef => <TableCell key={colDef.id}>{renderGlobalParticipantCustomCell(p, colDef)}</TableCell>)}
-                                            <TableCell>{/* Empty cell for alignment with "Add Column" header */}</TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    ) : (
-                        <div className="text-center py-10 text-muted-foreground">
-                            <Users className="h-12 w-12 mx-auto mb-3 text-primary/30" />
-                            <p>No participants match the current filters.</p>
-                             { (globalSearchTerm || globalSchoolFilter !== 'all' || globalPaymentStatusFilter !== 'all' || globalEventFilter !== 'all' || activeGlobalDynamicFilters.length > 0) &&
-                                <Button variant="link" onClick={() => { setGlobalSearchTerm(''); setGlobalSchoolFilter('all'); setGlobalPaymentStatusFilter('all'); setGlobalEventFilter('all'); setActiveGlobalDynamicFilters([]);}} className="mt-2">
-                                Clear All Global Participant Filters
-                                </Button>
-                            }
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-        </section>
-
-        {/* Dialog for Create/Edit Event */}
+      {/* Dialog for Create/Edit Event */}
         <Dialog open={isEventFormDialogOpen} onOpenChange={(isOpen) => {
             setIsEventFormDialogOpen(isOpen);
             if (!isOpen) {
@@ -1571,48 +766,34 @@ export default function DashboardPage() {
         }}>
             <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>{editingEventId ? `Edit Event: ${allPlatformEvents.find(e=>e.id === editingEventId)?.title}` : "Create New Event"}</DialogTitle>
+                    <DialogTitle>{editingEventId ? `Edit Event` : "Create New Event"}</DialogTitle>
                     <DialogDescription>
                        Fill in the details for the event. Click save when you&apos;re done.
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleEventFormSubmit} className="grid gap-4 py-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Form fields as before... */}
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <Label htmlFor="eventTitle">Event Title</Label>
-                            <Input id="eventTitle" value={currentEventForm.title} onChange={e => handleEventFormChange('title', e.target.value)} placeholder="E.g., Tech Conference 2024" required />
+                            <Input id="eventTitle" value={currentEventForm.title} onChange={e => setCurrentEventForm(f => ({...f, title: e.target.value}))} required />
                         </div>
                         <div>
                             <Label htmlFor="eventSuperpowerCategory">Superpower Category</Label>
-                            <Select value={currentEventForm.superpowerCategory} onValueChange={val => handleEventFormChange('superpowerCategory', val)}>
+                            <Select value={currentEventForm.superpowerCategory} onValueChange={val => setCurrentEventForm(f => ({...f, superpowerCategory: val}))}>
                                 <SelectTrigger id="eventSuperpowerCategory"><SelectValue /></SelectTrigger>
                                 <SelectContent>
-                                    {superpowerCategories.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+                                    <SelectItem value="The Thinker">The Thinker</SelectItem>
+                                    <SelectItem value="The Brainiac">The Brainiac</SelectItem>
+                                    <SelectItem value="The Strategist">The Strategist</SelectItem>
+                                    <SelectItem value="The Innovator">The Innovator</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
                     </div>
                     <div>
-                        <Label htmlFor="eventShortDescription">Short Description</Label>
-                        <Textarea id="eventShortDescription" value={currentEventForm.shortDescription} onChange={e => handleEventFormChange('shortDescription', e.target.value)} placeholder="A brief overview of the event (1-2 sentences)." />
-                    </div>
-                    <div>
-                        <Label htmlFor="eventDetailedDescription">Detailed Description</Label>
-                        <Textarea id="eventDetailedDescription" value={currentEventForm.detailedDescription} onChange={e => handleEventFormChange('detailedDescription', e.target.value)} placeholder="Full details about the event, rules, schedule, etc." rows={5}/>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <Label htmlFor="eventMainImageSrc">Main Image URL</Label>
-                            <Input id="eventMainImageSrc" value={currentEventForm.mainImageSrc} onChange={e => handleEventFormChange('mainImageSrc', e.target.value)} placeholder="https://placehold.co/600x400.png" />
-                        </div>
-                        <div>
-                            <Label htmlFor="eventMainImageAlt">Image Alt Text</Label>
-                            <Input id="eventMainImageAlt" value={currentEventForm.mainImageAlt} onChange={e => handleEventFormChange('mainImageAlt', e.target.value)} placeholder="Description of image" />
-                        </div>
-                        <div>
-                            <Label htmlFor="eventMainImageAiHint">Image AI Hint</Label>
-                            <Input id="eventMainImageAiHint" value={currentEventForm.mainImageAiHint} onChange={e => handleEventFormChange('mainImageAiHint', e.target.value)} placeholder="Keywords for AI (e.g., debate conference)" />
-                        </div>
+                        <Label htmlFor="detailedDescription">Detailed Description</Label>
+                        <Textarea id="detailedDescription" value={currentEventForm.detailedDescription} onChange={e => setCurrentEventForm(f => ({...f, detailedDescription: e.target.value}))} rows={5}/>
                     </div>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -1625,7 +806,7 @@ export default function DashboardPage() {
                                 </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0">
-                                <Calendar mode="single" selected={currentEventForm.eventDate ? parseISO(currentEventForm.eventDate) : undefined} onSelect={date => handleEventFormDateChange('eventDate', date)} initialFocus />
+                                <Calendar mode="single" selected={currentEventForm.eventDate ? parseISO(currentEventForm.eventDate) : undefined} onSelect={date => setCurrentEventForm(f => ({...f, eventDate: date?.toISOString()}))} initialFocus />
                                 </PopoverContent>
                             </Popover>
                         </div>
@@ -1639,333 +820,22 @@ export default function DashboardPage() {
                                 </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0">
-                                <Calendar mode="single" selected={currentEventForm.deadline ? parseISO(currentEventForm.deadline) : undefined} onSelect={date => handleEventFormDateChange('deadline', date)} initialFocus />
+                                <Calendar mode="single" selected={currentEventForm.deadline ? parseISO(currentEventForm.deadline) : undefined} onSelect={date => setCurrentEventForm(f => ({...f, deadline: date?.toISOString()}))} initialFocus />
                                 </PopoverContent>
                             </Popover>
                         </div>
                     </div>
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <Label htmlFor="eventVenue">Venue</Label>
-                            <Input id="eventVenue" value={currentEventForm.venue} onChange={e => handleEventFormChange('venue', e.target.value)} placeholder="E.g., Main Auditorium" />
-                        </div>
-                        <div>
-                            <Label htmlFor="eventStatusForm">Status</Label>
-                            <Select value={currentEventForm.status} onValueChange={val => handleEventFormChange('status', val as EventStatus)}>
-                                <SelectTrigger id="eventStatusForm"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Planning">Planning</SelectItem>
-                                    <SelectItem value="Active">Active</SelectItem>
-                                    <SelectItem value="open">Open (for Reg)</SelectItem>
-                                    <SelectItem value="closed">Closed (for Reg)</SelectItem>
-                                    <SelectItem value="Completed">Completed</SelectItem>
-                                    <SelectItem value="Cancelled">Cancelled</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
+                    <div>
+                        <Label htmlFor="eventReps">Event Representative UIDs (comma-separated)</Label>
+                        <Input id="eventReps" value={currentEventForm.event_representatives_str} onChange={e => setCurrentEventForm(f => ({...f, event_representatives_str: e.target.value}))} />
                     </div>
-                    <div className="flex items-center space-x-2">
-                        <Checkbox id="eventIsTeamBased" checked={currentEventForm.isTeamBased} onCheckedChange={checked => handleEventFormChange('isTeamBased', !!checked)} />
-                        <Label htmlFor="eventIsTeamBased" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                            Is this a Team Event?
-                        </Label>
-                    </div>
-                    {currentEventForm.isTeamBased && (
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <Label htmlFor="minTeamMembers">Min Team Members</Label>
-                                <Input id="minTeamMembers" type="number" value={currentEventForm.minTeamMembers || 1} onChange={e => handleEventFormChange('minTeamMembers', parseInt(e.target.value) || 1)} />
-                            </div>
-                            <div>
-                                <Label htmlFor="maxTeamMembers">Max Team Members</Label>
-                                <Input id="maxTeamMembers" type="number" value={currentEventForm.maxTeamMembers || 1} onChange={e => handleEventFormChange('maxTeamMembers', parseInt(e.target.value) || 1)} />
-                            </div>
-                        </div>
-                    )}
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <Label htmlFor="eventOrganizers">Organizer UIDs (comma-separated)</Label>
-                            <Input id="eventOrganizers" value={currentEventForm.organizers_str} onChange={e => handleEventFormChange('organizers_str', e.target.value)} placeholder="uid1, uid2, uid3" />
-                        </div>
-                        <div>
-                            <Label htmlFor="eventRepresentatives">Event Representative UIDs (comma-separated)</Label>
-                            <Input id="eventRepresentatives" value={currentEventForm.event_representatives_str} onChange={e => handleEventFormChange('event_representatives_str', e.target.value)} placeholder="uid_rep1, uid_rep2" />
-                        </div>
-                    </div>
-                     <div>
-                        <Label htmlFor="eventRegLink">Registration Link (optional external)</Label>
-                        <Input id="eventRegLink" value={currentEventForm.registrationLink} onChange={e => handleEventFormChange('registrationLink', e.target.value)} placeholder="/signup?event=your-event-slug" />
-                    </div>
-
                     <DialogFooter>
                         <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
-                        <Button type="submit">{editingEventId ? "Save Changes" : "Create Event"}</Button>
+                        <Button type="submit">Save</Button>
                     </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>
-
-        {/* AlertDialog for Delete Event Confirmation */}
-        <AlertDialog open={isDeleteEventConfirmOpen} onOpenChange={setIsDeleteEventConfirmOpen}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Confirm Delete Event</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Are you sure you want to delete the event &quot;{eventToDelete?.title}&quot;? This action cannot be undone. (Mock for now)
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={confirmDeleteEvent} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-      </div>
-    );
-  }
-  
-  // Default/Organizer/Admin/Test Dashboard
-  let dashboardTitle = "User Dashboard";
-  let quickActions: Array<{ href: string; label: string; icon: React.ElementType; disabled?: boolean;}> = [];
-  
-  const assignedOrganizerEvents = role === 'organizer' && userProfile.assignedEventSlugs
-    ? userProfile.assignedEventSlugs.map(slug => subEventsData.find(e => e.slug === slug)?.title).filter(Boolean)
-    : [];
-
-  switch(role) {
-    case 'organizer':
-      dashboardTitle = "Organizer Dashboard";
-      quickActions = [
-        { href: '/profile', label: 'My Profile', icon: UserCircle },
-        { href: '/notifications', label: 'Notifications', icon: Bell },
-        { href: '/ocr-tool', label: 'Scan Forms (OCR)', icon: FileScan },
-        { href: '/organizer/event-tasks', label: 'All Event Tasks', icon: ListChecks },
-      ];
-      break;
-    case 'admin':
-      dashboardTitle = "Admin Dashboard";
-       quickActions = [
-        { href: '/admin/tasks', label: 'Global Task Mgmt', icon: Settings},
-        { href: '/organizer/events/manage', label: 'Manage All Events', icon: Briefcase }, // This link might need updating if direct event management is centralized
-        { href: '/admin/users', label: 'Manage Users', icon: Users}, 
-        { href: '/ocr-tool', label: 'Scan Forms (OCR)', icon: FileScan },
-        { href: '/organizer/event-tasks', label: 'All Event Tasks', icon: ListChecks },
-        { href: '/profile', label: 'My Profile', icon: UserCircle }, 
-        { href: '/notifications', label: 'Notifications', icon: Bell },
-      ];
-      break;
-    case 'test': 
-        dashboardTitle = "Test User Dashboard";
-        quickActions = [
-            { href: '/profile', label: 'My Profile', icon: UserCircle },
-            { href: '/notifications', label: 'Notifications', icon: Bell },
-            { href: '/events', label: 'Browse Events', icon: Search },
-            { href: '/ocr-tool', label: 'OCR Tool (Test)', icon: FileScan },
-            { href: '/organizer/event-tasks', label: 'All Event Tasks', icon: ListChecks },
-        ];
-        break;
-    default:
-      dashboardTitle = "User Dashboard";
-  }
-
-
-  return ( 
-    <div className="space-y-8 animate-fade-in-up">
-      <header className="flex flex-col md:flex-row justify-between items-start gap-4">
-        <div className="flex items-center gap-4">
-           <Avatar className="h-20 w-20 border-2 border-primary">
-            <AvatarImage src={userProfile.photoURL || undefined} alt={userProfile.displayName || 'User'} />
-            <AvatarFallback className="text-2xl bg-primary/10 text-primary">{(userProfile.displayName || userProfile.email || 'U')[0].toUpperCase()}</AvatarFallback>
-          </Avatar>
-          <div>
-            <h1 className="text-3xl md:text-4xl font-bold text-primary">{userProfile.displayName || dashboardTitle}</h1>
-            <p className="text-muted-foreground mt-1">{userProfile.email}</p>
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mt-1">
-                <span className="flex items-center gap-1"><ShieldCheck className="h-4 w-4" /> Role: <Badge variant="secondary" className="capitalize text-xs">{userProfile.role.replace('_', ' ')}</Badge></span>
-                {userProfile.department && <span className="flex items-center gap-1"><Building className="h-4 w-4" /> {userProfile.department}</span>}
-            </div>
-          </div>
-        </div>
-        {(role === 'organizer' || role === 'overall_head' || role === 'admin') && userProfile.role !== 'overall_head' && ( // OH has its own Create Event Button
-          <Button asChild className="bg-accent hover:bg-accent/90 text-accent-foreground mt-4 md:mt-0 rounded-lg shadow-soft">
-            <Link href="/organizer/events/create">Create New Event (Legacy)</Link>
-          </Button>
-        )}
-      </header>
-
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {userProfile.points !== undefined && (
-            <Card className="shadow-soft rounded-xl">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">My Points</CardTitle>
-                    <Award className="h-5 w-5 text-yellow-500" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold text-yellow-600">{userProfile.points}</div>
-                </CardContent>
-            </Card>
-        )}
-        {userProfile.credibilityScore !== undefined && (
-            <Card className="shadow-soft rounded-xl">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Credibility Score</CardTitle>
-                    <Activity className="h-5 w-5 text-green-500" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold text-green-600">{userProfile.credibilityScore}%</div>
-                </CardContent>
-            </Card>
-        )}
-         {(myTasks.length > 0 || role === 'event_representative') && ( 
-            <Card className="shadow-soft rounded-xl">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Pending Tasks</CardTitle>
-                    <ClipboardList className="h-5 w-5 text-blue-500" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold text-blue-600">{myTasks.filter(t => t.status === 'Pending Review' || t.status === 'In Progress' || t.status === 'Not Started').length}</div>
-                </CardContent>
-            </Card>
-        )}
-      </section>
-      
-      {role === 'organizer' && assignedOrganizerEvents.length > 0 && (
-        <Card className="shadow-md-soft rounded-xl">
-            <CardHeader>
-                <CardTitle className="text-xl text-primary">My Assigned Events</CardTitle>
-                <CardDescription>Events you are contributing to.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-                {assignedOrganizerEvents.map(title => (
-                    <Badge key={title} variant="secondary" className="mr-2 mb-1 px-3 py-1 rounded-md">{title}</Badge>
-                ))}
-                <Button asChild variant="link" className="text-xs p-0 h-auto mt-2"><Link href="/organizer/events/manage">Manage My Events</Link></Button>
-            </CardContent>
-        </Card>
-      )}
-
-
-      {myTasks.length > 0 && (
-        <section id="my-tasks">
-          <Card className="shadow-md-soft rounded-xl">
-            <CardHeader>
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                <div>
-                    <CardTitle className="flex items-center gap-2 text-xl text-primary"><ClipboardList className="h-6 w-6"/>My Tasks</CardTitle>
-                    <CardDescription>Overview of tasks assigned to you.</CardDescription>
-                </div>
-                <Button asChild variant="outline" size="sm">
-                    <Link href="/organizer/event-tasks">View All My Tasks</Link>
-                </Button>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm border-t pt-3">
-                <span>Due Today: <Badge variant={tasksDueToday > 0 ? "default" : "outline"} className={`${tasksDueToday > 0 ? 'bg-blue-500/10 text-blue-700 border-blue-500/30' : 'text-muted-foreground'}` }>{tasksDueToday}</Badge></span>
-                <span>Overdue: <Badge variant={overdueTasks > 0 ? "destructive" : "outline"} className={overdueTasks > 0 ? "" : "text-muted-foreground"}>{overdueTasks}</Badge></span>
-                <span>This Week: <Badge variant={tasksThisWeek > 0 ? "secondary" : "outline"} className={`${tasksThisWeek > 0 ? 'bg-purple-500/10 text-purple-700 border-purple-500/30': 'text-muted-foreground'}`}>{tasksThisWeek}</Badge></span>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {myTasks.length > 0 ? (
-                 <div className="overflow-x-auto rounded-md border">
-                    <Table>
-                        <TableHeader>
-                        <TableRow className="bg-muted/20 hover:bg-muted/30">
-                            <TableHead className="w-[50px]"></TableHead>
-                            <TableHead>Task</TableHead>
-                            <TableHead className="w-[100px]">Event</TableHead>
-                            <TableHead className="w-[100px]">Due</TableHead>
-                            <TableHead className="w-[100px]">Priority</TableHead>
-                            <TableHead className="w-[120px]">Status</TableHead>
-                        </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                        {myTasks.slice(0, 7).map((task) => ( 
-                            <TableRow 
-                                key={task.id} 
-                                className={`hover:bg-muted/50 transition-colors duration-150 ${task.status === 'Completed' ? 'opacity-60' : ''}`}
-                            >
-                            <TableCell>
-                                <Checkbox
-                                checked={task.status === 'Completed'}
-                                onCheckedChange={() => handleTaskCompletionToggle(task.id)}
-                                aria-label={`Mark task ${task.title} as ${task.status === 'Completed' ? 'incomplete' : 'complete'}`}
-                                />
-                            </TableCell>
-                            <TableCell className="font-medium max-w-[200px] sm:max-w-xs md:max-w-sm truncate">
-                                <Link href="/organizer/event-tasks" title={task.title} className="hover:underline">{task.title}</Link>
-                            </TableCell>
-                            <TableCell className="text-xs text-muted-foreground">
-                                <Badge variant="outline" className="text-xs">{task.eventSlug ? subEventsData.find(e => e.slug === task.eventSlug)?.title || task.eventSlug : 'General'}</Badge>
-                            </TableCell>
-                            <TableCell 
-                                className={`text-xs ${task.dueDate && isValid(parseISO(task.dueDate)) && isPast(startOfDay(parseISO(task.dueDate))) && task.status !== 'Completed' ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}
-                            >
-                                {task.dueDate && isValid(parseISO(task.dueDate)) ? format(parseISO(task.dueDate), 'MMM dd') : 'N/A'}
-                            </TableCell>
-                            <TableCell>
-                                <Badge variant={getPriorityBadgeVariant(task.priority)} className="capitalize text-xs py-0.5 px-1.5">{task.priority}</Badge>
-                            </TableCell>
-                            <TableCell>
-                                <Badge variant={getStatusBadgeVariant(task.status).variant} className={`capitalize text-xs py-0.5 px-1.5 ${getStatusBadgeVariant(task.status).colorClass}`}>{task.status.replace('-', ' ')}</Badge>
-                            </TableCell>
-                            </TableRow>
-                        ))}
-                        </TableBody>
-                    </Table>
-                 </div>
-              ) : (
-                <div className="text-center py-6 text-muted-foreground">
-                  <CheckSquare className="h-10 w-10 mx-auto mb-2 text-green-500" />
-                  <p>Great job! You have no tasks assigned.</p>
-                  <p className="text-xs">Check back later or view all event tasks.</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </section>
-      )}
-
-      <section>
-        <Card className="shadow-md-soft rounded-xl">
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-            <CardDescription>Access common tasks quickly.</CardDescription>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            {quickActions.map(action => (
-              <Button variant="outline" asChild key={action.href} disabled={action.disabled} className="rounded-md">
-                <Link href={action.href} className="flex items-center justify-center gap-2 text-sm">
-                  <action.icon className="h-4 w-4" /> {action.label}
-                </Link>
-              </Button>
-            ))}
-             {(role === 'admin' || role === 'overall_head') && (
-              <Button variant="outline" asChild className="rounded-md">
-                <Link href="/admin/users" className="flex items-center justify-center gap-2 text-sm">
-                  <Users className="h-4 w-4" /> Manage Users
-                </Link>
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      </section>
-      
-      {(role === 'organizer' || role === 'overall_head' || role === 'admin') && (
-         <section>
-          <Card className="shadow-md-soft rounded-xl">
-              <CardHeader>
-                  <CardTitle>Upcoming Events Overview (Mock)</CardTitle>
-                  <CardDescription>A quick look at events you are managing.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                  <p className="text-muted-foreground">Chart or list of upcoming events will be displayed here.</p>
-                  <div className="mt-4 h-64 bg-muted/50 rounded-lg flex items-center justify-center">
-                      <BarChartBig className="h-16 w-16 text-muted-foreground/50" />
-                  </div>
-              </CardContent>
-          </Card>
-        </section>
-      )}
     </div>
   );
 }

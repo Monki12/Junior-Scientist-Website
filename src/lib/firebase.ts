@@ -66,5 +66,3 @@ if (
 }
 
 export { app, auth, db, storage };
-
-    

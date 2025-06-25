@@ -5,12 +5,13 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { SubEvent } from '@/types';
-import { subEventsData } from '@/data/subEvents';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Search, ListFilter, Loader2, CalendarDays, Tag } from 'lucide-react';
+import { collection, getDocs, query } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 function SubEventCard({ event }: { event: SubEvent }) {
   return (
@@ -59,8 +60,21 @@ export default function SubEventsListPage() {
   const [categoryFilter, setCategoryFilter] = useState('all');
 
   useEffect(() => {
-    setEvents(subEventsData);
-    setLoading(false);
+    const fetchEvents = async () => {
+      setLoading(true);
+      try {
+        const eventsCollection = collection(db, 'subEvents');
+        const eventSnapshot = await getDocs(eventsCollection);
+        const eventsList = eventSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SubEvent));
+        setEvents(eventsList);
+      } catch (error) {
+        console.error("Error fetching events: ", error);
+        // Optionally, show a toast notification
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchEvents();
   }, []);
 
   const filteredEvents = events
@@ -72,7 +86,7 @@ export default function SubEventsListPage() {
       categoryFilter === 'all' || (event.superpowerCategory && event.superpowerCategory === categoryFilter)
     );
   
-  const uniqueCategories = ['all', ...new Set(subEventsData.map(event => event.superpowerCategory).filter(Boolean) as string[])];
+  const uniqueCategories = ['all', ...new Set(events.map(event => event.superpowerCategory).filter(Boolean) as string[])];
 
   if (loading) {
     return (

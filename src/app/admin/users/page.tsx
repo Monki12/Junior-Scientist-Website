@@ -3,18 +3,23 @@
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, ShieldAlert, ArrowLeft, PlusCircle } from 'lucide-react';
-import Link from 'next/link';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Users, ShieldAlert, ArrowLeft, PlusCircle, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import CreateOrganizerForm from '@/components/admin/CreateOrganizerForm';
+import { collection, getDocs, query } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import type { UserProfileData } from '@/types';
 
 export default function AdminUsersPage() {
   const router = useRouter();
   const { userProfile, loading } = useAuth();
   const [isCreateOrganizerDialogOpen, setIsCreateOrganizerDialogOpen] = useState(false);
+  const [allUsers, setAllUsers] = useState<UserProfileData[]>([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
 
   useEffect(() => {
     if (!loading && userProfile && (userProfile.role !== 'admin' && userProfile.role !== 'overall_head')) {
@@ -22,6 +27,26 @@ export default function AdminUsersPage() {
     }
   }, [userProfile, loading, router]);
   
+  const fetchAllUsers = async () => {
+    setIsLoadingUsers(true);
+    try {
+      const usersCollection = collection(db, 'users');
+      const usersSnapshot = await getDocs(usersCollection);
+      const usersList = usersSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfileData));
+      setAllUsers(usersList);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  };
+
+  useEffect(() => {
+    if (userProfile && (userProfile.role === 'admin' || userProfile.role === 'overall_head')) {
+      fetchAllUsers();
+    }
+  }, [userProfile]);
+
   if (loading || !userProfile) {
      return (
       <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center">
@@ -43,50 +68,75 @@ export default function AdminUsersPage() {
 
   const handleOrganizerCreationSuccess = () => {
     setIsCreateOrganizerDialogOpen(false);
-    // You could add logic here to refresh a user list if one was displayed on this page
+    fetchAllUsers();
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-15rem)] animate-fade-in-up">
-      <Card className="w-full max-w-2xl text-center shadow-xl">
+    <div className="space-y-6 animate-fade-in-up">
+      <Card className="shadow-xl">
         <CardHeader>
-          <Users className="mx-auto h-16 w-16 text-primary mb-4" />
-          <CardTitle className="text-3xl font-headline text-primary">User Management</CardTitle>
-          <CardDescription>
-            Create new organizational accounts (Organizers, Event Reps, Overall Heads) and manage user roles.
-          </CardDescription>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle className="text-3xl font-headline text-primary flex items-center"><Users className="mr-3 h-8 w-8"/>User Management</CardTitle>
+              <CardDescription>
+                Create new organizational accounts and manage all platform users.
+              </CardDescription>
+            </div>
+             <Dialog open={isCreateOrganizerDialogOpen} onOpenChange={setIsCreateOrganizerDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <PlusCircle className="mr-2 h-4 w-4" /> Create Staff Account
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Create New Staff Account</DialogTitle>
+                  <DialogDescription>
+                    Fill in the details to create a new account for an organizer, representative, or admin.
+                  </DialogDescription>
+                </DialogHeader>
+                <CreateOrganizerForm
+                  currentAdminRole={userProfile.role as 'admin' | 'overall_head'}
+                  onSuccess={handleOrganizerCreationSuccess}
+                />
+              </DialogContent>
+            </Dialog>
+          </div>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <p className="text-muted-foreground">
-            Use the button below to create a new staff account. Full user editing and role management capabilities will be available in the main dashboard.
-          </p>
-
-          <Dialog open={isCreateOrganizerDialogOpen} onOpenChange={setIsCreateOrganizerDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <PlusCircle className="mr-2 h-4 w-4" /> Create Staff Account
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Create New Staff Account</DialogTitle>
-                <DialogDescription>
-                  Fill in the details to create a new account for an organizer, representative, or admin.
-                </DialogDescription>
-              </DialogHeader>
-              <CreateOrganizerForm
-                currentAdminRole={userProfile.role as 'admin' | 'overall_head'}
-                onSuccess={handleOrganizerCreationSuccess}
-              />
-            </DialogContent>
-          </Dialog>
-
-          <p className="text-sm text-accent">
-            Currently, organizational roles are based on pre-defined mock profiles for dashboard testing. This form creates real users in Firebase.
-          </p>
-          <Button onClick={() => router.back()} variant="outline">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Go Back
-          </Button>
+        <CardContent>
+          {isLoadingUsers ? (
+            <div className="flex items-center justify-center p-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="ml-2">Loading users...</p>
+            </div>
+          ) : (
+            <div className="border rounded-md">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Full Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Identifier</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {allUsers.map((user) => (
+                    <TableRow key={user.uid}>
+                      <TableCell className="font-medium">{user.fullName || user.displayName}</TableCell>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell className="capitalize">{user.role?.replace('_', ' ')}</TableCell>
+                      <TableCell>{user.role === 'student' ? `ID: ${user.shortId}` : `Roll: ${user.collegeRollNumber}`}</TableCell>
+                      <TableCell>
+                        <Button variant="outline" size="sm">Edit</Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
