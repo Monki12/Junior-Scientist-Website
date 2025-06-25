@@ -1,9 +1,9 @@
 
 'use client';
 
-import { type User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
+import { type User as FirebaseUser, onAuthStateChanged, signInWithEmailAndPassword, type AuthError } from 'firebase/auth';
 import { createContext, useState, useEffect, ReactNode } from 'react';
-import type { UserProfileData } from '@/types';
+import type { LoginFormData, UserProfileData, UserRole } from '@/types';
 import { auth, db } from '@/lib/firebase'; 
 import { doc, getDoc } from 'firebase/firestore'; 
 
@@ -11,6 +11,8 @@ interface AuthContextType {
   authUser: FirebaseUser | null;
   userProfile: UserProfileData | null;
   loading: boolean;
+  logIn: (formData: LoginFormData) => Promise<FirebaseUser | AuthError>;
+  setMockUserRole: (role: UserRole) => void;
   logOut: () => Promise<void>;
   setUserProfile: React.Dispatch<React.SetStateAction<UserProfileData | null>>;
 }
@@ -76,15 +78,63 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
+  const logIn = async (formData: LoginFormData): Promise<FirebaseUser | AuthError> => {
+    setLoading(true);
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
+      // onAuthStateChanged will handle setting state
+      return userCredential.user;
+    } catch (error) {
+      console.error("[AuthContext] Login Error:", error);
+      setLoading(false); // Only set loading false on error, success is handled by onAuthStateChanged
+      return error as AuthError;
+    }
+  };
+
+  const setMockUserRole = (role: UserRole) => {
+    const mockEmail = `${role.replace(/_/g, '.')}.test@example.com`;
+    const mockUser = {
+      uid: `mock-uid-${role}`,
+      email: mockEmail,
+      displayName: `Mock ${role}`,
+    } as FirebaseUser;
+
+    const mockProfile: UserProfileData = {
+      uid: mockUser.uid,
+      email: mockUser.email,
+      role: role,
+      displayName: `Mock ${role.replace('_', ' ')}`,
+      fullName: `Mock ${role.replace('_', ' ')}`,
+      shortId: role === 'student' ? 'S12345' : null,
+      collegeRollNumber: role !== 'student' ? 'BTXXTESTXXX' : null,
+      department: role !== 'student' ? 'Testing Dept.' : undefined,
+    };
+    
+    setAuthUser(mockUser);
+    setUserProfile(mockProfile);
+    setLoading(false);
+  };
+
   const logOut = async () => {
     setLoading(true);
-    await auth.signOut(); 
-    // The onAuthStateChanged listener will handle clearing user state.
-    console.log("[AuthContext] User logged out.");
+    // For mock users, authUser is set but isn't a real Firebase user.
+    // The uid check distinguishes them.
+    if(authUser?.uid.startsWith('mock-')) {
+        setAuthUser(null);
+        setUserProfile(null);
+        setLoading(false);
+    } else {
+      await auth.signOut();
+      // The onAuthStateChanged listener will handle clearing user state for real users.
+    }
   };
 
   const value = {
-    authUser, userProfile, loading,
+    authUser,
+    userProfile,
+    loading,
+    logIn,
+    setMockUserRole,
     logOut,
     setUserProfile,
   };
