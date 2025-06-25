@@ -21,11 +21,9 @@ import { mockSchoolsData } from '@/data/mockSchools';
 const gradeLevels = Array.from({ length: 9 }, (_, i) => `${i + 4}`); // Grades 4 through 12
 
 function generateShortId(length: number = 5): string {
-  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let result = '';
-  const charactersLength = characters.length;
   for (let i = 0; i < length; i++) {
-    result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    result += Math.floor(Math.random() * 10); // Generates a digit from 0-9
   }
   return result;
 }
@@ -121,7 +119,6 @@ export default function SignUpPage() {
           additionalNumber: formData.additionalNumber || null,
           photoURL: null,
           registeredEvents: [],
-          tasks: [],
           subEventsManaged: [],
           points: 0,
           credibilityScore: 0,
@@ -297,5 +294,3 @@ export default function SignUpPage() {
     </div>
   );
 }
-
-    

@@ -133,13 +133,12 @@ const mockGlobalParticipants: EventParticipant[] = [
   { id: 'stud-global-2', name: 'Global Bob Johnson', email: 'bob.johnson.global@example.com', contactNumber: '555-5678', schoolName: 'Northwood Academy', registrationDate: new Date('2024-07-02T11:30:00Z').toISOString(), paymentStatus: 'pending', registeredEventSlugs: ['robo-challenge'], customData: {} },
 ];
 
-
 const mockUserProfiles: Record<UserRole, UserProfileData> = {
   student: {
     uid: 'mock-student-uid-12345', email: 'student.test@example.com', fullName: 'Alex Johnson', displayName: 'Alex Johnson', role: 'student', photoURL: 'https://placehold.co/120x120.png?text=AJ',
     schoolName: 'Springfield High International', schoolId: 'school_001', schoolVerifiedByOrganizer: true, standard: '10', division: 'A',
     phoneNumbers: ['+1-555-0101', '+1-555-0102'], registeredEvents: mockStudentRegisteredEvents, tasks: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-    shortId: 'A5B1C'
+    shortId: '12345'
   },
   organizer: {
     uid: 'mock-organizer-uid', email: 'organizer.test@example.com', displayName: 'Test Organizer Alice', role: 'organizer', photoURL: 'https://placehold.co/100x100.png?text=TOA', department: 'Logistics', assignedEventSlugs: ['model-united-nations', 'robo-challenge', 'junior-scientist-olympiad', 'math-a-maze'],
@@ -237,6 +236,11 @@ export default function DashboardPage() {
       if ((userProfile.role === 'student' || userProfile.role === 'test') && authUser) {
         setLoadingStudentEvents(true);
         const fetchStudentRegistrations = async () => {
+          if (!authUser) {
+            console.log("Cannot fetch registrations: user not authenticated.");
+            setLoadingStudentEvents(false);
+            return;
+          }
           try {
             const registrationsRef = collection(db, 'event_registrations');
             const q = query(registrationsRef, where('userId', '==', authUser.uid), where('registrationStatus', '!=', 'cancelled'));
@@ -261,13 +265,13 @@ export default function DashboardPage() {
                                   const userDoc = await getDoc(doc(db, 'users', memberUid));
                                   if (userDoc.exists()) {
                                       const userData = userDoc.data() as UserProfileData;
-                                      teamMembersNames[memberUid] = userData.fullName || userData.displayName || memberUid;
+                                      teamMembersNames[memberUid] = userData.fullName || userData.displayName || 'Unknown Member';
                                   } else {
-                                      teamMembersNames[memberUid] = memberUid; // Fallback to UID
+                                      teamMembersNames[memberUid] = 'Unknown Member'; // Fallback to UID
                                   }
                               } catch (userFetchError) {
-                                  console.warn(`Could not fetch profile for user ${memberUid}. Falling back to UID.`, userFetchError);
-                                  teamMembersNames[memberUid] = memberUid; // Fallback on error
+                                  console.warn(`Could not fetch profile for user ${memberUid}. Falling back.`, userFetchError);
+                                  teamMembersNames[memberUid] = 'Unknown Member'; // Fallback on error
                               }
                           }
                         }
@@ -294,7 +298,7 @@ export default function DashboardPage() {
             setStudentRegisteredFullEvents(resolvedRegistrations);
           } catch (error) {
             console.error("Error fetching student registrations:", error);
-            toast({ title: "Error", description: "Could not fetch your registered events.", variant: "destructive" });
+            toast({ title: "Could not fetch events", description: "There was an issue loading your registered events. Please try again later.", variant: "destructive" });
           } finally {
             setLoadingStudentEvents(false);
           }
@@ -302,6 +306,7 @@ export default function DashboardPage() {
         fetchStudentRegistrations();
       }
     } else {
+      // Clear data on logout
       setLocalUserProfileTasks([]); 
       setGlobalParticipants([]);
       setStudentRegisteredFullEvents([]);
@@ -350,12 +355,12 @@ export default function DashboardPage() {
       }
 
       const currentTeamData = teamDoc.data() as EventTeam;
-      if (!currentTeamData.memberUids.includes(authUser.uid)) {
+      const newMemberUids = currentTeamData.memberUids.filter(uid => uid !== authUser.uid);
+
+      if (newMemberUids.length === currentTeamData.memberUids.length) {
          throw new Error("You are not a member of this team.");
       }
       
-      const newMemberUids = currentTeamData.memberUids.filter(uid => uid !== authUser.uid);
-
       // Perform updates
       await updateDoc(teamRef, {
         memberUids: newMemberUids,
@@ -777,13 +782,15 @@ export default function DashboardPage() {
                       </CardContent>
                     </Link>
                     <CardContent className="pt-0">
-                      {event.isTeamBased && event.teamName && (
+                      {event.isTeamBased && (
                         <div className="mt-2">
-                          <p className="text-xs text-accent font-semibold flex items-center gap-1"><Users className="h-4 w-4"/>Team: {event.teamName}</p>
-                          {event.teamMembersNames && Object.keys(event.teamMembersNames).length > 0 && (
+                          <p className="text-xs text-accent font-semibold flex items-center gap-1"><Users className="h-4 w-4"/>Team: {event.teamName || 'Your Team'}</p>
+                          {event.teamMembersNames && Object.keys(event.teamMembersNames).length > 0 ? (
                             <div className="text-xs text-muted-foreground mt-1">
-                                Members: {Object.values(event.teamMembersNames).join(', ') || 'No members listed'}
+                                Members: {Object.values(event.teamMembersNames).join(', ')}
                             </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground mt-1">Loading team members...</p>
                           )}
                            {authUser?.uid !== event.teamLeaderId && event.teamId && (
                                 <Button

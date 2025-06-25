@@ -7,15 +7,18 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/hooks/use-auth';
 import { subEventsData } from '@/data/subEvents';
-import type { SubEvent, UserProfileData } from '@/types'; // Added UserProfileData
+import type { SubEvent, UserProfileData } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, UserCircle, Mail, Shield, LogOut, ArrowLeft, CalendarDays, Info, Users, GraduationCap, School, Edit3, Check, X, HelpCircle } from 'lucide-react'; // Added Edit3, Check, X, HelpCircle
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader2, UserCircle, Mail, Shield, LogOut, ArrowLeft, CalendarDays, Info, Users, GraduationCap, School, Edit3, Check, X, HelpCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Badge } from '@/components/ui/badge'; // Added Badge
+import { Badge } from '@/components/ui/badge';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 interface RegisteredEventDisplay extends SubEvent {
   teamName?: string;
@@ -26,7 +29,6 @@ export default function ProfilePage() {
   const router = useRouter();
   const { toast } = useToast();
   
-  // Form state for editable fields
   const [isEditing, setIsEditing] = useState(false);
   const [editableProfile, setEditableProfile] = useState<Partial<UserProfileData>>({});
   const [isUpdating, setIsUpdating] = useState(false);
@@ -38,14 +40,17 @@ export default function ProfilePage() {
       router.push('/login?redirect=/profile');
     }
     if (userProfile) {
+      // Initialize editableProfile from the main userProfile context
       setEditableProfile({
         displayName: userProfile.displayName || '',
         fullName: userProfile.fullName || '',
         schoolName: userProfile.schoolName || '',
         standard: userProfile.standard || '',
         division: userProfile.division || '',
-        // Add other fields if they become editable for students
+        phoneNumbers: userProfile.phoneNumbers || [''],
+        additionalNumber: userProfile.additionalNumber || '',
       });
+
       if ((userProfile.role === 'student' || userProfile.role === 'test') && userProfile.registeredEvents) {
         const fullEvents = userProfile.registeredEvents
           .map(registeredInfo => {
@@ -58,10 +63,57 @@ export default function ProfilePage() {
           .filter(event => event !== null) as RegisteredEventDisplay[];
         setStudentRegisteredFullEvents(fullEvents);
       }
-    } else if (authUser && authUser.displayName && !userProfile) { // Only set if userProfile is null initially
-        setEditableProfile(prev => ({...prev, displayName: authUser.displayName || '' }));
     }
   }, [authUser, userProfile, loading, router]);
+  
+  const handleInputChange = (field: keyof UserProfileData, value: string) => {
+    setEditableProfile(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handlePhoneNumberChange = (value: string) => {
+    setEditableProfile(prev => ({ ...prev, phoneNumbers: [value, ...(prev.phoneNumbers?.slice(1) || [])] }));
+  };
+
+  const handleProfileUpdate = async () => {
+    if (!authUser || !userProfile || !setUserProfile || !editableProfile) {
+      toast({ title: "Error", description: "User not authenticated or profile data is missing.", variant: "destructive" });
+      return;
+    }
+
+    setIsUpdating(true);
+    
+    try {
+      const numericStandard = parseInt(editableProfile.standard || '0', 10);
+      if (isNaN(numericStandard) || numericStandard < 4 || numericStandard > 12) {
+        toast({ title: 'Invalid Grade', description: 'Standard must be a number between 4 and 12.', variant: 'destructive' });
+        setIsUpdating(false);
+        return;
+      }
+      
+      const userDocRef = doc(db, 'users', authUser.uid);
+      const updatesToSave: Partial<UserProfileData> = {
+        schoolName: editableProfile.schoolName,
+        standard: editableProfile.standard,
+        division: editableProfile.division || null,
+        phoneNumbers: editableProfile.phoneNumbers,
+        additionalNumber: editableProfile.additionalNumber || null,
+        schoolVerifiedByOrganizer: userProfile.schoolName === editableProfile.schoolName ? userProfile.schoolVerifiedByOrganizer : false,
+        updatedAt: serverTimestamp(),
+      };
+
+      await updateDoc(userDocRef, updatesToSave);
+
+      setUserProfile(prev => prev ? { ...prev, ...updatesToSave, updatedAt: new Date().toISOString() } : null);
+
+      toast({ title: 'Profile Updated', description: 'Your profile information has been successfully saved.' });
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      toast({ title: 'Update Failed', description: 'Could not save your profile changes. Please try again.', variant: 'destructive' });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -71,62 +123,12 @@ export default function ProfilePage() {
     } catch (error) {
        toast({
         title: 'Logout Failed',
-        description: (error as Error).message || 'An unexpected error occurred during logout.',
+        description: "An error occurred during logout. Please try again.",
         variant: 'destructive',
       });
     }
   };
   
-  const handleProfileUpdate = async () => {
-    if (!authUser || !userProfile || !setUserProfile) return;
-    setIsUpdating(true);
-    
-    // Simulate API call for update
-    await new Promise(resolve => setTimeout(resolve, 700)); 
-    
-    // Simulate grade validation if standard is being updated by a student
-    if (userProfile.role === 'student' && editableProfile.standard) {
-        const numericStandard = parseInt(editableProfile.standard, 10);
-        if (isNaN(numericStandard) || numericStandard < 4 || numericStandard > 12) {
-            toast({
-                title: 'Invalid Grade',
-                description: 'Standard must be between Grade 4 and Grade 12.',
-                variant: 'destructive',
-            });
-            setIsUpdating(false);
-            return;
-        }
-    }
-    
-    setUserProfile(prev => {
-        if (!prev) return null;
-        const updatedProfile = {
-            ...prev,
-            displayName: editableProfile.fullName || editableProfile.displayName || prev.displayName, // Prefer fullName for displayName if student
-            fullName: editableProfile.fullName || prev.fullName,
-            schoolName: editableProfile.schoolName || prev.schoolName,
-            standard: editableProfile.standard || prev.standard,
-            division: editableProfile.division || prev.division,
-            updatedAt: new Date().toISOString(),
-            // If schoolName changed by student, reset verification status (mock logic)
-            schoolVerifiedByOrganizer: prev.schoolName === editableProfile.schoolName ? prev.schoolVerifiedByOrganizer : false,
-        };
-        return updatedProfile;
-    });
-
-    toast({
-      title: 'Profile Updated (Mock)',
-      description: 'Your profile information has been updated locally for this session.',
-    });
-    setIsUpdating(false);
-    setIsEditing(false); // Exit editing mode
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEditableProfile({ ...editableProfile, [e.target.id]: e.target.value });
-  };
-
-
   if (loading || !authUser || !userProfile) {
     return (
       <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center">
@@ -136,7 +138,7 @@ export default function ProfilePage() {
   }
   
   const displayEmail = authUser.email || userProfile.email;
-  const currentDisplayName = isEditing ? (editableProfile.fullName || editableProfile.displayName) : (userProfile.fullName || userProfile.displayName);
+  const currentDisplayName = userProfile.fullName || userProfile.displayName;
   const avatarFallback = (currentDisplayName?.[0])?.toUpperCase() || (displayEmail?.[0])?.toUpperCase() || 'U';
   const currentPhotoURL = userProfile?.photoURL || authUser.photoURL;
 
@@ -161,7 +163,10 @@ export default function ProfilePage() {
             <AvatarFallback className="text-3xl">{avatarFallback}</AvatarFallback>
           </Avatar>
           <CardTitle className="text-2xl">{currentDisplayName || 'User Profile'}</CardTitle>
-          {displayEmail && <CardDescription className="flex items-center gap-1"><Mail className="h-4 w-4 text-muted-foreground" />{displayEmail}</CardDescription>}
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 mt-1">
+            {displayEmail && <p className="text-sm text-muted-foreground flex items-center gap-1.5"><Mail className="h-4 w-4"/>{displayEmail}</p>}
+            {userProfile.shortId && <p className="text-sm text-muted-foreground flex items-center gap-1.5"><Shield className="h-4 w-4"/>ID: {userProfile.shortId}</p>}
+          </div>
            {userProfile.role && (
             <Badge variant="secondary" className="mt-2 capitalize text-sm py-1 px-3">
                 <Shield className="mr-2 h-4 w-4" /> Role: {userProfile.role.replace('_', ' ')}
@@ -169,83 +174,94 @@ export default function ProfilePage() {
            )}
         </CardHeader>
         <CardContent className="space-y-6 pt-6">
-          {isEditing ? (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name</Label>
-                <Input id="fullName" value={editableProfile.fullName || ''} onChange={handleInputChange} placeholder="Your Full Name" />
-              </div>
-              {userProfile.role === 'student' && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="schoolName">School Name</Label>
-                    <Input id="schoolName" value={editableProfile.schoolName || ''} onChange={handleInputChange} placeholder="Your School Name" />
-                    {userProfile.schoolVerifiedByOrganizer === false && !editableProfile.schoolName?.includes(userProfile.schoolName || '') && (
-                        <p className="text-xs text-yellow-600 flex items-center gap-1"><HelpCircle className="h-3 w-3" /> Changing school will require re-verification.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+            {/* Non-Editable section */}
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Full Name</Label>
+              <p className="text-lg font-medium p-2 bg-muted/50 rounded-md">{userProfile.fullName || 'N/A'}</p>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Email Address</Label>
+              <p className="text-lg p-2 bg-muted/50 rounded-md">{displayEmail || 'N/A'}</p>
+            </div>
+
+            {/* Editable Section */}
+             <div className="space-y-1">
+              <Label htmlFor="schoolName">School Name</Label>
+              {isEditing ? (
+                 <Input id="schoolName" value={editableProfile?.schoolName || ''} onChange={(e) => handleInputChange('schoolName', e.target.value)} placeholder="Your School Name" />
+              ) : (
+                <div className="flex items-center gap-2 p-2 min-h-[40px]">
+                    <p className="text-lg">{userProfile.schoolName || 'Not Set'}</p>
+                    {userProfile.schoolName && (
+                        <Badge variant={userProfile.schoolVerifiedByOrganizer ? "default" : "outline"} className={`text-xs ${userProfile.schoolVerifiedByOrganizer ? 'bg-green-100 text-green-700 border-green-300' : 'text-yellow-700 border-yellow-400 bg-yellow-50'}`}>
+                        {userProfile.schoolVerifiedByOrganizer ? 'Verified' : 'Pending Review'}
+                        </Badge>
                     )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="standard">Standard (Grade 4-12)</Label>
-                        <Input id="standard" type="number" min="4" max="12" value={editableProfile.standard || ''} onChange={handleInputChange} placeholder="e.g., 10" />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="division">Division (Optional)</Label>
-                        <Input id="division" value={editableProfile.division || ''} onChange={handleInputChange} placeholder="e.g., A" />
-                    </div>
-                  </div>
-                </>
+                </div>
               )}
-              <div className="flex gap-2 justify-end">
-                <Button variant="outline" onClick={() => { setIsEditing(false); setEditableProfile({ fullName: userProfile.fullName, schoolName: userProfile.schoolName, standard: userProfile.standard, division: userProfile.division }); }} disabled={isUpdating}>
+            </div>
+
+            <div className="space-y-1">
+                <Label htmlFor="standard">Standard (Grade 4-12)</Label>
+                {isEditing ? (
+                     <Select value={editableProfile?.standard} onValueChange={(value) => handleInputChange('standard', value)}>
+                        <SelectTrigger><SelectValue placeholder="Select Grade" /></SelectTrigger>
+                        <SelectContent>
+                            {Array.from({ length: 9 }, (_, i) => `${i + 4}`).map(grade => (
+                                <SelectItem key={grade} value={grade}>{`Grade ${grade}`}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                ) : (
+                    <p className="text-lg p-2 min-h-[40px]">{userProfile.standard ? `Grade ${userProfile.standard}` : 'Not Set'}</p>
+                )}
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="division">Division</Label>
+              {isEditing ? (
+                <Input id="division" value={editableProfile?.division || ''} onChange={(e) => handleInputChange('division', e.target.value)} placeholder="e.g., A" />
+              ) : (
+                <p className="text-lg p-2 min-h-[40px]">{userProfile.division || 'Not Set'}</p>
+              )}
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="phoneNumber">Primary Phone Number</Label>
+              {isEditing ? (
+                <Input id="phoneNumber" type="tel" value={editableProfile?.phoneNumbers?.[0] || ''} onChange={(e) => handlePhoneNumberChange(e.target.value)} placeholder="+91 12345 67890" />
+              ) : (
+                <p className="text-lg p-2 min-h-[40px]">{userProfile.phoneNumbers?.[0] || 'Not Set'}</p>
+              )}
+            </div>
+             <div className="space-y-1 md:col-span-2">
+              <Label htmlFor="additionalNumber">Additional Phone Number (Optional)</Label>
+              {isEditing ? (
+                <Input id="additionalNumber" type="tel" value={editableProfile?.additionalNumber || ''} onChange={(e) => handleInputChange('additionalNumber', e.target.value)} placeholder="Secondary contact number" />
+              ) : (
+                <p className="text-lg p-2 min-h-[40px]">{userProfile.additionalNumber || 'Not Set'}</p>
+              )}
+            </div>
+
+          </div>
+          <div className="flex gap-2 justify-end mt-6">
+            {isEditing ? (
+              <>
+                <Button variant="outline" onClick={() => { setIsEditing(false); setEditableProfile(userProfile); }} disabled={isUpdating}>
                     <X className="mr-2 h-4 w-4" />Cancel
                 </Button>
                 <Button onClick={handleProfileUpdate} className="bg-accent hover:bg-accent/90 text-accent-foreground" disabled={isUpdating}>
                   {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
                   Save Changes
                 </Button>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Full Name</Label>
-                <p className="text-lg">{userProfile.fullName || userProfile.displayName || 'N/A'}</p>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Email Address</Label>
-                <p className="text-lg">{displayEmail || 'N/A'}</p>
-              </div>
-               {userProfile.role === 'student' && (
-                <>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">School Name</Label>
-                    <div className="flex items-center gap-2">
-                        <p className="text-lg">{userProfile.schoolName || 'N/A'}</p>
-                        {userProfile.schoolName && (
-                            <Badge variant={userProfile.schoolVerifiedByOrganizer ? "default" : "outline"} className={`text-xs ${userProfile.schoolVerifiedByOrganizer ? 'bg-green-100 text-green-700 border-green-300' : 'text-yellow-700 border-yellow-400 bg-yellow-50'}`}>
-                            {userProfile.schoolVerifiedByOrganizer ? 'Verified' : 'Pending Review'}
-                            </Badge>
-                        )}
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Standard (Grade)</Label>
-                        <p className="text-lg">{userProfile.standard ? `Grade ${userProfile.standard}` : 'N/A'}</p>
-                    </div>
-                    <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Division</Label>
-                        <p className="text-lg">{userProfile.division || 'N/A'}</p>
-                    </div>
-                  </div>
-                </>
-               )}
-              <Button onClick={() => setIsEditing(true)} variant="outline" className="w-full mt-4">
+              </>
+            ) : (
+              <Button onClick={() => setIsEditing(true)} variant="outline">
                 <Edit3 className="mr-2 h-4 w-4" /> Edit Profile
               </Button>
-            </>
-          )}
+            )}
+          </div>
         </CardContent>
       </Card>
 
