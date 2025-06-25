@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -7,107 +8,135 @@ service cloud.firestore {
     function isAuthenticated() {
       return request.auth != null;
     }
-    
-    function isStudent() {
-      return isAuthenticated() && request.auth.token.role == 'student';
-    }
 
-    function isOverallOrAdmin() {
-      return isAuthenticated() && (request.auth.token.role == 'overall_head' || request.auth.token.role == 'admin');
-    }
-    
-    function isEventRepresentative() {
-        return isAuthenticated() && request.auth.token.role == 'event_representative';
+    function isStudent() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'student';
     }
 
     function isOrganizer() {
-        return isAuthenticated() && request.auth.token.role == 'organizer';
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'organizer';
     }
     
-    function isStaff() {
-        return isOverallOrAdmin() || isEventRepresentative() || isOrganizer();
-    }
-    
-    function isAssignedToSubEvent(subEventId) {
-      return isAuthenticated() && (
-        isOverallOrAdmin() ||
-        (
-          (isEventRepresentative() || isOrganizer()) &&
-          get(/databases/$(database)/documents/subEvents/$(subEventId)).data.eventReps.hasAny([request.auth.uid])
-        )
-      );
-    }
-    
-    function isTeamMember(teamId) {
-       return isAuthenticated() && get(/databases/$(database)/documents/event_teams/$(teamId)).data.memberUids.hasAny([request.auth.uid]);
+    function isEventRepresentative() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'event_representative';
     }
 
-    // Collection Rules
+    function isOverallOrAdmin() {
+      let role = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+      return isAuthenticated() && (role == 'overall_head' || role == 'admin');
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAssignedToSubEvent(subEventId) {
+      if (!isAuthenticated() || subEventId == null) {
+        return false;
+      }
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let eventDoc = get(/databases/$(database)/documents/subEvents/$(subEventId)).data;
+      
+      return isOverallOrAdmin() ||
+        (userDoc.role == 'event_representative' && userDoc.assignedEventSlugs.hasAny([eventDoc.slug])) ||
+        (userDoc.role == 'organizer' && eventDoc.eventReps.hasAny([request.auth.uid]));
+    }
+    
+    // USERS collection
     match /users/{userId} {
-      allow read: if isAuthenticated(); // Allow any authenticated user to read profiles (e.g., for team member names)
+      allow read: if isAuthenticated();
       
-      allow create: if (
-        // Students can create their own 'student' role profile
-        (request.auth.uid == userId && request.resource.data.role == 'student' &&
-         request.resource.data.keys().hasAll(['fullName', 'email', 'schoolName', 'standard', 'phoneNumbers', 'role', 'shortId', 'createdAt', 'updatedAt']) &&
-         request.resource.data.keys().hasOnly(['fullName', 'email', 'schoolName', 'standard', 'division', 'schoolId', 'schoolVerifiedByOrganizer', 'role', 'createdAt', 'updatedAt', 'phoneNumbers', 'additionalNumber', 'photoURL', 'registeredEvents', 'subEventsManaged', 'points', 'credibilityScore', 'shortId']) &&
-         request.resource.data.email == request.auth.token.email &&
-         request.resource.data.createdAt == request.time &&
-         request.resource.data.updatedAt == request.time
+      // CREATE: Allow first admin creation, student self-signup, or admin creation of staff.
+      allow create: if
+        // Allow anyone to create the VERY FIRST admin/overall_head account if no users exist yet.
+        (
+            get(/databases/$(database)/documents/users).size() == 0 &&
+            request.resource.data.role in ['admin', 'overall_head'] &&
+            request.resource.data.fullName is string && request.resource.data.fullName.size() > 0 &&
+            request.resource.data.department is string && request.resource.data.department.size() > 0 &&
+            request.resource.data.collegeRollNumber is string && request.resource.data.collegeRollNumber.matches('^[A-Z]{2}\\d{2}[A-Z]{3}\\d{3}$') &&
+            request.resource.data.phoneNumbers is list && request.resource.data.phoneNumbers.size() > 0
         ) ||
-        // Admins/Overall Heads can create staff profiles
-        (isOverallOrAdmin() && request.resource.data.role in ['organizer', 'event_representative', 'overall_head', 'admin'] &&
-         request.resource.data.keys().hasAll(['fullName', 'email', 'department', 'phoneNumbers', 'collegeRollNumber', 'role', 'createdAt', 'updatedAt']) &&
-         request.resource.data.keys().hasOnly(['uid', 'fullName', 'email', 'role', 'department', 'phoneNumbers', 'collegeRollNumber', 'shortId', 'createdAt', 'updatedAt', 'photoURL', 'additionalNumber', 'subEventsManaged', 'tasks', 'points', 'credibilityScore']) &&
-         request.resource.data.collegeRollNumber.matches('^[A-Z]{2}\\d{2}[A-Z]{3}\\d{3}$') &&
-         request.resource.data.createdAt == request.time &&
-         request.resource.data.updatedAt == request.time
-        )
-      );
-      
+        // Students can create their own 'student' profile.
+        (
+            isOwner(userId) && 
+            request.resource.data.role == 'student' &&
+            request.resource.data.fullName is string && request.resource.data.fullName.size() > 0 &&
+            request.resource.data.schoolName is string && request.resource.data.schoolName.size() > 0 &&
+            request.resource.data.standard is string && request.resource.data.standard.size() > 0 &&
+            request.resource.data.phoneNumbers is list && request.resource.data.phoneNumbers.size() > 0
+        ) ||
+        // Overall heads/admins can create other staff accounts.
+        (
+            isOverallOrAdmin() &&
+            request.resource.data.role in ['organizer', 'event_representative', 'overall_head', 'admin'] &&
+            request.resource.data.fullName is string && request.resource.data.fullName.size() > 0 &&
+            request.resource.data.department is string && request.resource.data.department.size() > 0 &&
+            request.resource.data.collegeRollNumber is string && request.resource.data.collegeRollNumber.matches('^[A-Z]{2}\\d{2}[A-Z]{3}\\d{3}$') &&
+            request.resource.data.phoneNumbers is list && request.resource.data.phoneNumbers.size() > 0
+        );
+
+      // UPDATE: Users can update their own info. Admins can update any user. Organizers can verify schools.
       allow update: if (
-        // Users can update their own editable profile fields
-        (isAuthenticated() && request.auth.uid == userId &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['schoolName', 'standard', 'division', 'phoneNumbers', 'additionalNumber', 'photoURL', 'department', 'updatedAt']) &&
-          request.resource.data.updatedAt == request.time
+        // Owner can update specific fields.
+        (
+            isOwner(userId) &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'fullName', 'displayName', 'photoURL', 'phoneNumbers', 'additionalNumber', 
+                'schoolName', 'standard', 'division', 'updatedAt', 'department'
+            ]) &&
+            request.resource.data.email == resource.data.email &&
+            request.resource.data.role == resource.data.role &&
+            request.resource.data.updatedAt == request.time
         ) ||
-        // Staff can update specific fields on other users (e.g., verification)
-        (isStaff() && isAssignedToSubEvent(request.resource.data.eventId) && // This may not work if eventId isn't on user doc. Refine based on need.
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['schoolVerifiedByOrganizer', 'updatedAt'])
+        // Organizers/Event Reps can verify schools for students.
+        (
+            (isOrganizer() || isEventRepresentative()) &&
+            get(/databases/$(database)/documents/users/$(userId)).data.role == 'student' &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['schoolVerifiedByOrganizer', 'updatedAt']) &&
+            request.resource.data.updatedAt == request.time
         ) ||
-        // Admins can update almost anything
-        (isOverallOrAdmin() &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role', 'points', 'credibilityScore', 'schoolVerifiedByOrganizer', 'subEventsManaged', 'department', 'updatedAt']) &&
-          request.resource.data.updatedAt == request.time
-        )
+        // Admins can update any field.
+        isOverallOrAdmin()
       );
       
       allow delete: if isOverallOrAdmin();
     }
     
+    // SUBEVENTS collection
     match /subEvents/{subEventId} {
         allow read: if isAuthenticated();
         allow create, update, delete: if isOverallOrAdmin();
     }
-    
+
+    // EVENT REGISTRATIONS collection
     match /event_registrations/{registrationId} {
-        allow read: if request.auth.uid == resource.data.userId || isAssignedToSubEvent(resource.data.subEventId);
-        allow create: if request.auth.uid == request.resource.data.userId;
-        allow update: if isAssignedToSubEvent(resource.data.subEventId) || request.auth.uid == resource.data.userId; // User can cancel their own registration
+        allow create: if isStudent() && request.auth.uid == request.resource.data.userId;
+        allow read: if (isStudent() && request.auth.uid == resource.data.userId) || isAssignedToSubEvent(resource.data.subEventId);
+        allow update: if (isStudent() && request.auth.uid == resource.data.userId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['registrationStatus', 'lastUpdatedAt'])) || isAssignedToSubEvent(resource.data.subEventId);
         allow delete: if isOverallOrAdmin();
     }
     
+    // EVENT TEAMS collection
     match /event_teams/{teamId} {
-        allow read: if isTeamMember(teamId) || isAssignedToSubEvent(resource.data.eventId);
-        allow create: if request.auth.uid == request.resource.data.teamLeaderId;
-        allow update: if (request.auth.uid == resource.data.teamLeaderId) || isAssignedToSubEvent(resource.data.eventId);
+        allow create: if isStudent();
+        allow read: if isStudent() || isAssignedToSubEvent(resource.data.eventId);
+        allow update: if (isStudent() && resource.data.memberUids.hasAny([request.auth.uid])) || isAssignedToSubEvent(resource.data.eventId);
         allow delete: if isOverallOrAdmin();
     }
-    
+
+    // TASKS collection
     match /tasks/{taskId} {
-      allow create: if isOverallOrAdmin() || isEventRepresentative();
-      allow read: if isOverallOrAdmin() || isAssignedToSubEvent(resource.data.eventSlug) || request.auth.uid == resource.data.assignedToUid || request.auth.uid == resource.data.createdBy;
-      allow update: if isOverallOrAdmin() || request.auth.uid == resource.data.assignedToUid || request.auth.uid == resource.data.createdBy;
+      allow create: if isOverallOrAdmin();
+      allow read: if 
+        isOverallOrAdmin() ||
+        (resource.data.eventId != null && isAssignedToSubEvent(resource.data.eventId)) ||
+        (resource.data.assignedToUid != null && request.auth.uid == resource.data.assignedToUid) ||
+        (resource.data.assignedByUid != null && request.auth.uid == resource.data.assignedByUid);
+      allow update: if
+        isOverallOrAdmin() ||
+        (request.auth.uid == resource.data.assignedByUid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'description', 'assignedTo', 'assignedToUid', 'dueDate', 'priority', 'status', 'points', 'updatedAt'])) ||
+        (request.auth.uid == resource.data.assignedToUid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']));
       allow delete: if isOverallOrAdmin();
     }
   }
