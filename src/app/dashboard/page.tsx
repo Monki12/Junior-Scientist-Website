@@ -7,7 +7,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/hooks/use-auth';
 import { subEventsData } from '@/data/subEvents';
-import type { UserRole, SubEvent, Task, UserProfileData, EventParticipant, CustomColumnDefinition, ActiveDynamicFilter, EventStatus, EventRegistration, EventTeam } from '@/types';
+import type { UserRole, SubEvent, Task, UserProfileData, EventParticipant, CustomColumnDefinition, ActiveDynamicFilter, EventStatus, EventRegistration, EventTeam, RegisteredEventInfo } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -93,6 +93,89 @@ const getEventStatusBadgeVariant = (status: EventStatus | undefined): "default" 
         default: return 'outline';
     }
 };
+
+const mockTasksData: Omit<Task, 'id' | 'assignedTo' | 'createdBy' | 'createdAt' | 'updatedAt' | 'customTaskData' >[] = [
+  { title: 'Prepare MUN Delegate Handbook', description: 'Draft handbook including rules of procedure and country profiles.', status: 'Not Started', dueDate: '2024-10-15T00:00:00Z', points: 25, priority: 'High', eventSlug: 'model-united-nations', assignedByName: 'Overall Head Carol' },
+  { title: 'Finalize Quiz Questions - Round 1', description: 'Create 50 MCQs for science round.', status: 'In Progress', dueDate: '2024-11-01T00:00:00Z', points: 30, priority: 'High', eventSlug: 'ex-quiz-it', assignedByName: 'Event Rep Bob' },
+  { title: 'Book Auditorium for MUN', description: 'Confirm booking for main hall for Dec 1st.', status: 'Pending Review', dueDate: '2024-09-30T00:00:00Z', points: 15, priority: 'Medium', eventSlug: 'model-united-nations', assignedByName: 'Organizer Alice' },
+  { title: 'Design RoboChallenge Arena Layout', description: 'Draft the arena specifications and obstacle placements.', status: 'Not Started', dueDate: '2024-10-20T00:00:00Z', points: 20, priority: 'High', eventSlug: 'robo-challenge', assignedByName: 'Organizer Alice' },
+  { title: 'Procure Robotics Kits', description: 'Order 20 standard robotics kits for participants.', status: 'Completed', dueDate: '2024-09-15T00:00:00Z', points: 10, priority: 'Medium', eventSlug: 'robo-challenge', assignedByName: 'Organizer Alice' },
+  { title: 'Update EventFlow Website Content', description: 'Add details for newly approved sub-events.', status: 'In Progress', dueDate: '2024-08-25T00:00:00Z', points: 15, priority: 'Low', eventSlug: 'global', assignedByName: 'Admin Dave' },
+  { title: 'Coordinate Volunteer Training Session', description: 'Schedule and organize a training session for all event volunteers.', status: 'Not Started', dueDate: '2024-11-10T00:00:00Z', points: 20, priority: 'Medium', eventSlug: 'global', assignedByName: 'Overall Head Carol' },
+  { title: 'Test Registration Payment Gateway', description: 'Perform end-to-end test of the payment flow.', status: 'Pending Review', dueDate: '2024-08-30T00:00:00Z', points: 10, priority: 'High', eventSlug: 'global', assignedByName: 'Admin Dave' },
+  { title: 'Prepare Olympiad Question Paper Set A', description: 'Create 30 physics problems for Junior Scientist Olympiad.', status: 'In Progress', dueDate: '2024-11-05T00:00:00Z', points: 25, priority: 'High', eventSlug: 'junior-scientist-olympiad', assignedByName: 'Organizer Alice'},
+  { title: 'Setup Math-A-Maze Puzzles Online', description: 'Deploy digital version of puzzles for practice.', status: 'Not Started', dueDate: '2024-11-10T00:00:00Z', points: 15, priority: 'Medium', eventSlug: 'math-a-maze', assignedByName: 'Organizer Alice'},
+];
+
+const createTaskObject = (
+    baseTask: Omit<Task, 'id' | 'assignedTo' | 'createdBy' | 'createdAt' | 'updatedAt' | 'customTaskData'>,
+    id: string,
+    assignedTo: string[],
+    createdBy: string
+): Task => ({
+    ...baseTask,
+    id,
+    assignedTo,
+    createdBy,
+    createdAt: new Date(Date.now() - Math.random() * 10 * 24 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date().toISOString(),
+    customTaskData: baseTask.title.includes("Quiz") ? { notes: 'Focus on STEM', difficulty: 5 } : {}
+});
+
+const mockStudentRegisteredEvents: RegisteredEventInfo[] = [
+  { eventSlug: 'model-united-nations', eventDate: '2024-12-01', admitCardStatus: 'pending' },
+  { eventSlug: 'ex-quiz-it', teamName: 'Quiz Wizards', eventDate: '2024-12-05', admitCardStatus: 'published', teamMembers: [{id: 'mem1', name: 'Jane Doe'}, {id: 'mem2', name: 'John Smith'}] },
+  { eventSlug: 'robo-challenge', eventDate: '2024-11-28', admitCardStatus: 'unavailable', teamName: 'RoboKnights', teamMembers: [{id: 'mem3', name: 'Alice Wonder'}] }
+];
+
+const mockGlobalParticipants: EventParticipant[] = [
+  { id: 'stud-global-1', name: 'Global Alice Smith', email: 'alice.smith.global@example.com', contactNumber: '555-1234', schoolName: 'Springfield High', registrationDate: new Date('2024-07-01T10:00:00Z').toISOString(), paymentStatus: 'paid', registeredEventSlugs: ['model-united-nations', 'ex-quiz-it'], customData: { notes: 'Interested in volunteering too.'} },
+  { id: 'stud-global-2', name: 'Global Bob Johnson', email: 'bob.johnson.global@example.com', contactNumber: '555-5678', schoolName: 'Northwood Academy', registrationDate: new Date('2024-07-02T11:30:00Z').toISOString(), paymentStatus: 'pending', registeredEventSlugs: ['robo-challenge'], customData: {} },
+];
+
+
+const mockUserProfiles: Record<UserRole, UserProfileData> = {
+  student: {
+    uid: 'mock-student-uid-12345', email: 'student.test@example.com', fullName: 'Alex Johnson', displayName: 'Alex Johnson', role: 'student', photoURL: 'https://placehold.co/120x120.png?text=AJ',
+    schoolName: 'Springfield High International', schoolId: 'school_001', schoolVerifiedByOrganizer: true, standard: '10', division: 'A',
+    phoneNumbers: ['+1-555-0101', '+1-555-0102'], registeredEvents: mockStudentRegisteredEvents, tasks: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    shortId: 'A5B1C'
+  },
+  organizer: {
+    uid: 'mock-organizer-uid', email: 'organizer.test@example.com', displayName: 'Test Organizer Alice', role: 'organizer', photoURL: 'https://placehold.co/100x100.png?text=TOA', department: 'Logistics', assignedEventSlugs: ['model-united-nations', 'robo-challenge', 'junior-scientist-olympiad', 'math-a-maze'],
+    tasks: [
+        createTaskObject(mockTasksData[0], 'task-org-1', ['Test Organizer Alice'], 'Overall Head Carol'),
+        createTaskObject(mockTasksData[3], 'task-org-2', ['Test Organizer Alice'], 'Event Rep Bob'),
+    ].filter(task => task.assignedTo?.includes('Test Organizer Alice')), points: 150, credibilityScore: 75, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+  },
+  event_representative: {
+    uid: 'mock-representative-uid', email: 'representative.test@example.com', displayName: 'Test Event Rep Bob', role: 'event_representative', photoURL: 'https://placehold.co/100x100.png?text=ERB', department: 'Event Management', assignedEventSlug: 'ex-quiz-it',
+    tasks: [
+        createTaskObject(mockTasksData[1], 'task-er-1', ['Test Event Rep Bob'], 'Overall Head Carol'),
+    ].filter(task => task.assignedTo?.includes('Test Event Rep Bob')), points: 200, credibilityScore: 80, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+  },
+  overall_head: {
+    uid: 'mock-overall-head-uid', email: 'overall.test@example.com', displayName: 'Test Overall Head Carol', role: 'overall_head', photoURL: 'https://placehold.co/100x100.png?text=OHC', department: 'Coordination',
+    tasks: [
+         createTaskObject(mockTasksData[6], 'task-oh-1', ['Test Overall Head Carol'], 'Admin Dave'),
+    ].filter(task => task.assignedTo?.includes('Test Overall Head Carol')), points: 300, credibilityScore: 85, allPlatformParticipants: mockGlobalParticipants, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+  },
+  admin: {
+    uid: 'mock-admin-uid', email: 'admin.test@example.com', displayName: 'Test Admin Dave', role: 'admin', photoURL: 'https://placehold.co/100x100.png?text=TAD', department: 'Administration',
+    tasks: [
+        createTaskObject(mockTasksData[5], 'task-adm-1', ['Test Admin Dave'], 'System'),
+    ].filter(task => task.assignedTo?.includes('Test Admin Dave')), points: 500, credibilityScore: 95, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+  },
+  test: {
+    uid: 'mock-test-uid-67890', email: 'generic.test@example.com', displayName: 'Sam Williams (Test)', role: 'test', photoURL: 'https://placehold.co/120x120.png?text=SW',
+    fullName: 'Sam Williams', schoolName: 'Testington Academy Global', schoolId: 'school_003', schoolVerifiedByOrganizer: true, standard: '12', division: 'B',
+    phoneNumbers: ['+1-555-0201'],
+    registeredEvents: [ { eventSlug: 'robo-challenge', teamName: 'RoboKnights', eventDate: '2024-11-28', admitCardStatus: 'pending' }, { eventSlug: 'math-a-maze', eventDate: '2024-11-22', admitCardStatus: 'unavailable'} ], department: 'QA',
+    tasks: [ { ...createTaskObject(mockTasksData[1], 'task-test-1', ['Sam Williams (Test)'], 'Overall Head Carol'), title: 'Verify Quiz Task Functionality', eventSlug: 'ex-quiz-it', priority: 'Low' }
+    ].filter(task => task.assignedTo?.includes('Sam Williams (Test)')), points: 50, credibilityScore: 60, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+  }
+};
+
 
 export default function DashboardPage() {
   const { authUser, userProfile, setUserProfile, loading } = useAuth();
@@ -1868,5 +1951,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
