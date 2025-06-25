@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import type { LoginFormData } from '@/types';
-import { Loader2, LogIn, ShieldKeyhole } from 'lucide-react';
+import { Loader2, LogIn, ShieldCheck } from 'lucide-react';
 
 export default function OrgLoginPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -66,7 +66,7 @@ export default function OrgLoginPage() {
     <div className="flex min-h-[calc(100vh-15rem)] items-center justify-center py-12 animate-fade-in-up">
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="text-center">
-          <ShieldKeyhole className="mx-auto h-12 w-12 text-primary mb-4" />
+          <ShieldCheck className="mx-auto h-12 w-12 text-primary mb-4" />
           <CardTitle className="text-3xl font-headline text-primary">Organizational Login</CardTitle>
           <CardDescription>Access for Event Organizers, Representatives, and Admins.</CardDescription>
         </CardHeader>
