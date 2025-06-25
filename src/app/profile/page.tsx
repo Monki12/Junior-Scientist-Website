@@ -14,7 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, UserCircle, Mail, Shield, LogOut, ArrowLeft, CalendarDays, Info, Users, GraduationCap, School, Edit3, Check, X, HelpCircle } from 'lucide-react';
+import { Loader2, UserCircle, Mail, Shield, LogOut, ArrowLeft, CalendarDays, Info, Users, GraduationCap, School, Edit3, Check, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
@@ -40,7 +40,6 @@ export default function ProfilePage() {
       router.push('/login?redirect=/profile');
     }
     if (userProfile) {
-      // Initialize editableProfile from the main userProfile context
       setEditableProfile({
         displayName: userProfile.displayName || '',
         fullName: userProfile.fullName || '',
@@ -49,6 +48,7 @@ export default function ProfilePage() {
         division: userProfile.division || '',
         phoneNumbers: userProfile.phoneNumbers || [''],
         additionalNumber: userProfile.additionalNumber || '',
+        photoURL: userProfile.photoURL || '',
       });
 
       if ((userProfile.role === 'student' || userProfile.role === 'test') && userProfile.registeredEvents) {
@@ -70,8 +70,12 @@ export default function ProfilePage() {
     setEditableProfile(prev => ({ ...prev, [field]: value }));
   };
 
-  const handlePhoneNumberChange = (value: string) => {
-    setEditableProfile(prev => ({ ...prev, phoneNumbers: [value, ...(prev.phoneNumbers?.slice(1) || [])] }));
+  const handlePhoneNumberChange = (index: number, value: string) => {
+    setEditableProfile(prev => {
+      const newPhoneNumbers = [...(prev.phoneNumbers || [])];
+      newPhoneNumbers[index] = value;
+      return { ...prev, phoneNumbers: newPhoneNumbers };
+    });
   };
 
   const handleProfileUpdate = async () => {
@@ -91,18 +95,22 @@ export default function ProfilePage() {
       }
       
       const userDocRef = doc(db, 'users', authUser.uid);
+      
       const updatesToSave: Partial<UserProfileData> = {
         schoolName: editableProfile.schoolName,
         standard: editableProfile.standard,
         division: editableProfile.division || null,
-        phoneNumbers: editableProfile.phoneNumbers,
+        phoneNumbers: (editableProfile.phoneNumbers || []).filter(Boolean),
         additionalNumber: editableProfile.additionalNumber || null,
+        photoURL: editableProfile.photoURL || null,
+        // If school name is changed, verification status is reset
         schoolVerifiedByOrganizer: userProfile.schoolName === editableProfile.schoolName ? userProfile.schoolVerifiedByOrganizer : false,
         updatedAt: serverTimestamp(),
       };
 
       await updateDoc(userDocRef, updatesToSave);
 
+      // Optimistically update local context state
       setUserProfile(prev => prev ? { ...prev, ...updatesToSave, updatedAt: new Date().toISOString() } : null);
 
       toast({ title: 'Profile Updated', description: 'Your profile information has been successfully saved.' });
@@ -143,7 +151,7 @@ export default function ProfilePage() {
   const currentPhotoURL = userProfile?.photoURL || authUser.photoURL;
 
   return (
-    <div className="max-w-3xl mx-auto space-y-8 animate-fade-in-up">
+    <div className="max-w-4xl mx-auto space-y-8 animate-fade-in-up">
       <div className="flex justify-between items-center mb-6">
         <header className="text-left">
           <h1 className="text-3xl md:text-4xl font-bold text-primary">My Profile</h1>
@@ -157,7 +165,7 @@ export default function ProfilePage() {
       </div>
 
       <Card className="shadow-xl">
-        <CardHeader className="flex flex-col items-center text-center border-b pb-6">
+        <CardHeader className="flex flex-col items-center text-center border-b pb-6 bg-muted/20">
           <Avatar className="h-24 w-24 mb-4 border-2 border-primary shadow-md">
             <AvatarImage src={currentPhotoURL || undefined} alt={currentDisplayName || displayEmail || 'User'} />
             <AvatarFallback className="text-3xl">{avatarFallback}</AvatarFallback>
@@ -175,24 +183,24 @@ export default function ProfilePage() {
         </CardHeader>
         <CardContent className="space-y-6 pt-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-            {/* Non-Editable section */}
+            {/* --- Non-Editable section --- */}
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Full Name</Label>
-              <p className="text-lg font-medium p-2 bg-muted/50 rounded-md">{userProfile.fullName || 'N/A'}</p>
+              <Label htmlFor="fullName">Full Name</Label>
+              <Input id="fullName" value={userProfile.fullName || 'N/A'} disabled />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Email Address</Label>
-              <p className="text-lg p-2 bg-muted/50 rounded-md">{displayEmail || 'N/A'}</p>
+              <Label htmlFor="email">Email Address</Label>
+              <Input id="email" value={displayEmail || 'N/A'} disabled />
             </div>
 
-            {/* Editable Section */}
+            {/* --- Editable Section --- */}
              <div className="space-y-1">
               <Label htmlFor="schoolName">School Name</Label>
               {isEditing ? (
                  <Input id="schoolName" value={editableProfile?.schoolName || ''} onChange={(e) => handleInputChange('schoolName', e.target.value)} placeholder="Your School Name" />
               ) : (
-                <div className="flex items-center gap-2 p-2 min-h-[40px]">
-                    <p className="text-lg">{userProfile.schoolName || 'Not Set'}</p>
+                <div className="flex items-center gap-2 p-2 min-h-[40px] bg-muted/50 rounded-md">
+                    <p className="text-base">{userProfile.schoolName || 'Not Set'}</p>
                     {userProfile.schoolName && (
                         <Badge variant={userProfile.schoolVerifiedByOrganizer ? "default" : "outline"} className={`text-xs ${userProfile.schoolVerifiedByOrganizer ? 'bg-green-100 text-green-700 border-green-300' : 'text-yellow-700 border-yellow-400 bg-yellow-50'}`}>
                         {userProfile.schoolVerifiedByOrganizer ? 'Verified' : 'Pending Review'}
@@ -214,7 +222,7 @@ export default function ProfilePage() {
                         </SelectContent>
                     </Select>
                 ) : (
-                    <p className="text-lg p-2 min-h-[40px]">{userProfile.standard ? `Grade ${userProfile.standard}` : 'Not Set'}</p>
+                    <p className="text-base p-2 min-h-[40px] bg-muted/50 rounded-md">{userProfile.standard ? `Grade ${userProfile.standard}` : 'Not Set'}</p>
                 )}
             </div>
 
@@ -223,16 +231,16 @@ export default function ProfilePage() {
               {isEditing ? (
                 <Input id="division" value={editableProfile?.division || ''} onChange={(e) => handleInputChange('division', e.target.value)} placeholder="e.g., A" />
               ) : (
-                <p className="text-lg p-2 min-h-[40px]">{userProfile.division || 'Not Set'}</p>
+                <p className="text-base p-2 min-h-[40px] bg-muted/50 rounded-md">{userProfile.division || 'Not Set'}</p>
               )}
             </div>
 
             <div className="space-y-1">
               <Label htmlFor="phoneNumber">Primary Phone Number</Label>
               {isEditing ? (
-                <Input id="phoneNumber" type="tel" value={editableProfile?.phoneNumbers?.[0] || ''} onChange={(e) => handlePhoneNumberChange(e.target.value)} placeholder="+91 12345 67890" />
+                <Input id="phoneNumber" type="tel" value={editableProfile?.phoneNumbers?.[0] || ''} onChange={(e) => handlePhoneNumberChange(0, e.target.value)} placeholder="+91 12345 67890" />
               ) : (
-                <p className="text-lg p-2 min-h-[40px]">{userProfile.phoneNumbers?.[0] || 'Not Set'}</p>
+                <p className="text-base p-2 min-h-[40px] bg-muted/50 rounded-md">{userProfile.phoneNumbers?.[0] || 'Not Set'}</p>
               )}
             </div>
              <div className="space-y-1 md:col-span-2">
@@ -240,12 +248,11 @@ export default function ProfilePage() {
               {isEditing ? (
                 <Input id="additionalNumber" type="tel" value={editableProfile?.additionalNumber || ''} onChange={(e) => handleInputChange('additionalNumber', e.target.value)} placeholder="Secondary contact number" />
               ) : (
-                <p className="text-lg p-2 min-h-[40px]">{userProfile.additionalNumber || 'Not Set'}</p>
+                <p className="text-base p-2 min-h-[40px] bg-muted/50 rounded-md">{userProfile.additionalNumber || 'Not Set'}</p>
               )}
             </div>
-
           </div>
-          <div className="flex gap-2 justify-end mt-6">
+          <div className="flex gap-2 justify-end pt-4 border-t">
             {isEditing ? (
               <>
                 <Button variant="outline" onClick={() => { setIsEditing(false); setEditableProfile(userProfile); }} disabled={isUpdating}>

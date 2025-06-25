@@ -209,10 +209,13 @@ export default function DashboardPage() {
 
 
   useEffect(() => {
+    console.log("Dashboard auth state change detected. Loading:", loading, "AuthUser:", !!authUser);
     if (!loading && !authUser) {
+      console.log("Redirecting to login from dashboard.");
       router.push('/login?redirect=/dashboard');
     }
     if (userProfile) {
+      console.log("User profile loaded:", userProfile.role, userProfile.displayName);
       const personallyAssignedTasks = userProfile.tasks?.filter(task => 
         task.assignedTo?.includes(userProfile.displayName!) // Assuming displayName is a valid string for matching
       ) || [];
@@ -224,9 +227,10 @@ export default function DashboardPage() {
 
       if ((userProfile.role === 'student' || userProfile.role === 'test') && authUser) {
         setLoadingStudentEvents(true);
+        console.log("Fetching student registrations for UID:", authUser.uid);
         const fetchStudentRegistrations = async () => {
           if (!authUser) {
-            console.log("Cannot fetch registrations: user not authenticated.");
+            console.log("Cannot fetch registrations: user not authenticated. Aborting fetch.");
             setLoadingStudentEvents(false);
             return;
           }
@@ -234,10 +238,11 @@ export default function DashboardPage() {
             const registrationsRef = collection(db, 'event_registrations');
             const q = query(registrationsRef, where('userId', '==', authUser.uid), where('registrationStatus', '!=', 'cancelled'));
             const querySnapshot = await getDocs(q);
+            console.log(`Found ${querySnapshot.docs.length} registrations.`);
             
             const fetchedRegistrationsPromises = querySnapshot.docs.map(async (regDoc) => {
               const regData = regDoc.data() as EventRegistration;
-              const eventDetail = subEventsData.find(event => event.id === regData.subEventId); // Match subEventId
+              const eventDetail = subEventsData.find(event => event.id === regData.subEventId);
               if (eventDetail) {
                 let teamDetails: EventTeam | undefined;
                 let teamMembersNames: Record<string, string> = {};
@@ -249,6 +254,7 @@ export default function DashboardPage() {
                     if(teamDocSnap.exists()){
                         teamDetails = { id: teamDocSnap.id, ...teamDocSnap.data() } as EventTeam;
                         if (teamDetails.memberUids) {
+                          console.log(`Fetching names for team ${teamDetails.teamName} with members:`, teamDetails.memberUids);
                           for (const memberUid of teamDetails.memberUids) {
                               try {
                                   const userDoc = await getDoc(doc(db, 'users', memberUid));
@@ -263,6 +269,7 @@ export default function DashboardPage() {
                                   teamMembersNames[memberUid] = 'Unknown Member'; // Fallback on error
                               }
                           }
+                          console.log(`Fetched names for team ${teamDetails.teamName}:`, teamMembersNames);
                         }
                     }
                    } catch (teamError) {
@@ -285,11 +292,13 @@ export default function DashboardPage() {
             });
             const resolvedRegistrations = (await Promise.all(fetchedRegistrationsPromises)).filter(Boolean) as StudentRegisteredEventDisplay[];
             setStudentRegisteredFullEvents(resolvedRegistrations);
+            console.log("Final processed student events:", resolvedRegistrations);
           } catch (error) {
-            // Only show toast if user is still logged in. This prevents errors on logout.
             if (authUser) {
               console.error("Error fetching student registrations:", error);
               toast({ title: "Could not fetch events", description: "There was an issue loading your registered events. Please try again later.", variant: "destructive" });
+            } else {
+              console.log("Fetch error occurred after logout, suppressing toast.");
             }
           } finally {
             setLoadingStudentEvents(false);
@@ -298,13 +307,12 @@ export default function DashboardPage() {
         fetchStudentRegistrations();
       }
     } else {
-      // Clear data on logout
+      console.log("No user profile, clearing dashboard data.");
       setLocalUserProfileTasks([]); 
       setGlobalParticipants([]);
       setStudentRegisteredFullEvents([]);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authUser, userProfile, loading, router]); // toast was removed as it's stable
+  }, [authUser, userProfile, loading, router, toast]);
 
 
   const handleTaskCompletionToggle = (taskId: string) => {
@@ -1773,5 +1781,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
