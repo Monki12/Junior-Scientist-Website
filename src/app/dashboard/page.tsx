@@ -155,7 +155,7 @@ export default function DashboardPage() {
             
             const fetchedRegistrationsPromises = querySnapshot.docs.map(async (regDoc) => {
               const regData = regDoc.data() as EventRegistration;
-              const eventDetail = subEventsData.find(event => event.id === regData.eventId);
+              const eventDetail = subEventsData.find(event => event.id === regData.subEventId); // Match subEventId
               if (eventDetail) {
                 let teamDetails: EventTeam | undefined;
                 let teamMembersNames: Record<string, string> = {};
@@ -165,15 +165,22 @@ export default function DashboardPage() {
                     const teamDocRef = doc(db, 'event_teams', regData.teamId);
                     const teamDocSnap = await getDoc(teamDocRef);
                     if(teamDocSnap.exists()){
-                        teamDetails = teamDocSnap.data() as EventTeam;
-                        // Fetch member names (can be slow, consider optimization for many members)
-                        for (const memberUid of teamDetails.memberUids) {
-                            const userDoc = await getDoc(doc(db, 'users', memberUid));
-                            if (userDoc.exists()) {
-                                teamMembersNames[memberUid] = (userDoc.data() as UserProfileData).fullName || memberUid;
-                            } else {
-                                teamMembersNames[memberUid] = memberUid; // Fallback to UID
-                            }
+                        teamDetails = { id: teamDocSnap.id, ...teamDocSnap.data() } as EventTeam;
+                        if (teamDetails.memberUids) {
+                          for (const memberUid of teamDetails.memberUids) {
+                              try {
+                                  const userDoc = await getDoc(doc(db, 'users', memberUid));
+                                  if (userDoc.exists()) {
+                                      const userData = userDoc.data() as UserProfileData;
+                                      teamMembersNames[memberUid] = userData.fullName || userData.displayName || memberUid;
+                                  } else {
+                                      teamMembersNames[memberUid] = memberUid; // Fallback to UID
+                                  }
+                              } catch (userFetchError) {
+                                  console.warn(`Could not fetch profile for user ${memberUid}. Falling back to UID.`, userFetchError);
+                                  teamMembersNames[memberUid] = memberUid; // Fallback on error
+                              }
+                          }
                         }
                     }
                    } catch (teamError) {
@@ -1756,5 +1763,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    

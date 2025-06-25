@@ -98,12 +98,7 @@ service cloud.firestore {
                       (request.resource.data.credibilityScore == null || request.resource.data.credibilityScore is number);
 
       // Read permissions for user profiles
-      allow read: if isAuthenticated() && (
-        request.auth.uid == userId || // Users can read their own profile
-        isOverallOrAdmin()            // Overall Heads and Admins can read any user profile
-        // Direct read by Event Reps/Organizers to arbitrary user documents is restricted for efficiency.
-        // Participant info for specific events is usually accessed via denormalized data in 'event_registrations'.
-      );
+      allow read: if isAuthenticated(); // Any authenticated user can read public profile data.
 
       // Update permissions for user profiles
       allow update: if isAuthenticated() && (
@@ -393,5 +388,3 @@ service cloud.firestore {
     }
   }
 }
-
-    
