@@ -5,9 +5,13 @@ import React, { useState, useEffect, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import type { SubEvent, UserProfileData } from '@/types';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
 import { doc, updateDoc, deleteDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { format, parseISO, isValid } from 'date-fns';
+import Image from 'next/image';
+import dynamic from 'next/dynamic';
+import 'react-quill/dist/quill.snow.css';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,7 +24,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Loader2, Save, Trash2, CalendarIcon, ChevronDown } from 'lucide-react';
+import { Loader2, Save, Trash2, CalendarIcon, ChevronDown, Trash } from 'lucide-react';
+
+const ReactQuill = dynamic(() => import('react-quill'), { ssr: false });
 
 interface EditEventFormProps {
   event: SubEvent;
@@ -35,10 +41,17 @@ export function EditEventForm({ event }: EditEventFormProps) {
     eventDate: event.eventDate && isValid(parseISO(event.eventDate)) ? parseISO(event.eventDate) : null,
     organizerUids: event.organizerUids || [],
     eventReps: event.eventReps || [],
+    galleryImages: event.galleryImages || [],
   });
   const [allStaff, setAllStaff] = useState<UserProfileData[]>([]);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  
+  const [mainImageFile, setMainImageFile] = useState<File | null>(null);
+  const [mainImagePreview, setMainImagePreview] = useState<string | null>(event.mainImage.src);
+  const [galleryImageFiles, setGalleryImageFiles] = useState<File[]>([]);
+  const [galleryPreviews, setGalleryPreviews] = useState<string[]>([]);
+
 
   useEffect(() => {
     const fetchStaff = async () => {
@@ -54,23 +67,65 @@ export function EditEventForm({ event }: EditEventFormProps) {
   const handleInputChange = (field: keyof SubEvent, value: any) => {
     setFormData((prev: any) => ({ ...prev, [field]: value }));
   };
+  
+  const handleMainImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setMainImageFile(file);
+      setMainImagePreview(URL.createObjectURL(file));
+    }
+  };
+
+  const handleGalleryFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      setGalleryImageFiles(prev => [...prev, ...files]);
+      const newPreviews = files.map(file => URL.createObjectURL(file));
+      setGalleryPreviews(prev => [...prev, ...newPreviews]);
+    }
+  };
+
+  const removeGalleryPreview = (index: number) => {
+    setGalleryImageFiles(files => files.filter((_, i) => i !== index));
+    setGalleryPreviews(previews => previews.filter((_, i) => i !== index));
+  };
+
 
   const handleUpdate = async (e: FormEvent) => {
     e.preventDefault();
     setIsUpdating(true);
-
-    const dataToSave = {
-      ...formData,
-      deadline: formData.deadline ? formData.deadline.toISOString() : null,
-      eventDate: formData.eventDate ? formData.eventDate.toISOString() : null,
-      slug: formData.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, ''),
-    };
+    
+    const slug = formData.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+    let mainImageUrl = formData.mainImage.src;
 
     try {
-      const eventRef = doc(db, 'subEvents', event.id);
-      await updateDoc(eventRef, dataToSave);
-      toast({ title: "Event Updated", description: "Changes have been saved successfully." });
-      router.push(`/organizer/events/manage/${dataToSave.slug}`); // Navigate to new slug if title changed
+        if (mainImageFile) {
+            const imageRef = ref(storage, `event_images/${slug}/${mainImageFile.name}`);
+            await uploadBytes(imageRef, mainImageFile);
+            mainImageUrl = await getDownloadURL(imageRef);
+        }
+        
+        const uploadedGalleryUrls: SubEvent['galleryImages'] = [...formData.galleryImages];
+        for (const file of galleryImageFiles) {
+            const galleryImageRef = ref(storage, `event_images/${slug}/gallery/${file.name}_${Date.now()}`);
+            await uploadBytes(galleryImageRef, file);
+            const url = await getDownloadURL(galleryImageRef);
+            uploadedGalleryUrls.push({ src: url, alt: file.name, dataAiHint: 'event gallery' });
+        }
+
+        const dataToSave = {
+            ...formData,
+            deadline: formData.deadline ? formData.deadline.toISOString() : null,
+            eventDate: formData.eventDate ? formData.eventDate.toISOString() : null,
+            slug: slug,
+            mainImage: { ...formData.mainImage, src: mainImageUrl },
+            galleryImages: uploadedGalleryUrls,
+        };
+
+        const eventRef = doc(db, 'subEvents', event.id);
+        await updateDoc(eventRef, dataToSave);
+        toast({ title: "Event Updated", description: "Changes have been saved successfully." });
+        router.push(`/organizer/events/manage/${dataToSave.slug}`);
     } catch (error: any) {
       console.error("Error updating event:", error);
       toast({ title: "Update Failed", description: error.message || "Could not save changes.", variant: "destructive" });
@@ -104,7 +159,7 @@ export function EditEventForm({ event }: EditEventFormProps) {
               <Label htmlFor="title">Event Title</Label>
               <Input id="title" value={formData.title} onChange={e => handleInputChange('title', e.target.value)} required />
             </div>
-            <div>
+             <div>
                 <Label htmlFor="superpowerCategory">Superpower Category</Label>
                 <Select value={formData.superpowerCategory} onValueChange={val => handleInputChange('superpowerCategory', val)}>
                     <SelectTrigger id="superpowerCategory"><SelectValue /></SelectTrigger>
@@ -122,13 +177,13 @@ export function EditEventForm({ event }: EditEventFormProps) {
             </div>
             <div>
               <Label htmlFor="detailedDescription">Detailed Description</Label>
-              <Textarea id="detailedDescription" rows={6} value={formData.detailedDescription} onChange={e => handleInputChange('detailedDescription', e.target.value)} />
+              <ReactQuill theme="snow" value={formData.detailedDescription} onChange={value => handleInputChange('detailedDescription', value)} />
             </div>
             <div>
               <Label htmlFor="venue">Venue</Label>
               <Input id="venue" value={formData.venue} onChange={e => handleInputChange('venue', e.target.value)} />
             </div>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <Label htmlFor="eventDate">Event Date</Label>
                     <Popover>
@@ -156,6 +211,45 @@ export function EditEventForm({ event }: EditEventFormProps) {
                          <Calendar mode="single" selected={formData.deadline} onSelect={date => handleInputChange('deadline', date)} initialFocus />
                         </PopoverContent>
                     </Popover>
+                </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-lg mt-6">
+          <CardHeader><CardTitle>Media</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+                <Label htmlFor="mainImageFile">Main Event Image</Label>
+                <Input id="mainImageFile" type="file" accept="image/*" onChange={handleMainImageFileChange} />
+                {mainImagePreview && (
+                    <div className="mt-2 relative w-full h-40 rounded-md overflow-hidden border">
+                        <Image src={mainImagePreview} alt="Event image preview" fill style={{ objectFit: 'cover' }} />
+                    </div>
+                )}
+            </div>
+            <div>
+                <Label htmlFor="galleryImageFiles">Gallery Images (optional)</Label>
+                <Input id="galleryImageFiles" type="file" accept="image/*" multiple onChange={handleGalleryFilesChange} />
+                <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                    {/* Existing gallery images */}
+                    {formData.galleryImages.map((image: {src: string, alt: string}, index: number) => (
+                        <div key={index} className="relative group">
+                            <Image src={image.src} alt={image.alt} width={100} height={100} className="w-full h-24 object-cover rounded-md" />
+                            <Button type="button" size="icon" variant="destructive" className="absolute top-1 right-1 h-6 w-6 opacity-70 group-hover:opacity-100" onClick={() => handleInputChange('galleryImages', formData.galleryImages.filter((_: any, i: number) => i !== index))}>
+                                <Trash className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    ))}
+                    {/* New gallery image previews */}
+                    {galleryPreviews.map((src, index) => (
+                        <div key={index} className="relative group">
+                            <Image src={src} alt={`Gallery preview ${index + 1}`} width={100} height={100} className="w-full h-24 object-cover rounded-md" />
+                            <Button type="button" size="icon" variant="destructive" className="absolute top-1 right-1 h-6 w-6 opacity-70 group-hover:opacity-100" onClick={() => removeGalleryPreview(index)}>
+                                <Trash className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    ))}
                 </div>
             </div>
           </CardContent>

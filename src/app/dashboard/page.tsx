@@ -26,12 +26,17 @@ import { auth, db, storage } from '@/lib/firebase';
 import { collection, query, where, getDocs, doc, getDoc, updateDoc, serverTimestamp, addDoc, deleteDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
+import dynamic from 'next/dynamic';
+
 
 import { format, isToday, isPast, isThisWeek, startOfDay, parseISO, isValid } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import {
-  Loader2, BarChartBig, Edit, Users, FileScan, Settings, BookUser, ListChecks, CalendarDays, UserCircle, Bell, GraduationCap, School, Download, Info, Briefcase, Newspaper, Award, Star, CheckCircle, ClipboardList, TrendingUp, Building, Activity, ShieldCheck, ExternalLink, Home, Search, CalendarCheck, Ticket, Users2, Phone, Mail, Milestone, MapPin, Clock, UsersRound, CheckSquare, BarChartHorizontalBig, Rss, AlertTriangle, Filter as FilterIcon, PlusCircle, GanttChartSquare, Rows, Tag, XIcon, Pencil, Trash2, CalendarRange, LayoutDashboard, CalendarIcon, UploadCloud
+  Loader2, BarChartBig, Edit, Users, FileScan, Settings, BookUser, ListChecks, CalendarDays, UserCircle, Bell, GraduationCap, School, Download, Info, Briefcase, Newspaper, Award, Star, CheckCircle, ClipboardList, TrendingUp, Building, Activity, ShieldCheck, ExternalLink, Home, Search, CalendarCheck, Ticket, Users2, Phone, Mail, Milestone, MapPin, Clock, UsersRound, CheckSquare, BarChartHorizontalBig, Rss, AlertTriangle, Filter as FilterIcon, PlusCircle, GanttChartSquare, Rows, Tag, X as XIcon, Pencil, Trash2, CalendarRange, LayoutDashboard, CalendarIcon, UploadCloud, Image as ImageIcon, Trash
 } from 'lucide-react';
+
+
+const ReactQuill = dynamic(() => import('react-quill'), { ssr: false });
 
 
 const defaultEventFormState: Omit<SubEvent, 'id' | 'slug' | 'mainImage' | 'organizerUids'> & { mainImageSrc: string; mainImageAlt: string; mainImageAiHint: string; eventReps: string; organizers_str: string } = {
@@ -53,6 +58,7 @@ const defaultEventFormState: Omit<SubEvent, 'id' | 'slug' | 'mainImage' | 'organ
   eventReps: '',
   registeredParticipantCount: 0,
   organizers_str: '',
+  galleryImages: [],
 };
 
 
@@ -129,6 +135,8 @@ export default function DashboardPage() {
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [mainImageFile, setMainImageFile] = useState<File | null>(null);
+  const [galleryImageFiles, setGalleryImageFiles] = useState<File[]>([]);
+  const [galleryPreviews, setGalleryPreviews] = useState<string[]>([]);
 
 
   const [isDeleteEventConfirmOpen, setIsDeleteEventConfirmOpen] = useState(false);
@@ -357,11 +365,25 @@ export default function DashboardPage() {
             return;
         }
         setMainImageFile(file);
-        // Create a preview URL
         const previewUrl = URL.createObjectURL(file);
         setCurrentEventForm(f => ({ ...f, mainImageSrc: previewUrl }));
     }
   };
+
+  const handleGalleryFilesChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+     if (files.length > 0) {
+        setGalleryImageFiles(prev => [...prev, ...files]);
+        const newPreviews = files.map(file => URL.createObjectURL(file));
+        setGalleryPreviews(prev => [...prev, ...newPreviews]);
+     }
+  };
+  
+  const removeGalleryPreview = (index: number) => {
+    setGalleryImageFiles(files => files.filter((_, i) => i !== index));
+    setGalleryPreviews(previews => previews.filter((_, i) => i !== index));
+  };
+
 
   const handleEventFormSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -382,6 +404,17 @@ export default function DashboardPage() {
             imageUrl = await getDownloadURL(imageRef);
         }
 
+        const galleryImageUrls: SubEvent['galleryImages'] = editingEventId 
+          ? allPlatformEvents.find(e => e.id === editingEventId)?.galleryImages || [] 
+          : [];
+
+        for (const file of galleryImageFiles) {
+            const galleryImageRef = ref(storage, `event_images/${slug}/gallery/${file.name}_${Date.now()}`);
+            await uploadBytes(galleryImageRef, file);
+            const url = await getDownloadURL(galleryImageRef);
+            galleryImageUrls.push({ src: url, alt: file.name, dataAiHint: 'event gallery' });
+        }
+
         const eventDataToSave: Omit<SubEvent, 'id'| 'slug'> = {
             title: currentEventForm.title,
             superpowerCategory: currentEventForm.superpowerCategory,
@@ -392,6 +425,7 @@ export default function DashboardPage() {
                 alt: currentEventForm.mainImageAlt || currentEventForm.title,
                 dataAiHint: currentEventForm.mainImageAiHint || 'event placeholder'
             },
+            galleryImages: galleryImageUrls,
             registrationLink: currentEventForm.registrationLink,
             deadline: currentEventForm.deadline || null,
             eventDate: currentEventForm.eventDate || null,
@@ -421,6 +455,8 @@ export default function DashboardPage() {
         setEditingEventId(null);
         setCurrentEventForm(defaultEventFormState);
         setMainImageFile(null);
+        setGalleryImageFiles([]);
+        setGalleryPreviews([]);
     } catch(error) {
        console.error("Error saving event:", error);
        toast({ title: "Error Saving Event", description: (error as Error).message || "An unexpected error occurred.", variant: "destructive"});
@@ -434,11 +470,15 @@ export default function DashboardPage() {
     setEditingEventId(null);
     setCurrentEventForm(defaultEventFormState);
     setMainImageFile(null);
+    setGalleryImageFiles([]);
+    setGalleryPreviews([]);
     setIsEventFormDialogOpen(true);
   };
   const openEditEventDialog = (event: SubEvent) => {
     setEditingEventId(event.id);
     setMainImageFile(null);
+    setGalleryImageFiles([]);
+    setGalleryPreviews([]);
     setCurrentEventForm({
         ...defaultEventFormState,
         ...event,
@@ -468,8 +508,6 @@ export default function DashboardPage() {
       }
     }
   };
-
-  // ... other handler functions ...
 
   if (loading || !authUser || !userProfile) {
     return (
@@ -791,155 +829,167 @@ export default function DashboardPage() {
       )}
 
       {/* Dialog for Create/Edit Event */}
-        <Dialog open={isEventFormDialogOpen} onOpenChange={(isOpen) => {
+      <Dialog open={isEventFormDialogOpen} onOpenChange={(isOpen) => {
             if (isUploading) return;
             setIsEventFormDialogOpen(isOpen);
             if (!isOpen) {
                 setEditingEventId(null);
                 setCurrentEventForm(defaultEventFormState);
                 setMainImageFile(null);
+                setGalleryImageFiles([]);
+                setGalleryPreviews([]);
             }
         }}>
-            <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle>{editingEventId ? `Edit Event: ${currentEventForm.title}` : "Create New Event"}</DialogTitle>
-                    <DialogDescription>
-                       Fill in the details for the event. Click save when you&apos;re done.
-                    </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleEventFormSubmit} className="grid gap-4 py-4">
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <Label htmlFor="eventTitle">Event Title</Label>
-                            <Input id="eventTitle" value={currentEventForm.title} onChange={e => setCurrentEventForm(f => ({...f, title: e.target.value}))} required />
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+                <DialogTitle>{editingEventId ? `Edit Event: ${currentEventForm.title}` : "Create New Event"}</DialogTitle>
+                <DialogDescription>
+                    Fill in the details for the event. Click save when you&apos;re done.
+                </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleEventFormSubmit} className="grid gap-4 py-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <Label htmlFor="eventTitle">Event Title</Label>
+                        <Input id="eventTitle" value={currentEventForm.title} onChange={e => setCurrentEventForm(f => ({...f, title: e.target.value}))} required />
+                    </div>
+                    <div>
+                        <Label htmlFor="eventSuperpowerCategory">Superpower Category</Label>
+                        <Select value={currentEventForm.superpowerCategory} onValueChange={val => setCurrentEventForm(f => ({...f, superpowerCategory: val as any}))}>
+                            <SelectTrigger id="eventSuperpowerCategory"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="The Thinker">The Thinker</SelectItem>
+                                <SelectItem value="The Brainiac">The Brainiac</SelectItem>
+                                <SelectItem value="The Strategist">The Strategist</SelectItem>
+                                <SelectItem value="The Innovator">The Innovator</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+                    <div>
+                    <Label htmlFor="shortDescription">Short Description (for cards)</Label>
+                    <Textarea id="shortDescription" value={currentEventForm.shortDescription} onChange={e => setCurrentEventForm(f => ({...f, shortDescription: e.target.value}))} rows={2}/>
+                </div>
+                <div>
+                    <Label htmlFor="detailedDescription">Detailed Description (for event page)</Label>
+                    <ReactQuill theme="snow" value={currentEventForm.detailedDescription} onChange={value => setCurrentEventForm(f => ({ ...f, detailedDescription: value }))} />
+                </div>
+                <div>
+                    <Label htmlFor="mainImageFile">Main Event Image</Label>
+                    <Input id="mainImageFile" type="file" accept="image/*" onChange={handleImageFileChange} />
+                        {currentEventForm.mainImageSrc && (
+                        <div className="mt-2 relative w-full h-40 rounded-md overflow-hidden border">
+                            <Image src={currentEventForm.mainImageSrc} alt="Event image preview" fill style={{ objectFit: 'cover' }} />
                         </div>
-                        <div>
-                            <Label htmlFor="eventSuperpowerCategory">Superpower Category</Label>
-                            <Select value={currentEventForm.superpowerCategory} onValueChange={val => setCurrentEventForm(f => ({...f, superpowerCategory: val as any}))}>
-                                <SelectTrigger id="eventSuperpowerCategory"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="The Thinker">The Thinker</SelectItem>
-                                    <SelectItem value="The Brainiac">The Brainiac</SelectItem>
-                                    <SelectItem value="The Strategist">The Strategist</SelectItem>
-                                    <SelectItem value="The Innovator">The Innovator</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-                     <div>
-                        <Label htmlFor="shortDescription">Short Description (for cards)</Label>
-                        <Textarea id="shortDescription" value={currentEventForm.shortDescription} onChange={e => setCurrentEventForm(f => ({...f, shortDescription: e.target.value}))} rows={2}/>
-                    </div>
-                    <div>
-                        <Label htmlFor="detailedDescription">Detailed Description (for event page)</Label>
-                        <Textarea id="detailedDescription" value={currentEventForm.detailedDescription} onChange={e => setCurrentEventForm(f => ({...f, detailedDescription: e.target.value}))} rows={5}/>
-                    </div>
-                    <div>
-                        <Label htmlFor="mainImageFile">Event Image</Label>
-                        <Input id="mainImageFile" type="file" accept="image/*" onChange={handleImageFileChange} />
-                         {currentEventForm.mainImageSrc && (
-                            <div className="mt-2 relative w-full h-40 rounded-md overflow-hidden border">
-                                <Image src={currentEventForm.mainImageSrc} alt="Event image preview" fill style={{ objectFit: 'cover' }} />
-                            </div>
-                        )}
-                    </div>
-                    <div>
-                        <Label htmlFor="mainImageAlt">Image Alt Text (for accessibility)</Label>
-                        <Input id="mainImageAlt" value={currentEventForm.mainImageAlt} onChange={e => setCurrentEventForm(f => ({...f, mainImageAlt: e.target.value}))} placeholder="e.g., Students collaborating on a project"/>
-                    </div>
-                    <div>
-                        <Label htmlFor="mainImageAiHint">Image AI Hint</Label>
-                        <Input id="mainImageAiHint" value={currentEventForm.mainImageAiHint} onChange={e => setCurrentEventForm(f => ({...f, mainImageAiHint: e.target.value}))} placeholder="e.g., science experiment"/>
-                    </div>
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <Label htmlFor="eventDateForm">Event Date</Label>
-                             <Popover>
-                                <PopoverTrigger asChild>
-                                <Button id="eventDateForm" variant="outline" className={`w-full justify-start text-left font-normal ${!currentEventForm.eventDate && "text-muted-foreground"}`}>
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {currentEventForm.eventDate && isValid(currentEventForm.eventDate) ? format(currentEventForm.eventDate, "PPP") : <span>Pick a date</span>}
-                                </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0">
-                                <Calendar mode="single" selected={currentEventForm.eventDate} onSelect={date => setCurrentEventForm(f => ({...f, eventDate: date || null}))} initialFocus />
-                                </PopoverContent>
-                            </Popover>
-                        </div>
-                        <div>
-                            <Label htmlFor="eventDeadlineForm">Registration Deadline</Label>
-                             <Popover>
-                                <PopoverTrigger asChild>
-                                <Button id="eventDeadlineForm" variant="outline" className={`w-full justify-start text-left font-normal ${!currentEventForm.deadline && "text-muted-foreground"}`}>
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {currentEventForm.deadline && isValid(currentEventForm.deadline) ? format(currentEventForm.deadline, "PPP") : <span>Pick a date</span>}
-                                </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0">
-                                <Calendar mode="single" selected={currentEventForm.deadline} onSelect={date => setCurrentEventForm(f => ({...f, deadline: date || null}))} initialFocus />
-                                </PopoverContent>
-                            </Popover>
-                        </div>
-                    </div>
-                     <div className="space-y-2">
-                        <Label>Team Settings</Label>
-                        <div className='flex items-center space-x-2'>
-                           <Checkbox id="isTeamBased" checked={currentEventForm.isTeamBased} onCheckedChange={checked => setCurrentEventForm(f => ({...f, isTeamBased: !!checked}))} />
-                           <Label htmlFor='isTeamBased'>This is a team-based event</Label>
-                        </div>
-                        {currentEventForm.isTeamBased && (
-                            <div className='grid grid-cols-2 gap-4 pl-6'>
-                               <div>
-                                 <Label htmlFor="minTeamMembers">Min Team Size</Label>
-                                 <Input id="minTeamMembers" type="number" value={currentEventForm.minTeamMembers} onChange={e => setCurrentEventForm(f => ({...f, minTeamMembers: Number(e.target.value)}))} />
-                               </div>
-                               <div>
-                                 <Label htmlFor="maxTeamMembers">Max Team Size</Label>
-                                 <Input id="maxTeamMembers" type="number" value={currentEventForm.maxTeamMembers} onChange={e => setCurrentEventForm(f => ({...f, maxTeamMembers: Number(e.target.value)}))} />
-                               </div>
-                            </div>
-                        )}
-                    </div>
-                    <div>
-                        <Label htmlFor="eventReps">Event Representative UIDs (comma-separated)</Label>
-                        <Input id="eventReps" value={currentEventForm.eventReps} onChange={e => setCurrentEventForm(f => ({...f, eventReps: e.target.value}))} />
-                    </div>
-                     <div>
-                        <Label htmlFor="organizers_str">Organizer UIDs (comma-separated)</Label>
-                        <Input id="organizers_str" value={currentEventForm.organizers_str} onChange={e => setCurrentEventForm(f => ({...f, organizers_str: e.target.value}))} />
-                    </div>
-                    <div>
-                        <Label htmlFor="venue">Venue</Label>
-                        <Input id="venue" value={currentEventForm.venue} onChange={e => setCurrentEventForm(f => ({...f, venue: e.target.value}))} />
-                    </div>
-                    <DialogFooter>
-                        <DialogClose asChild><Button type="button" variant="outline" disabled={isUploading}>Cancel</Button></DialogClose>
-                        <Button type="submit" disabled={isUploading}>
-                            {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                            {isUploading ? "Saving..." : "Save Event"}
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
+                    )}
+                </div>
 
-        <AlertDialog open={isDeleteEventConfirmOpen} onOpenChange={setIsDeleteEventConfirmOpen}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete the event
-                        &quot;{eventToDelete?.title}&quot; and all associated registrations.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={confirmDeleteEvent} className="bg-destructive hover:bg-destructive/90">
-                        Yes, delete event
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
+                <div>
+                    <Label htmlFor="galleryImageFiles">Gallery Images (optional)</Label>
+                    <Input id="galleryImageFiles" type="file" accept="image/*" multiple onChange={handleGalleryFilesChange} />
+                    <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                        {galleryPreviews.map((src, index) => (
+                            <div key={index} className="relative group">
+                                <Image src={src} alt={`Gallery preview ${index + 1}`} width={100} height={100} className="w-full h-24 object-cover rounded-md" />
+                                <Button type="button" size="icon" variant="destructive" className="absolute top-1 right-1 h-6 w-6 opacity-70 group-hover:opacity-100" onClick={() => removeGalleryPreview(index)}>
+                                    <Trash className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <Label htmlFor="eventDateForm">Event Date</Label>
+                            <Popover>
+                            <PopoverTrigger asChild>
+                            <Button id="eventDateForm" variant="outline" className={`w-full justify-start text-left font-normal ${!currentEventForm.eventDate && "text-muted-foreground"}`}>
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {currentEventForm.eventDate && isValid(currentEventForm.eventDate) ? format(currentEventForm.eventDate, "PPP") : <span>Pick a date</span>}
+                            </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                            <Calendar mode="single" selected={currentEventForm.eventDate ?? undefined} onSelect={date => setCurrentEventForm(f => ({...f, eventDate: date ?? null}))} initialFocus />
+                            </PopoverContent>
+                        </Popover>
+                    </div>
+                    <div>
+                        <Label htmlFor="eventDeadlineForm">Registration Deadline</Label>
+                            <Popover>
+                            <PopoverTrigger asChild>
+                            <Button id="eventDeadlineForm" variant="outline" className={`w-full justify-start text-left font-normal ${!currentEventForm.deadline && "text-muted-foreground"}`}>
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {currentEventForm.deadline && isValid(currentEventForm.deadline) ? format(currentEventForm.deadline, "PPP") : <span>Pick a date</span>}
+                            </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                            <Calendar mode="single" selected={currentEventForm.deadline ?? undefined} onSelect={date => setCurrentEventForm(f => ({...f, deadline: date ?? null}))} initialFocus />
+                            </PopoverContent>
+                        </Popover>
+                    </div>
+                </div>
+                    <div className="space-y-2">
+                    <Label>Team Settings</Label>
+                    <div className='flex items-center space-x-2'>
+                        <Checkbox id="isTeamBased" checked={currentEventForm.isTeamBased} onCheckedChange={checked => setCurrentEventForm(f => ({...f, isTeamBased: !!checked}))} />
+                        <Label htmlFor='isTeamBased'>This is a team-based event</Label>
+                    </div>
+                    {currentEventForm.isTeamBased && (
+                        <div className='grid grid-cols-2 gap-4 pl-6'>
+                            <div>
+                                <Label htmlFor="minTeamMembers">Min Team Size</Label>
+                                <Input id="minTeamMembers" type="number" value={currentEventForm.minTeamMembers} onChange={e => setCurrentEventForm(f => ({...f, minTeamMembers: Number(e.target.value)}))} />
+                            </div>
+                            <div>
+                                <Label htmlFor="maxTeamMembers">Max Team Size</Label>
+                                <Input id="maxTeamMembers" type="number" value={currentEventForm.maxTeamMembers} onChange={e => setCurrentEventForm(f => ({...f, maxTeamMembers: Number(e.target.value)}))} />
+                            </div>
+                        </div>
+                    )}
+                </div>
+                <div>
+                    <Label htmlFor="eventReps">Event Representative UIDs (comma-separated)</Label>
+                    <Input id="eventReps" value={currentEventForm.eventReps} onChange={e => setCurrentEventForm(f => ({...f, eventReps: e.target.value}))} />
+                </div>
+                    <div>
+                    <Label htmlFor="organizers_str">Organizer UIDs (comma-separated)</Label>
+                    <Input id="organizers_str" value={currentEventForm.organizers_str} onChange={e => setCurrentEventForm(f => ({...f, organizers_str: e.target.value}))} />
+                </div>
+                <div>
+                    <Label htmlFor="venue">Venue</Label>
+                    <Input id="venue" value={currentEventForm.venue} onChange={e => setCurrentEventForm(f => ({...f, venue: e.target.value}))} />
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild><Button type="button" variant="outline" disabled={isUploading}>Cancel</Button></DialogClose>
+                    <Button type="submit" disabled={isUploading}>
+                        {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        {isUploading ? "Saving..." : "Save Event"}
+                    </Button>
+                </DialogFooter>
+            </form>
+        </DialogContent>
+      </Dialog>
+      
+      <AlertDialog open={isDeleteEventConfirmOpen} onOpenChange={setIsDeleteEventConfirmOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete the event
+                    &quot;{eventToDelete?.title}&quot; and all associated registrations.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <Button variant="outline" onClick={() => setIsDeleteEventConfirmOpen(false)}>Cancel</Button>
+              <Button onClick={confirmDeleteEvent} className="bg-destructive hover:bg-destructive/90">
+                  Yes, delete event
+              </Button>
+            </AlertDialogFooter>
+        </AlertDialogContent>
       </AlertDialog>
     </div>
   );
 }
+
+    

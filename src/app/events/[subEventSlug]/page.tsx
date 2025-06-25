@@ -21,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, CalendarDays, ExternalLink, Info, Users, CheckCircle, Loader2, UserCheck, UserPlus, PlusCircle, AlertTriangle, Ticket, Search as SearchIcon } from 'lucide-react';
+import { ArrowLeft, CalendarDays, ExternalLink, Info, Users, CheckCircle, Loader2, UserCheck, UserPlus, PlusCircle, AlertTriangle, Ticket, Search as SearchIcon, ImageIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
@@ -362,7 +362,7 @@ export default function SubEventDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="prose prose-invert dark:prose-invert max-w-none text-foreground/90 text-lg leading-relaxed">
-            <p>{event.detailedDescription}</p>
+            <div dangerouslySetInnerHTML={{ __html: event.detailedDescription }} />
             {event.isTeamBased && (
               <p className="mt-2 text-sm text-accent">
                 Team size: {event.minTeamMembers || 1} - {event.maxTeamMembers || 'N/A'} members.
@@ -370,6 +370,24 @@ export default function SubEventDetailPage() {
             )}
           </CardContent>
         </Card>
+        
+        {event.galleryImages && event.galleryImages.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center text-2xl text-accent">
+                <ImageIcon className="mr-2 h-6 w-6" />
+                Gallery
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {event.galleryImages.map((image, index) => (
+                    <div key={index} className="relative aspect-square rounded-lg overflow-hidden shadow-md">
+                        <Image src={image.src} alt={image.alt} fill style={{ objectFit: 'cover' }} data-ai-hint={image.dataAiHint} />
+                    </div>
+                ))}
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="bg-accent/10 border-accent">
           <CardHeader>
