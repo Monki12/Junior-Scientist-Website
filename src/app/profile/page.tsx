@@ -14,7 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, UserCircle, Mail, Shield, LogOut, ArrowLeft, CalendarDays, Info, Users, GraduationCap, School, Edit3, Check, X } from 'lucide-react';
+import { Loader2, UserCircle, Mail, Shield, LogOut, ArrowLeft, CalendarDays, Info, Users, GraduationCap, School, Edit3, Check, X, Building, Tag } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
@@ -49,6 +49,7 @@ export default function ProfilePage() {
         phoneNumbers: userProfile.phoneNumbers || [''],
         additionalNumber: userProfile.additionalNumber || '',
         photoURL: userProfile.photoURL || '',
+        department: userProfile.department || '',
       });
 
       if ((userProfile.role === 'student' || userProfile.role === 'test') && userProfile.registeredEvents) {
@@ -87,26 +88,36 @@ export default function ProfilePage() {
     setIsUpdating(true);
     
     try {
-      const numericStandard = parseInt(editableProfile.standard || '0', 10);
-      if (isNaN(numericStandard) || numericStandard < 4 || numericStandard > 12) {
-        toast({ title: 'Invalid Grade', description: 'Standard must be a number between 4 and 12.', variant: 'destructive' });
-        setIsUpdating(false);
-        return;
+      if (userProfile.role === 'student' || userProfile.role === 'test') {
+        const numericStandard = parseInt(editableProfile.standard || '0', 10);
+        if (isNaN(numericStandard) || numericStandard < 4 || numericStandard > 12) {
+          toast({ title: 'Invalid Grade', description: 'Standard must be a number between 4 and 12.', variant: 'destructive' });
+          setIsUpdating(false);
+          return;
+        }
       }
       
       const userDocRef = doc(db, 'users', authUser.uid);
       
+      // Build update object based on what is editable for the role
       const updatesToSave: Partial<UserProfileData> = {
-        schoolName: editableProfile.schoolName,
-        standard: editableProfile.standard,
-        division: editableProfile.division || null,
         phoneNumbers: (editableProfile.phoneNumbers || []).filter(Boolean),
         additionalNumber: editableProfile.additionalNumber || null,
         photoURL: editableProfile.photoURL || null,
-        // If school name is changed, verification status is reset
-        schoolVerifiedByOrganizer: userProfile.schoolName === editableProfile.schoolName ? userProfile.schoolVerifiedByOrganizer : false,
         updatedAt: serverTimestamp(),
       };
+      
+      if (userProfile.role === 'student' || userProfile.role === 'test') {
+        updatesToSave.schoolName = editableProfile.schoolName;
+        updatesToSave.standard = editableProfile.standard;
+        updatesToSave.division = editableProfile.division || null;
+        updatesToSave.schoolVerifiedByOrganizer = userProfile.schoolName === editableProfile.schoolName ? userProfile.schoolVerifiedByOrganizer : false;
+      }
+      
+      if (userProfile.role !== 'student') {
+        updatesToSave.department = editableProfile.department;
+      }
+
 
       await updateDoc(userDocRef, updatesToSave);
 
@@ -149,6 +160,8 @@ export default function ProfilePage() {
   const currentDisplayName = userProfile.fullName || userProfile.displayName;
   const avatarFallback = (currentDisplayName?.[0])?.toUpperCase() || (displayEmail?.[0])?.toUpperCase() || 'U';
   const currentPhotoURL = userProfile?.photoURL || authUser.photoURL;
+  const isStudentRole = userProfile.role === 'student' || userProfile.role === 'test';
+  const isOrganizerRole = !isStudentRole;
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-fade-in-up">
@@ -173,7 +186,8 @@ export default function ProfilePage() {
           <CardTitle className="text-2xl">{currentDisplayName || 'User Profile'}</CardTitle>
           <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 mt-1">
             {displayEmail && <p className="text-sm text-muted-foreground flex items-center gap-1.5"><Mail className="h-4 w-4"/>{displayEmail}</p>}
-            {userProfile.shortId && <p className="text-sm text-muted-foreground flex items-center gap-1.5"><Shield className="h-4 w-4"/>ID: {userProfile.shortId}</p>}
+            {userProfile.shortId && isStudentRole && <p className="text-sm text-muted-foreground flex items-center gap-1.5"><Shield className="h-4 w-4"/>ID: {userProfile.shortId}</p>}
+            {userProfile.collegeRollNumber && isOrganizerRole && <p className="text-sm text-muted-foreground flex items-center gap-1.5"><Shield className="h-4 w-4"/>Roll No: {userProfile.collegeRollNumber}</p>}
           </div>
            {userProfile.role && (
             <Badge variant="secondary" className="mt-2 capitalize text-sm py-1 px-3">
@@ -192,8 +206,28 @@ export default function ProfilePage() {
               <Label htmlFor="email">Email Address</Label>
               <Input id="email" value={displayEmail || 'N/A'} disabled />
             </div>
+            
+            {isOrganizerRole && (
+                 <div className="space-y-1">
+                    <Label htmlFor="collegeRollNumber">College Roll Number</Label>
+                    <Input id="collegeRollNumber" value={userProfile.collegeRollNumber || 'N/A'} disabled />
+                 </div>
+            )}
+            {isOrganizerRole && (
+                 <div className="space-y-1">
+                    <Label htmlFor="department">Department</Label>
+                    {isEditing ? (
+                        <Input id="department" value={editableProfile?.department || ''} onChange={(e) => handleInputChange('department', e.target.value)} placeholder="e.g., Computer Science" />
+                    ) : (
+                        <p className="text-base p-2 min-h-[40px] bg-muted/50 rounded-md">{userProfile.department || 'Not Set'}</p>
+                    )}
+                 </div>
+            )}
 
-            {/* --- Editable Section --- */}
+
+            {/* --- Student-Specific Editable Section --- */}
+            {isStudentRole && (
+            <>
              <div className="space-y-1">
               <Label htmlFor="schoolName">School Name</Label>
               {isEditing ? (
@@ -234,7 +268,10 @@ export default function ProfilePage() {
                 <p className="text-base p-2 min-h-[40px] bg-muted/50 rounded-md">{userProfile.division || 'Not Set'}</p>
               )}
             </div>
+            </>
+            )}
 
+            {/* --- Common Editable section --- */}
             <div className="space-y-1">
               <Label htmlFor="phoneNumber">Primary Phone Number</Label>
               {isEditing ? (

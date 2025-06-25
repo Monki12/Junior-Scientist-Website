@@ -36,6 +36,7 @@ export interface Task {
   createdBy?: string; // UID of creator
   createdAt: string; // ISO Date string
   updatedAt: string; // ISO Date string
+  completedAt?: string; // ISO Date string for when task was completed
   customTaskData?: Record<string, any>;
 }
 
@@ -55,6 +56,7 @@ export interface UserProfileData {
   fullName?: string;
   displayName?: string;
   shortId?: string;
+  collegeRollNumber?: string | null;
   schoolName?: string;
   schoolId?: string | null;
   schoolVerifiedByOrganizer?: boolean;
@@ -65,6 +67,7 @@ export interface UserProfileData {
   department?: string;
   assignedEventSlug?: string;
   assignedEventSlugs?: string[];
+  subEventsManaged?: string[];
   phoneNumbers?: string[];
   additionalNumber?: string | null;
   tasks?: Task[];
@@ -76,7 +79,6 @@ export interface UserProfileData {
   registeredEventIds?: string[]; 
   teamIds?: string[];
   registeredEvents?: any[];
-  subEventsManaged?: string[];
 }
 
 export interface SubEvent {
@@ -94,7 +96,7 @@ export interface SubEvent {
   isTeamBased: boolean; // CRITICAL for new logic
   minTeamMembers?: number;
   maxTeamMembers?: number;
-  eventReps?: string[];
+  eventReps?: string[]; // Changed from organizerUids
   status?: EventStatus;
   venue?: string;
   registeredParticipantCount?: number;

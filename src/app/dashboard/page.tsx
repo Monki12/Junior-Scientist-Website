@@ -33,25 +33,14 @@ import {
   Loader2, BarChartBig, Edit, Users, FileScan, Settings, BookUser, ListChecks, CalendarDays, UserCircle, Bell, GraduationCap, School, Download, Info, Briefcase, Newspaper, Award, Star, CheckCircle, ClipboardList, TrendingUp, Building, Activity, ShieldCheck, ExternalLink, Home, Search, CalendarCheck, Ticket, Users2, Phone, Mail, Milestone, MapPin, Clock, UsersRound, CheckSquare, BarChartHorizontalBig, Rss, AlertTriangle, Filter as FilterIcon, PlusCircle, GanttChartSquare, Rows, Tag, XIcon, Pencil, Trash2, CalendarRange, LayoutDashboard, CalendarIcon
 } from 'lucide-react';
 
+// Mock Data Definitions (Simplified for clarity, as requested)
 const mockUserProfiles: Record<UserRole, Partial<UserProfileData>> = {
-  student: {
-    uid: 'mock-student-uid-12345', email: 'student.test@example.com', fullName: 'Alex Johnson', displayName: 'Alex Johnson', role: 'student',
-  },
-  organizer: {
-    uid: 'mock-organizer-uid', email: 'organizer.test@example.com', displayName: 'Test Organizer Alice', role: 'organizer',
-  },
-  event_representative: {
-    uid: 'mock-representative-uid', email: 'representative.test@example.com', displayName: 'Test Event Rep Bob', role: 'event_representative',
-  },
-  overall_head: {
-    uid: 'mock-overall-head-uid', email: 'overall.test@example.com', displayName: 'Test Overall Head Carol', role: 'overall_head',
-  },
-  admin: {
-    uid: 'mock-admin-uid', email: 'admin.test@example.com', displayName: 'Test Admin Dave', role: 'admin',
-  },
-  test: {
-    uid: 'mock-test-uid-67890', email: 'generic.test@example.com', displayName: 'Sam Williams (Test)', role: 'test',
-  }
+  student: { uid: 'mock-student-uid-12345', email: 'student.test@example.com', displayName: 'Alex Johnson' },
+  organizer: { uid: 'mock-organizer-uid', email: 'organizer.test@example.com', displayName: 'Test Organizer Alice' },
+  event_representative: { uid: 'mock-representative-uid', email: 'representative.test@example.com', displayName: 'Test Event Rep Bob' },
+  overall_head: { uid: 'mock-overall-head-uid', email: 'overall.test@example.com', displayName: 'Test Overall Head Carol' },
+  admin: { uid: 'mock-admin-uid', email: 'admin.test@example.com', displayName: 'Test Admin Dave' },
+  test: { uid: 'mock-test-uid-67890', email: 'generic.test@example.com', displayName: 'Sam Williams (Test)' }
 };
 
 
