@@ -1,4 +1,3 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -43,10 +42,10 @@ service cloud.firestore {
     // IMPORTANT: If sub-event data is still local (e.g., src/data/subEvents.ts),
     // this rule helper will not function correctly. Migrate sub-event data to Firestore.
     function isAssignedToSubEvent(subEventId) {
+      // This is a placeholder for actual Firestore data check
+      // For now, it might rely on denormalized roles in user profiles for broader access
       return isAuthenticated() && (
-        isOverallOrAdmin() ||
-        (isEventRepresentative() && get(/databases/$(database)/documents/subEvents/$(subEventId)).data.eventReps.hasAny([request.auth.uid])) ||
-        (isOrganizer() && get(/databases/$(database)/documents/subEvents/$(subEventId)).data.eventReps.hasAny([request.auth.uid]))
+        isOverallOrAdmin() || isEventRepresentative() || isOrganizer()
       );
     }
 
@@ -59,6 +58,20 @@ service cloud.firestore {
                       request.auth.uid == userId && // User must create their own profile
                       request.resource.data.role == 'student' && // Role must be 'student' for self-creation
                       request.resource.data.email == request.auth.token.email && // Email must match authenticated token
+                      // All fields in the new document must be from the allowed set (mandatory + optional)
+                      request.resource.data.keys().hasAll([ // Ensure all mandatory fields are present
+                        'fullName', 'email', 'role', 'schoolName', 'standard', 'phoneNumbers',
+                        'createdAt', 'updatedAt', 'schoolId', 'schoolVerifiedByOrganizer',
+                        'division', 'additionalNumber', 'photoURL', 'registeredEvents',
+                        'subEventsManaged', 'points', 'credibilityScore'
+                      ]) &&
+                      request.resource.data.keys().hasOnly([ // Ensure no unauthorized/unexpected fields are present
+                        'fullName', 'email', 'role', 'schoolName', 'standard',
+                        'division', 'schoolId', 'schoolVerifiedByOrganizer',
+                        'phoneNumbers', 'photoURL', 'additionalNumber',
+                        'registeredEvents', 'subEventsManaged',
+                        'points', 'credibilityScore', 'createdAt', 'updatedAt'
+                      ]) &&
                       // Mandatory fields and their types
                       request.resource.data.fullName is string &&
                       request.resource.data.email is string &&
@@ -72,33 +85,19 @@ service cloud.firestore {
                       // Ensure timestamps are set by the server (client uses serverTimestamp())
                       request.resource.data.createdAt == request.time &&
                       request.resource.data.updatedAt == request.time &&
-                      // All fields in the new document must be from the allowed set (mandatory + optional)
-                      request.resource.data.keys().hasAll([ // Ensure all mandatory fields are present
-                        'fullName', 'email', 'role', 'schoolName', 'standard', 'phoneNumbers',
-                        'createdAt', 'updatedAt'
-                      ]) &&
-                      request.resource.data.keys().hasOnly([ // Ensure no unauthorized/unexpected fields are present
-                        'fullName', 'email', 'role', 'schoolName', 'standard',
-                        'division', 'schoolId', 'schoolVerifiedByOrganizer',
-                        'phoneNumbers', 'photoURL', 'additionalNumber',
-                        'registeredEvents', 'subEventsManaged',
-                        'points', 'credibilityScore', 'createdAt', 'updatedAt'
-                      ]) &&
                       // Validate types for optional fields if they are present
                       (request.resource.data.division == null || request.resource.data.division is string) &&
                       (request.resource.data.schoolId == null || request.resource.data.schoolId is string) &&
-                      (request.resource.data.schoolVerifiedByOrganizer == null || request.resource.data.schoolVerifiedByOrganizer is bool) &&
-                      // PhoneNumbers list elements are expected to be strings based on earlier validation.
-                      // The previous 'every' check was causing parser issues and is removed.
+                      (request.resource.data.schoolVerifiedByOrganizer is bool) &&
                       (request.resource.data.photoURL == null || request.resource.data.photoURL is string) &&
                       (request.resource.data.additionalNumber == null || request.resource.data.additionalNumber is string) &&
-                      (request.resource.data.registeredEvents == null || request.resource.data.registeredEvents is list) &&
-                      (request.resource.data.subEventsManaged == null || request.resource.data.subEventsManaged is list) &&
-                      (request.resource.data.points == null || request.resource.data.points is number) &&
-                      (request.resource.data.credibilityScore == null || request.resource.data.credibilityScore is number);
+                      (request.resource.data.registeredEvents is list) &&
+                      (request.resource.data.subEventsManaged is list) &&
+                      (request.resource.data.points is number) &&
+                      (request.resource.data.credibilityScore is number);
 
       // Read permissions for user profiles
-      allow read: if isAuthenticated(); // Any authenticated user can read public profile data.
+      allow read: if isAuthenticated(); // Allow any authenticated user to read public profile info
 
       // Update permissions for user profiles
       allow update: if isAuthenticated() && (
@@ -106,8 +105,8 @@ service cloud.firestore {
         (request.auth.uid == userId &&
          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
            'fullName', 'schoolName', 'standard', 'division',
-           'phoneNumbers', 'photoURL', 'additionalNumber', // Allow these for update
-           'updatedAt', 'registeredEvents', 'teamId'
+           'phoneNumbers', 'photoURL', 'additionalNumber',
+           'updatedAt'
          ]) &&
          request.resource.data.updatedAt == request.time // Enforce serverTimestamp for updatedAt
         ) ||
@@ -117,10 +116,10 @@ service cloud.firestore {
            'fullName', 'email', 'role', 'schoolName', 'standard', 'division', 'schoolId',
            'schoolVerifiedByOrganizer', 'phoneNumbers', 'photoURL', 'additionalNumber',
            'registeredEvents', 'subEventsManaged',
-           'points', 'credibilityScore', 'updatedAt', 'teamId'
+           'points', 'credibilityScore', 'updatedAt'
          ]) &&
          request.resource.data.updatedAt == request.time && // Enforce serverTimestamp for updatedAt
-         request.resource.data.role in ['student', 'organizer', 'event_representative', 'overall_head', 'admin'] // Validate role changes
+         request.resource.data.role in ['student', 'organizer', 'event_representative', 'overall_head', 'admin', 'test'] // Validate role changes
         )
       );
 
@@ -138,35 +137,7 @@ service cloud.firestore {
     // (Individual sub-events like 'Robotics Challenge')
     match /subEvents/{subEventId} {
       allow read: if true; // Publicly readable for sub-event listings
-      // Only Overall Heads and Admins can create sub-events
-      allow create: if isOverallOrAdmin() &&
-                      request.resource.data.keys().hasAll([
-                        'eventName', 'description', 'date', 'time', 'location',
-                        'eventReps', 'parentEventId', 'createdAt', 'updatedAt', 'status'
-                      ]) &&
-                      request.resource.data.eventName is string &&
-                      request.resource.data.description is string &&
-                      request.resource.data.date is timestamp &&
-                      request.resource.data.time is string &&
-                      request.resource.data.location is string &&
-                      request.resource.data.eventReps is list && // Array of UIDs assigned as reps/organizers
-                      request.resource.data.parentEventId is string &&
-                      request.resource.data.createdAt is timestamp &&
-                      request.resource.data.updatedAt is timestamp &&
-                      request.resource.data.status is string &&
-                      request.resource.data.createdAt == request.time && // Enforce serverTimestamp
-                      request.resource.data.updatedAt == request.time && // Enforce serverTimestamp
-                      request.resource.data.keys().hasOnly([ // Allowed fields for creation
-                        'eventName', 'description', 'date', 'time', 'location', 'eventReps',
-                        'parentEventId', 'createdAt', 'updatedAt', 'status',
-                        'maxParticipants', 'currentParticipantsCount' // Optional fields
-                      ]) &&
-                      (request.resource.data.maxParticipants == null || request.resource.data.maxParticipants is number) &&
-                      (request.resource.data.currentParticipantsCount == null || request.resource.data.currentParticipantsCount is number);
-
-      // Overall Heads/Admins can update/delete any sub-event
-      // Event Reps/Organizers can update/delete only sub-events they are assigned to
-      allow update, delete: if isAssignedToSubEvent(subEventId);
+      allow create, update, delete: if isOverallOrAdmin();
     }
 
     // --- Event Registrations Collection Rules ---
@@ -218,7 +189,7 @@ service cloud.firestore {
          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
            'admitCardUrl', 'presentee', 'registrationStatus', 'submittedDocuments', 'lastUpdatedAt'
          ]) &&
-         request.resource.data.presentee is bool &&
+         (request.resource.data.presentee == null || request.resource.data.presentee is bool) &&
          request.resource.data.registrationStatus in ['approved', 'declined', 'pending', 'cancelled', 'attended'] &&
          (request.resource.data.admitCardUrl == null || request.resource.data.admitCardUrl is string) &&
          (request.resource.data.submittedDocuments == null || request.resource.data.submittedDocuments is list) &&
@@ -257,28 +228,17 @@ service cloud.firestore {
                       ]); // No other optional fields for teams on create.
 
       // Read permissions for teams (BROADER for team search/joining)
-      allow read: if isAuthenticated() && (
-        resource.data.memberUids.hasAny([request.auth.uid]) || // Team members can read their team
-        isOverallOrAdmin() || // Overall Heads/Admins can read all teams
-        isAssignedToSubEvent(resource.data.eventId) || // Event Reps/Organizers can read teams for their assigned sub-events
-        isStudent() // Allows students to read all teams (for joining/browsing)
-      );
+      allow read: if isAuthenticated();
 
       // Update permissions for teams
       allow update: if isAuthenticated() && (
-        // Team Leader can update team name, members, and team size
+        // Team Leader can update team name
         (request.auth.uid == resource.data.teamLeaderId &&
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-           'teamName', 'memberUids', 'teamSize', 'updatedAt'
-         ]) &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['teamName', 'updatedAt']) &&
          request.resource.data.teamName is string &&
-         request.resource.data.memberUids is list &&
-         request.resource.data.memberUids.hasAll([request.auth.uid]) && // Leader must remain a member
-         request.resource.data.teamSize is number &&
-         request.resource.data.teamSize == resource.data.memberUids.size() &&
          request.resource.data.updatedAt == request.time
         ) ||
-        // Overall Heads, Admins, Event Reps, and Organizers can update team status
+        // Organizers can update team status
         (isAssignedToSubEvent(resource.data.eventId) &&
          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']) &&
          request.resource.data.status in ['approved', 'disqualified', 'pending'] &&
@@ -286,14 +246,24 @@ service cloud.firestore {
         ) ||
         // Student joins an existing team:
         (isStudent() &&
-         request.auth.uid != resource.data.teamLeaderId && // Student must not be the leader
-         !resource.data.memberUids.hasAny([request.auth.uid]) && // Student must not already be a member
-         request.resource.data.memberUids.hasAll(resource.data.memberUids.concat([request.auth.uid])) && // New list has existing + current user
-         request.resource.data.memberUids.size() == resource.data.memberUids.size() + 1 && // Size incremented by 1
-         request.resource.data.teamSize == resource.data.teamSize + 1 && // Team size incremented by 1
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberUids', 'teamSize', 'updatedAt']) && // Only these fields can change
-         request.resource.data.memberUids is list &&
-         request.resource.data.teamSize is number &&
+         request.auth.uid != resource.data.teamLeaderId &&
+         !resource.data.memberUids.hasAny([request.auth.uid]) &&
+         request.resource.data.memberUids.size() == resource.data.memberUids.size() + 1 &&
+         request.resource.data.memberUids.hasAll(resource.data.memberUids) &&
+         request.resource.data.memberUids.hasAny([request.auth.uid]) &&
+         request.resource.data.teamSize == resource.data.teamSize + 1 &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberUids', 'teamSize', 'updatedAt']) &&
+         request.resource.data.updatedAt == request.time
+        ) ||
+        // Student leaves an existing team
+        (isStudent() &&
+         request.auth.uid != resource.data.teamLeaderId &&
+         resource.data.memberUids.hasAny([request.auth.uid]) &&
+         request.resource.data.memberUids.size() == resource.data.memberUids.size() - 1 &&
+         !request.resource.data.memberUids.hasAny([request.auth.uid]) &&
+         resource.data.memberUids.hasAll(request.resource.data.memberUids.concat([request.auth.uid])) &&
+         request.resource.data.teamSize == resource.data.teamSize - 1 &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberUids', 'teamSize', 'updatedAt']) &&
          request.resource.data.updatedAt == request.time
         )
       );
@@ -303,88 +273,13 @@ service cloud.firestore {
 
     // --- Tasks Collection Rules ---
     match /tasks/{taskId} {
-      // Only Overall Heads and Admins can create tasks
-      allow create: if isOverallOrAdmin() &&
-                      request.resource.data.keys().hasAll([
-                        'title', 'description', 'assignedToUid', 'assignedByUid',
-                        'eventId', 'status', 'points', 'createdAt', 'updatedAt'
-                      ]) &&
-                      request.resource.data.title is string &&
-                      request.resource.data.description is string &&
-                      request.resource.data.assignedToUid is string &&
-                      request.resource.data.assignedByUid is string &&
-                      request.resource.data.eventId is string && // Link to a sub-event
-                      request.resource.data.status == 'pending' && // Initial status
-                      request.resource.data.points is number &&
-                      request.resource.data.createdAt is timestamp &&
-                      request.resource.data.updatedAt is timestamp &&
-                      request.resource.data.createdAt == request.time && // Enforce serverTimestamp
-                      request.resource.data.updatedAt == request.time && // Enforce serverTimestamp
-                      request.resource.data.keys().hasOnly([ // Allowed fields
-                        'title', 'description', 'assignedToUid', 'assignedByUid',
-                        'eventId', 'status', 'points', 'createdAt', 'updatedAt', 'completedAt' // completedAt optional on create
-                      ]) &&
-                      (request.resource.data.completedAt == null || request.resource.data.completedAt is timestamp);
-
-      // Read permissions for tasks
-      allow read: if isAuthenticated() && (
-        request.auth.uid == resource.data.assignedToUid || // Assigned user can read their tasks
-        request.auth.uid == resource.data.assignedByUid || // User who assigned the task can read it
-        isOverallOrAdmin() || // Overall Heads/Admins can read all tasks
-        isAssignedToSubEvent(resource.data.eventId) // Event Reps/Organizers can read tasks related to their assigned sub-events
-      );
-
-      // Update permissions for tasks
-      allow update: if isAuthenticated() && (
-        // Assigned user can update status (e.g., 'completed', 'in-progress')
-        (request.auth.uid == resource.data.assignedToUid &&
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'completedAt']) &&
-         request.resource.data.status in ['pending', 'in-progress', 'completed'] &&
-         request.resource.data.updatedAt == request.time &&
-         (request.resource.data.status == 'completed' ? request.resource.data.completedAt is timestamp : true)
-        ) ||
-        // User who assigned the task or Overall Heads/Admins can update specific fields (including reassigning)
-        (isOverallOrAdmin() &&
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-           'title', 'description', 'assignedToUid', 'status', 'points', 'updatedAt', 'completedAt'
-         ]) &&
-         request.resource.data.assignedToUid is string && // Validate assignedToUid type if changed
-         request.resource.data.status in ['pending', 'in-progress', 'completed'] &&
-         request.resource.data.points is number &&
-         request.resource.data.updatedAt == request.time &&
-         (request.resource.data.status == 'completed' ? request.resource.data.completedAt is timestamp : true)
-        ) ||
-        // User who assigned the task (if not overall/admin) can update limited fields
-        (request.auth.uid == resource.data.assignedByUid && !isOverallOrAdmin() &&
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-           'status', 'points', 'updatedAt', 'completedAt'
-         ]) &&
-         request.resource.data.status in ['pending', 'in-progress', 'completed'] &&
-         request.resource.data.points is number &&
-         request.resource.data.updatedAt == request.time &&
-         (request.resource.data.status == 'completed' ? request.resource.data.completedAt is timestamp : true)
-        )
-      );
-
-      // Only Overall Heads and Admins can delete tasks
-      allow delete: if isOverallOrAdmin();
+      allow read, write: if isOverallOrAdmin();
     }
 
     // --- Schools Collection Rules ---
     match /schools/{schoolId} {
       allow read: if true; // Publicly readable for lookup
-      allow create: if isOverallOrAdmin() && // Only Overall Heads/Admins can create schools
-                      request.resource.data.keys().hasAll([
-                        'name', 'address', 'createdAt', 'updatedAt'
-                      ]) &&
-                      request.resource.data.name is string &&
-                      request.resource.data.address is string &&
-                      request.resource.data.createdAt is timestamp &&
-                      request.resource.data.updatedAt == request.time &&
-                      request.resource.data.keys().hasOnly([
-                        'name', 'address', 'createdAt', 'updatedAt'
-                      ]);
-      allow update, delete: if isOverallOrAdmin(); // Only Overall Heads/Admins can update/delete schools
+      allow create, update, delete: if isOverallOrAdmin();
     }
   }
 }
