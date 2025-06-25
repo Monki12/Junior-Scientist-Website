@@ -23,7 +23,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Calendar } from '@/components/ui/calendar';
-import { db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { collection, query, where, getDocs, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 
 
@@ -294,7 +294,7 @@ export default function DashboardPage() {
             setStudentRegisteredFullEvents(resolvedRegistrations);
             console.log("Final processed student events:", resolvedRegistrations);
           } catch (error) {
-            if (authUser) {
+            if (auth.currentUser) {
               console.error("Error fetching student registrations:", error);
               toast({ title: "Could not fetch events", description: "There was an issue loading your registered events. Please try again later.", variant: "destructive" });
             } else {
@@ -1767,7 +1767,7 @@ export default function DashboardPage() {
           <Card className="shadow-md-soft rounded-xl">
               <CardHeader>
                   <CardTitle>Upcoming Events Overview (Mock)</CardTitle>
-                  <CardDescription>A quick look at events you are managing.</CardDescription>
+                  <CardDescription>A quick look at events you are managing.</CardHeader>
               </CardHeader>
               <CardContent>
                   <p className="text-muted-foreground">Chart or list of upcoming events will be displayed here.</p>
@@ -1781,3 +1781,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
