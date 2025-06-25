@@ -142,6 +142,13 @@ export default function DashboardPage() {
   const [isDeleteEventConfirmOpen, setIsDeleteEventConfirmOpen] = useState(false);
   const [eventToDelete, setEventToDelete] = useState<SubEvent | null>(null);
 
+  // New state for custom columns for events
+  const [eventCustomColumnDefinitions, setEventCustomColumnDefinitions] = useState<CustomColumnDefinition[]>([]);
+  const [isAddEventCustomColumnDialogOpen, setIsAddEventCustomColumnDialogOpen] = useState(false);
+  const [newEventCustomColumnForm, setNewEventCustomColumnForm] = useState<{ name: string; dataType: CustomColumnDefinition['dataType']; options: string; defaultValue: string; description: string;}>({ name: '', dataType: 'text', options: '', defaultValue: '', description: '' });
+  const [editingEventCustomCell, setEditingEventCustomCell] = useState<{ eventId: string; columnId: string } | null>(null);
+
+
 
   useEffect(() => {
     console.log("Dashboard auth state change detected. Loading:", loading, "AuthUser:", !!authUser);
@@ -656,6 +663,83 @@ export default function DashboardPage() {
     }
   };
 
+  const handleAddEventCustomColumnSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!newEventCustomColumnForm.name || !newEventCustomColumnForm.dataType) {
+      toast({ title: "Error", description: "Column Name and Data Type are required.", variant: "destructive" });
+      return;
+    }
+    const newColumnId = `event_custom_${Date.now()}_${newEventCustomColumnForm.name.toLowerCase().replace(/\s+/g, '_')}`;
+    const newDefinition: CustomColumnDefinition = {
+      id: newColumnId,
+      name: newEventCustomColumnForm.name,
+      dataType: newEventCustomColumnForm.dataType,
+      options: newEventCustomColumnForm.dataType === 'dropdown' ? newEventCustomColumnForm.options.split(',').map(opt => opt.trim()).filter(Boolean) : undefined,
+      defaultValue: newEventCustomColumnForm.defaultValue || getInitialValueForDataType(newEventCustomColumnForm.dataType),
+      description: newEventCustomColumnForm.description,
+    };
+    setEventCustomColumnDefinitions(prev => [...prev, newDefinition]);
+
+    setAllPlatformEvents(prevEvents => prevEvents.map(event => ({
+        ...event,
+        customData: {
+            ...(event.customData || {}),
+            [newColumnId]: newDefinition.defaultValue
+        }
+    })));
+
+    setNewEventCustomColumnForm({ name: '', dataType: 'text', options: '', defaultValue: '', description: ''});
+    setIsAddEventCustomColumnDialogOpen(false);
+    toast({ title: "Success", description: `Event custom column "${newDefinition.name}" added.` });
+  };
+
+  const handleEventCustomDataChange = (eventId: string, columnId: string, value: any) => {
+     setAllPlatformEvents(prevEvents => prevEvents.map(e =>
+         e.id === eventId
+         ? { ...e, customData: { ...(e.customData || {}), [columnId]: value } }
+         : e
+     ));
+  };
+  
+  const renderEventCustomCell = (event: SubEvent, column: CustomColumnDefinition) => {
+    const value = event.customData?.[column.id] ?? column.defaultValue ?? getInitialValueForDataType(column.dataType);
+    const isEditing = editingEventCustomCell?.eventId === event.id && editingEventCustomCell?.columnId === column.id;
+
+    if (isEditing) {
+       switch (column.dataType) {
+        case 'text':
+          return <Input type="text" value={String(value)} onChange={(e) => handleEventCustomDataChange(event.id, column.id, e.target.value)} onBlur={() => setEditingEventCustomCell(null)} autoFocus className="h-8 text-xs"/>;
+        case 'number':
+          return <Input type="number" value={Number(value)} onChange={(e) => handleEventCustomDataChange(event.id, column.id, parseFloat(e.target.value) || 0)} onBlur={() => setEditingEventCustomCell(null)} autoFocus className="h-8 text-xs"/>;
+        case 'date':
+          return <Input type="date" value={value && isValid(parseISO(String(value))) ? format(parseISO(String(value)), 'yyyy-MM-dd') : ''} onChange={(e) => handleEventCustomDataChange(event.id, column.id, e.target.value)} onBlur={() => setEditingEventCustomCell(null)} autoFocus className="h-8 text-xs"/>;
+        case 'checkbox':
+           return <Checkbox checked={!!value} onCheckedChange={(checked) => {handleEventCustomDataChange(event.id, column.id, !!checked); setEditingEventCustomCell(null);}} />;
+        case 'dropdown':
+          return (
+            <Select value={String(value)} onValueChange={(val) => { handleEventCustomDataChange(event.id, column.id, val); setEditingEventCustomCell(null); }} >
+              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select..." /></SelectTrigger>
+              <SelectContent>
+                {column.options?.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          );
+        default:
+          return String(value);
+      }
+    }
+
+    switch (column.dataType) {
+        case 'checkbox':
+            return <Checkbox checked={!!value} onCheckedChange={(checked) => handleEventCustomDataChange(event.id, column.id, !!checked)} aria-label={`Toggle ${column.name} for ${event.title}`}/>;
+        case 'date':
+            return <span onClick={() => setEditingEventCustomCell({ eventId: event.id, columnId: column.id })} className="cursor-pointer hover:bg-muted/50 p-1 rounded min-h-[2rem] block">{value && isValid(parseISO(String(value))) ? format(parseISO(String(value)), 'MMM dd, yyyy') : 'N/A'}</span>;
+        default:
+            return <span onClick={() => column.dataType !== 'checkbox' && setEditingEventCustomCell({ eventId: event.id, columnId: column.id })} className="cursor-pointer hover:bg-muted/50 p-1 rounded min-h-[2rem] block">{String(value)}</span>;
+    }
+  };
+
+
 
   if (loading || !authUser || !userProfile) {
     return (
@@ -884,14 +968,16 @@ export default function DashboardPage() {
     ];
 
     const availableEventFilterColumns = useMemo(() => {
-        return [
+        const standardCols = [
             { id: 'title', name: 'Title', isCustom: false },
             { id: 'superpowerCategory', name: 'Category', isCustom: false },
             { id: 'venue', name: 'Venue', isCustom: false },
             { id: 'status', name: 'Status', isCustom: false },
             { id: 'isTeamBased', name: 'Is Team Event', isCustom: false },
         ];
-    }, []);
+        const customCols = eventCustomColumnDefinitions.map(col => ({ id: col.id, name: col.name, isCustom: true }));
+        return [...standardCols, ...customCols];
+    }, [eventCustomColumnDefinitions]);
 
     const handleAddEventDynamicFilter = () => {
         if (newEventFilterColumn && newEventFilterValue.trim() !== '') {
@@ -1144,7 +1230,61 @@ export default function DashboardPage() {
                         <TableHead>Participants</TableHead>
                         <TableHead>ERs</TableHead>
                         <TableHead>Organizers</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+                        {eventCustomColumnDefinitions.map(col => (
+                          <TableHead key={col.id}>{col.name}</TableHead>
+                        ))}
+                        <TableHead className="text-right">
+                          <AlertDialog open={isAddEventCustomColumnDialogOpen} onOpenChange={setIsAddEventCustomColumnDialogOpen}>
+                              <AlertDialogTrigger asChild>
+                              <Button variant="outline" size="sm" className="border-dashed hover:border-primary hover:text-primary h-8">
+                                  <PlusCircle className="mr-2 h-4 w-4" /> Add Column
+                              </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                              <form onSubmit={handleAddEventCustomColumnSubmit}>
+                                  <AlertDialogHeader>
+                                  <AlertDialogTitle>Add New Event Custom Column</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                      Define a new column for all platform events.
+                                  </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <div className="space-y-4 py-4">
+                                  <div>
+                                      <Label htmlFor="newEventCustomColName">Column Name</Label>
+                                      <Input id="newEventCustomColName" value={newEventCustomColumnForm.name} onChange={e => setNewEventCustomColumnForm({...newEventCustomColumnForm, name: e.target.value})} placeholder="E.g., Sponsor" required />
+                                  </div>
+                                  <div>
+                                      <Label htmlFor="newEventCustomColDataType">Data Type</Label>
+                                      <Select value={newEventCustomColumnForm.dataType} onValueChange={val => setNewEventCustomColumnForm({...newEventCustomColumnForm, dataType: val as CustomColumnDefinition['dataType']})}>
+                                      <SelectTrigger id="newEventCustomColDataType"><SelectValue /></SelectTrigger>
+                                      <SelectContent>
+                                          <SelectItem value="text">Text</SelectItem>
+                                          <SelectItem value="number">Number</SelectItem>
+                                          <SelectItem value="checkbox">Checkbox</SelectItem>
+                                          <SelectItem value="dropdown">Dropdown</SelectItem>
+                                          <SelectItem value="date">Date</SelectItem>
+                                      </SelectContent>
+                                      </Select>
+                                  </div>
+                                  {newEventCustomColumnForm.dataType === 'dropdown' && (
+                                      <div>
+                                      <Label htmlFor="newEventCustomColOptions">Options (comma-separated)</Label>
+                                      <Input id="newEventCustomColOptions" value={newEventCustomColumnForm.options} onChange={e => setNewEventCustomColumnForm({...newEventCustomColumnForm, options: e.target.value})} placeholder="E.g., Sponsor A, Sponsor B" />
+                                      </div>
+                                  )}
+                                  <div>
+                                      <Label htmlFor="newEventCustomColDefaultValue">Default Value (optional)</Label>
+                                      <Input id="newEventCustomColDefaultValue" value={newEventCustomColumnForm.defaultValue} onChange={e => setNewEventCustomColumnForm({...newEventCustomColumnForm, defaultValue: e.target.value})} />
+                                  </div>
+                                  </div>
+                                  <AlertDialogFooter>
+                                  <AlertDialogCancel asChild><Button variant="outline" type="button">Cancel</Button></AlertDialogCancel>
+                                  <Button type="submit">Save Column</Button>
+                                  </AlertDialogFooter>
+                              </form>
+                              </AlertDialogContent>
+                          </AlertDialog>
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1165,6 +1305,7 @@ export default function DashboardPage() {
                            <TableCell className="text-xs max-w-[150px] truncate">
                              {event.eventReps && event.eventReps.length > 0 ? event.eventReps.map(uid => mockUserProfiles[userProfile?.role as UserRole || 'student']?.displayName || uid).join(', ') : <span className="text-muted-foreground italic">None</span>}
                            </TableCell>
+                           {eventCustomColumnDefinitions.map(colDef => <TableCell key={colDef.id}>{renderEventCustomCell(event, colDef)}</TableCell>)}
                           <TableCell className="text-right space-x-1">
                             <Button variant="ghost" size="icon" className="hover:bg-muted/50 h-8 w-8" onClick={() => openEditEventDialog(event)}>
                               <Pencil className="h-4 w-4" /> <span className="sr-only">Edit Event</span>

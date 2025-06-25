@@ -101,6 +101,7 @@ export interface SubEvent {
   venue?: string;
   registeredParticipantCount?: number;
   isFeatured?: boolean;
+  customData?: Record<string, any>;
 }
 
 export interface SignUpFormData {
