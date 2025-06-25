@@ -33,7 +33,7 @@ import {
 } from 'lucide-react';
 
 
-const defaultEventFormState: Omit<SubEvent, 'id' | 'slug' | 'mainImage'> & { mainImageSrc: string; mainImageAlt: string; mainImageAiHint: string; eventReps: string; organizers_str: string } = {
+const defaultEventFormState: Omit<SubEvent, 'id' | 'slug' | 'mainImage' | 'organizerUids'> & { mainImageSrc: string; mainImageAlt: string; mainImageAiHint: string; eventReps: string; organizers_str: string } = {
   title: '',
   superpowerCategory: 'The Thinker',
   shortDescription: '',
@@ -363,8 +363,8 @@ export default function DashboardPage() {
             dataAiHint: currentEventForm.mainImageAiHint || 'event placeholder'
         },
         registrationLink: currentEventForm.registrationLink,
-        deadline: currentEventForm.deadline,
-        eventDate: currentEventForm.eventDate,
+        deadline: currentEventForm.deadline || null,
+        eventDate: currentEventForm.eventDate || null,
         isTeamBased: currentEventForm.isTeamBased,
         minTeamMembers: Number(currentEventForm.minTeamMembers),
         maxTeamMembers: Number(currentEventForm.maxTeamMembers),
@@ -395,7 +395,7 @@ export default function DashboardPage() {
       setCurrentEventForm(defaultEventFormState);
     } catch(error) {
        console.error("Error saving event:", error);
-       toast({ title: "Error Saving Event", description: "An error occurred while saving the event.", variant: "destructive"});
+       toast({ title: "Error Saving Event", description: (error as Error).message || "An unexpected error occurred.", variant: "destructive"});
     }
   };
 

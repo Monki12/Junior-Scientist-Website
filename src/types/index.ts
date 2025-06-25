@@ -90,8 +90,8 @@ export interface SubEvent {
   mainImage: { src: string; alt: string; dataAiHint: string };
   galleryImages?: Array<{ src: string; alt: string; dataAiHint: string }>;
   registrationLink: string;
-  deadline?: string; // ISO Date string
-  eventDate?: string; // ISO Date string
+  deadline?: string | null; // ISO Date string
+  eventDate?: string | null; // ISO Date string
   isTeamBased: boolean;
   minTeamMembers?: number;
   maxTeamMembers?: number;
