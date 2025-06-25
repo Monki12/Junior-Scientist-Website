@@ -2,7 +2,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter, notFound, Link } from 'next/link';
+import { useParams, useRouter, notFound } from 'next/navigation';
+import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/hooks/use-auth';
 import type { SubEvent, EventStatus } from '@/types';
