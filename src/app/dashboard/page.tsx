@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState, useMemo, useCallback, FormEvent } from 'react';
+import { useEffect, useState, useMemo, useCallback, FormEvent, ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -22,14 +22,15 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Calendar } from '@/components/ui/calendar';
-import { auth, db } from '@/lib/firebase';
+import { auth, db, storage } from '@/lib/firebase';
 import { collection, query, where, getDocs, doc, getDoc, updateDoc, serverTimestamp, addDoc, deleteDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 
 import { format, isToday, isPast, isThisWeek, startOfDay, parseISO, isValid } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import {
-  Loader2, BarChartBig, Edit, Users, FileScan, Settings, BookUser, ListChecks, CalendarDays, UserCircle, Bell, GraduationCap, School, Download, Info, Briefcase, Newspaper, Award, Star, CheckCircle, ClipboardList, TrendingUp, Building, Activity, ShieldCheck, ExternalLink, Home, Search, CalendarCheck, Ticket, Users2, Phone, Mail, Milestone, MapPin, Clock, UsersRound, CheckSquare, BarChartHorizontalBig, Rss, AlertTriangle, Filter as FilterIcon, PlusCircle, GanttChartSquare, Rows, Tag, XIcon, Pencil, Trash2, CalendarRange, LayoutDashboard, CalendarIcon
+  Loader2, BarChartBig, Edit, Users, FileScan, Settings, BookUser, ListChecks, CalendarDays, UserCircle, Bell, GraduationCap, School, Download, Info, Briefcase, Newspaper, Award, Star, CheckCircle, ClipboardList, TrendingUp, Building, Activity, ShieldCheck, ExternalLink, Home, Search, CalendarCheck, Ticket, Users2, Phone, Mail, Milestone, MapPin, Clock, UsersRound, CheckSquare, BarChartHorizontalBig, Rss, AlertTriangle, Filter as FilterIcon, PlusCircle, GanttChartSquare, Rows, Tag, XIcon, Pencil, Trash2, CalendarRange, LayoutDashboard, CalendarIcon, UploadCloud
 } from 'lucide-react';
 
 
@@ -126,6 +127,9 @@ export default function DashboardPage() {
   const [isEventFormDialogOpen, setIsEventFormDialogOpen] = useState(false);
   const [currentEventForm, setCurrentEventForm] = useState(defaultEventFormState);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [mainImageFile, setMainImageFile] = useState<File | null>(null);
+
 
   const [isDeleteEventConfirmOpen, setIsDeleteEventConfirmOpen] = useState(false);
   const [eventToDelete, setEventToDelete] = useState<SubEvent | null>(null);
@@ -345,57 +349,83 @@ export default function DashboardPage() {
   }, [allStudents]);
 
   
-  const handleEventFormSubmit = async (e: FormEvent) => {
-     e.preventDefault();
-     if (!currentEventForm.title) {
-        toast({ title: "Error", description: "Event Title is required.", variant: "destructive" });
-        return;
-     }
+  const handleImageFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+        if (file.size > 5 * 1024 * 1024) { // 5MB limit
+            toast({ title: "File Too Large", description: "Image must be smaller than 5MB.", variant: "destructive"});
+            return;
+        }
+        setMainImageFile(file);
+        // Create a preview URL
+        const previewUrl = URL.createObjectURL(file);
+        setCurrentEventForm(f => ({ ...f, mainImageSrc: previewUrl }));
+    }
+  };
 
-    const eventDataToSave: Omit<SubEvent, 'id'| 'slug'> = {
-        title: currentEventForm.title,
-        superpowerCategory: currentEventForm.superpowerCategory,
-        shortDescription: currentEventForm.shortDescription,
-        detailedDescription: currentEventForm.detailedDescription,
-        mainImage: { 
-            src: currentEventForm.mainImageSrc || 'https://placehold.co/600x400.png', 
-            alt: currentEventForm.mainImageAlt || currentEventForm.title,
-            dataAiHint: currentEventForm.mainImageAiHint || 'event placeholder'
-        },
-        registrationLink: currentEventForm.registrationLink,
-        deadline: currentEventForm.deadline || null,
-        eventDate: currentEventForm.eventDate || null,
-        isTeamBased: currentEventForm.isTeamBased,
-        minTeamMembers: Number(currentEventForm.minTeamMembers),
-        maxTeamMembers: Number(currentEventForm.maxTeamMembers),
-        status: currentEventForm.status,
-        venue: currentEventForm.venue,
-        eventReps: currentEventForm.eventReps.split(',').map(s => s.trim()).filter(Boolean),
-        organizerUids: currentEventForm.organizers_str.split(',').map(s => s.trim()).filter(Boolean),
-        registeredParticipantCount: currentEventForm.registeredParticipantCount || 0,
-        customData: currentEventForm.customData || {},
-    };
-    
-    const slug = eventDataToSave.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+  const handleEventFormSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setIsUploading(true);
+    if (!currentEventForm.title) {
+        toast({ title: "Error", description: "Event Title is required.", variant: "destructive" });
+        setIsUploading(false);
+        return;
+    }
+
+    let imageUrl = currentEventForm.mainImageSrc || 'https://placehold.co/600x400.png';
+    const slug = currentEventForm.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
 
     try {
-      if (editingEventId) {
-        const eventRef = doc(db, "subEvents", editingEventId);
-        await updateDoc(eventRef, { ...eventDataToSave, slug });
-        setAllPlatformEvents(prev => prev.map(event => event.id === editingEventId ? { ...event, ...eventDataToSave, slug, id: editingEventId } : event));
-        toast({ title: "Event Updated", description: `Event "${eventDataToSave.title}" has been updated.`});
-      } else {
-        const docRef = await addDoc(collection(db, "subEvents"), { ...eventDataToSave, slug });
-        const newEvent: SubEvent = { id: docRef.id, slug, ...eventDataToSave };
-        setAllPlatformEvents(prev => [newEvent, ...prev]);
-        toast({ title: "Event Created", description: `Event "${newEvent.title}" has been added.`});
-      }
-      setIsEventFormDialogOpen(false);
-      setEditingEventId(null);
-      setCurrentEventForm(defaultEventFormState);
+        if (mainImageFile) {
+            const imageRef = ref(storage, `event_images/${slug}/${mainImageFile.name}`);
+            await uploadBytes(imageRef, mainImageFile);
+            imageUrl = await getDownloadURL(imageRef);
+        }
+
+        const eventDataToSave: Omit<SubEvent, 'id'| 'slug'> = {
+            title: currentEventForm.title,
+            superpowerCategory: currentEventForm.superpowerCategory,
+            shortDescription: currentEventForm.shortDescription,
+            detailedDescription: currentEventForm.detailedDescription,
+            mainImage: { 
+                src: imageUrl, 
+                alt: currentEventForm.mainImageAlt || currentEventForm.title,
+                dataAiHint: currentEventForm.mainImageAiHint || 'event placeholder'
+            },
+            registrationLink: currentEventForm.registrationLink,
+            deadline: currentEventForm.deadline || null,
+            eventDate: currentEventForm.eventDate || null,
+            isTeamBased: currentEventForm.isTeamBased,
+            minTeamMembers: Number(currentEventForm.minTeamMembers),
+            maxTeamMembers: Number(currentEventForm.maxTeamMembers),
+            status: currentEventForm.status,
+            venue: currentEventForm.venue,
+            eventReps: currentEventForm.eventReps.split(',').map(s => s.trim()).filter(Boolean),
+            organizerUids: currentEventForm.organizers_str.split(',').map(s => s.trim()).filter(Boolean),
+            registeredParticipantCount: currentEventForm.registeredParticipantCount || 0,
+            customData: currentEventForm.customData || {},
+        };
+      
+        if (editingEventId) {
+          const eventRef = doc(db, "subEvents", editingEventId);
+          await updateDoc(eventRef, { ...eventDataToSave, slug });
+          setAllPlatformEvents(prev => prev.map(event => event.id === editingEventId ? { ...event, ...eventDataToSave, slug, id: editingEventId } : event));
+          toast({ title: "Event Updated", description: `Event "${eventDataToSave.title}" has been updated.`});
+        } else {
+          const docRef = await addDoc(collection(db, "subEvents"), { ...eventDataToSave, slug });
+          const newEvent: SubEvent = { id: docRef.id, slug, ...eventDataToSave };
+          setAllPlatformEvents(prev => [newEvent, ...prev]);
+          toast({ title: "Event Created", description: `Event "${newEvent.title}" has been added.`});
+        }
+        setIsEventFormDialogOpen(false);
+        setEditingEventId(null);
+        setCurrentEventForm(defaultEventFormState);
+        setMainImageFile(null);
     } catch(error) {
        console.error("Error saving event:", error);
        toast({ title: "Error Saving Event", description: (error as Error).message || "An unexpected error occurred.", variant: "destructive"});
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -403,13 +433,17 @@ export default function DashboardPage() {
   const openCreateEventDialog = () => {
     setEditingEventId(null);
     setCurrentEventForm(defaultEventFormState);
+    setMainImageFile(null);
     setIsEventFormDialogOpen(true);
   };
   const openEditEventDialog = (event: SubEvent) => {
     setEditingEventId(event.id);
+    setMainImageFile(null);
     setCurrentEventForm({
         ...defaultEventFormState,
         ...event,
+        deadline: event.deadline ? parseISO(event.deadline) : null,
+        eventDate: event.eventDate ? parseISO(event.eventDate) : null,
         mainImageSrc: event.mainImage.src,
         mainImageAlt: event.mainImage.alt,
         mainImageAiHint: event.mainImage.dataAiHint,
@@ -758,10 +792,12 @@ export default function DashboardPage() {
 
       {/* Dialog for Create/Edit Event */}
         <Dialog open={isEventFormDialogOpen} onOpenChange={(isOpen) => {
+            if (isUploading) return;
             setIsEventFormDialogOpen(isOpen);
             if (!isOpen) {
                 setEditingEventId(null);
                 setCurrentEventForm(defaultEventFormState);
+                setMainImageFile(null);
             }
         }}>
             <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -798,6 +834,23 @@ export default function DashboardPage() {
                         <Label htmlFor="detailedDescription">Detailed Description (for event page)</Label>
                         <Textarea id="detailedDescription" value={currentEventForm.detailedDescription} onChange={e => setCurrentEventForm(f => ({...f, detailedDescription: e.target.value}))} rows={5}/>
                     </div>
+                    <div>
+                        <Label htmlFor="mainImageFile">Event Image</Label>
+                        <Input id="mainImageFile" type="file" accept="image/*" onChange={handleImageFileChange} />
+                         {currentEventForm.mainImageSrc && (
+                            <div className="mt-2 relative w-full h-40 rounded-md overflow-hidden border">
+                                <Image src={currentEventForm.mainImageSrc} alt="Event image preview" fill style={{ objectFit: 'cover' }} />
+                            </div>
+                        )}
+                    </div>
+                    <div>
+                        <Label htmlFor="mainImageAlt">Image Alt Text (for accessibility)</Label>
+                        <Input id="mainImageAlt" value={currentEventForm.mainImageAlt} onChange={e => setCurrentEventForm(f => ({...f, mainImageAlt: e.target.value}))} placeholder="e.g., Students collaborating on a project"/>
+                    </div>
+                    <div>
+                        <Label htmlFor="mainImageAiHint">Image AI Hint</Label>
+                        <Input id="mainImageAiHint" value={currentEventForm.mainImageAiHint} onChange={e => setCurrentEventForm(f => ({...f, mainImageAiHint: e.target.value}))} placeholder="e.g., science experiment"/>
+                    </div>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <Label htmlFor="eventDateForm">Event Date</Label>
@@ -805,11 +858,11 @@ export default function DashboardPage() {
                                 <PopoverTrigger asChild>
                                 <Button id="eventDateForm" variant="outline" className={`w-full justify-start text-left font-normal ${!currentEventForm.eventDate && "text-muted-foreground"}`}>
                                     <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {currentEventForm.eventDate && isValid(parseISO(currentEventForm.eventDate)) ? format(parseISO(currentEventForm.eventDate), "PPP") : <span>Pick a date</span>}
+                                    {currentEventForm.eventDate && isValid(currentEventForm.eventDate) ? format(currentEventForm.eventDate, "PPP") : <span>Pick a date</span>}
                                 </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0">
-                                <Calendar mode="single" selected={currentEventForm.eventDate ? parseISO(currentEventForm.eventDate) : undefined} onSelect={date => setCurrentEventForm(f => ({...f, eventDate: date?.toISOString()}))} initialFocus />
+                                <Calendar mode="single" selected={currentEventForm.eventDate} onSelect={date => setCurrentEventForm(f => ({...f, eventDate: date || null}))} initialFocus />
                                 </PopoverContent>
                             </Popover>
                         </div>
@@ -819,11 +872,11 @@ export default function DashboardPage() {
                                 <PopoverTrigger asChild>
                                 <Button id="eventDeadlineForm" variant="outline" className={`w-full justify-start text-left font-normal ${!currentEventForm.deadline && "text-muted-foreground"}`}>
                                     <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {currentEventForm.deadline && isValid(parseISO(currentEventForm.deadline)) ? format(parseISO(currentEventForm.deadline), "PPP") : <span>Pick a date</span>}
+                                    {currentEventForm.deadline && isValid(currentEventForm.deadline) ? format(currentEventForm.deadline, "PPP") : <span>Pick a date</span>}
                                 </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0">
-                                <Calendar mode="single" selected={currentEventForm.deadline ? parseISO(currentEventForm.deadline) : undefined} onSelect={date => setCurrentEventForm(f => ({...f, deadline: date?.toISOString()}))} initialFocus />
+                                <Calendar mode="single" selected={currentEventForm.deadline} onSelect={date => setCurrentEventForm(f => ({...f, deadline: date || null}))} initialFocus />
                                 </PopoverContent>
                             </Popover>
                         </div>
@@ -860,8 +913,11 @@ export default function DashboardPage() {
                         <Input id="venue" value={currentEventForm.venue} onChange={e => setCurrentEventForm(f => ({...f, venue: e.target.value}))} />
                     </div>
                     <DialogFooter>
-                        <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
-                        <Button type="submit">Save</Button>
+                        <DialogClose asChild><Button type="button" variant="outline" disabled={isUploading}>Cancel</Button></DialogClose>
+                        <Button type="submit" disabled={isUploading}>
+                            {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                            {isUploading ? "Saving..." : "Save Event"}
+                        </Button>
                     </DialogFooter>
                 </form>
             </DialogContent>
