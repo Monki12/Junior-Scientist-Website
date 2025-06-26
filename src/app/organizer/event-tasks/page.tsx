@@ -25,7 +25,7 @@ import { format, parseISO, isValid, isPast, startOfDay, differenceInDays, addDay
 import {
   ListChecks, ShieldAlert, Loader2, Search, Filter, PlusCircle, Edit2, Trash2, CalendarIcon, ArrowUpDown, Tag, XIcon, ChevronDown, Rows, GanttChartSquare, LayoutDashboard
 } from 'lucide-react';
-import { collection, query, where, getDocs, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs, onSnapshot, addDoc, updateDoc, deleteDoc, doc, Unsubscribe } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 const mockAssignableUsersForEvent = [
@@ -43,7 +43,7 @@ const defaultTaskFormState = {
   priority: 'Medium' as TaskPriority,
   status: 'Not Started' as TaskStatus,
   points: 0,
-  eventSlug: '',
+  eventSlug: 'general',
   customTaskData: {},
 };
 
@@ -194,6 +194,8 @@ export default function EventTasksPage() {
     if (!userProfile) return;
 
     setLoadingData(true);
+    let unsubscribe: Unsubscribe | null = null;
+
     const fetchEvents = async () => {
         const eventsQuery = query(collection(db, 'subEvents'));
         const eventsSnapshot = await getDocs(eventsQuery);
@@ -201,37 +203,47 @@ export default function EventTasksPage() {
         setAllEvents(eventsList);
     };
 
-    const canAccess = userProfile.role === 'event_representative' || userProfile.role === 'overall_head' || userProfile.role === 'admin' || userProfile.role === 'organizer' || userProfile.role === 'test';
-    if (!canAccess) {
-      toast({ title: "Access Denied", description: "You don't have permission to view this page.", variant: "destructive" });
-      router.push('/dashboard');
-      return;
-    }
+    const setupListener = async () => {
+      await fetchEvents();
+      
+      const canAccess = userProfile.role === 'event_representative' || userProfile.role === 'overall_head' || userProfile.role === 'admin' || userProfile.role === 'organizer' || userProfile.role === 'test';
+      if (!canAccess) {
+        toast({ title: "Access Denied", description: "You don't have permission to view this page.", variant: "destructive" });
+        router.push('/dashboard');
+        setLoadingData(false);
+        return;
+      }
+  
+      let tasksQuery;
+      if (userProfile.role === 'overall_head' || userProfile.role === 'admin') {
+        tasksQuery = query(collection(db, 'tasks'));
+      } else if (userProfile.displayName) {
+        tasksQuery = query(collection(db, 'tasks'), where('assignedTo', 'array-contains', userProfile.displayName));
+      } 
 
-    let tasksQuery;
-    if (userProfile.role === 'overall_head' || userProfile.role === 'admin') {
-      tasksQuery = query(collection(db, 'tasks'));
-    } else if (userProfile.displayName) {
-      tasksQuery = query(collection(db, 'tasks'), where('assignedTo', 'array-contains', userProfile.displayName));
-    } else {
-      setTasks([]);
-      setLoadingData(false);
-      fetchEvents();
-      return; 
-    }
+      if (tasksQuery) {
+        unsubscribe = onSnapshot(tasksQuery, (snapshot) => {
+          const tasksList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
+          setTasks(tasksList);
+          setLoadingData(false);
+        }, (error) => {
+          console.error("Error fetching tasks:", error);
+          toast({ title: "Error", description: "Could not fetch tasks.", variant: "destructive" });
+          setLoadingData(false);
+        });
+      } else {
+        setTasks([]);
+        setLoadingData(false);
+      }
+    };
     
-    const unsubscribe = onSnapshot(tasksQuery, (snapshot) => {
-      const tasksList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
-      setTasks(tasksList);
-      setLoadingData(false);
-    }, (error) => {
-      console.error("Error fetching tasks:", error);
-      toast({ title: "Error", description: "Could not fetch tasks.", variant: "destructive" });
-      setLoadingData(false);
-    });
-
-    fetchEvents();
-    return () => unsubscribe();
+    setupListener();
+    
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, [userProfile, router, toast]);
 
   const handleTaskFormSubmit = async () => {
@@ -477,5 +489,3 @@ export default function EventTasksPage() {
     </div>
   );
 }
-
-    
