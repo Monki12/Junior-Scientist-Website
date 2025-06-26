@@ -434,7 +434,7 @@ export default function EventTasksPage() {
                  <Select value={currentTaskForm.eventSlug} onValueChange={v => setCurrentTaskForm({...currentTaskForm, eventSlug: v})}>
                     <SelectTrigger><SelectValue placeholder="Assign to Event"/></SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="">General</SelectItem>
+                        <SelectItem value="general">General</SelectItem>
                         {allEvents.map(e => <SelectItem key={e.id} value={e.slug}>{e.title}</SelectItem>)}
                     </SelectContent>
                 </Select>
