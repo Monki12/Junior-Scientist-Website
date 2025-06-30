@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useEffect, FormEvent } from 'react';
@@ -11,7 +12,6 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { format, parseISO, isValid } from 'date-fns';
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
-import 'react-quill/dist/quill.snow.css';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,8 +25,17 @@ import { Calendar } from '@/components/ui/calendar';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Loader2, Save, Trash2, CalendarIcon, ChevronDown, Trash } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
-const ReactQuill = dynamic(() => import('react-quill'), { ssr: false });
+const ReactQuill = dynamic(() => import('@/components/admin/QuillEditorWrapper'), { 
+  ssr: false,
+  loading: () => (
+    <div className="space-y-2">
+      <Skeleton className="h-4 w-24" />
+      <Skeleton className="h-32 w-full rounded-md" />
+    </div>
+  ),
+});
 
 interface EditEventFormProps {
   event: SubEvent;
