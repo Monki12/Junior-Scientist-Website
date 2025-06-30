@@ -22,11 +22,11 @@ import { cn } from '@/lib/utils';
 import { nanoid } from 'nanoid';
 import { Textarea } from '@/components/ui/textarea';
 
-// Enriched student type for local display
 interface DisplayStudent extends UserProfileData {
   registeredEventNames?: string[];
   schoolVerifiedByOrganizer: boolean;
-  [key: string]: any; // For custom columns
+  customData: Record<string, any>;
+  [key: string]: any;
 }
 
 const DEFAULT_COLUMNS: CustomColumnDefinition[] = [
@@ -36,7 +36,6 @@ const DEFAULT_COLUMNS: CustomColumnDefinition[] = [
     { id: 'standard', name: 'Grade', dataType: 'text' },
     { id: 'schoolName', name: 'School', dataType: 'text' },
     { id: 'phoneNumbers', name: 'Primary Phone', dataType: 'text'},
-    { id: 'additionalNumber', name: 'Additional Phone', dataType: 'text'},
     { id: 'schoolVerifiedByOrganizer', name: 'School Verified', dataType: 'checkbox' },
     { id: 'registeredEventNames', name: 'Registered Events', dataType: 'text' },
 ];
@@ -60,6 +59,7 @@ const displayValue = (value: any, placeholder: string = '(N/A)') => {
     return value.toString();
 };
 
+
 export default function StudentsPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -68,25 +68,24 @@ export default function StudentsPage() {
   const [students, setStudents] = useState<DisplayStudent[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
-  // For joining data
   const [eventsMap, setEventsMap] = useState<Map<string, string>>(new Map());
   const [registrationsMap, setRegistrationsMap] = useState<Map<string, string[]>>(new Map());
 
-  // --- Dynamic Column & Filter State ---
+  // --- Dynamic UI State ---
   const [customColumnDefinitions, setCustomColumnDefinitions] = useState<CustomColumnDefinition[]>([]);
   const [visibleColumns, setVisibleColumns] = useState<string[]>(DEFAULT_COLUMNS.map(c => c.id));
   const [activeFilters, setActiveFilters] = useState<ActiveDynamicFilter[]>([]);
+  
+  const [isAddColumnDialogOpen, setIsAddColumnDialogOpen] = useState(false);
+  const [isCustomizeDialogOpen, setIsCustomizeDialogOpen] = useState(false);
+  const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
+  
+  const [newColumn, setNewColumn] = useState<Omit<CustomColumnDefinition, 'id'>>({ name: '', dataType: 'text' });
+  const [newColumnOptions, setNewColumnOptions] = useState('');
 
   const availableColumns = useMemo(() => {
     return [...DEFAULT_COLUMNS, ...customColumnDefinitions];
   }, [customColumnDefinitions]);
-
-  // --- Dialog States ---
-  const [isAddColumnDialogOpen, setIsAddColumnDialogOpen] = useState(false);
-  const [isCustomizeDialogOpen, setIsCustomizeDialogOpen] = useState(false);
-  const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
-  const [newColumn, setNewColumn] = useState<Omit<CustomColumnDefinition, 'id'>>({ name: '', dataType: 'text' });
-  const [newColumnOptions, setNewColumnOptions] = useState('');
 
   const canManageStudents = userProfile?.role === 'admin' || userProfile?.role === 'overall_head' || userProfile?.role === 'event_representative';
   const canManageColumns = userProfile?.role === 'admin' || userProfile?.role === 'overall_head';
@@ -122,10 +121,7 @@ export default function StudentsPage() {
 
         const unsubEvents = onSnapshot(eventsQuery, (snapshot) => {
             const newMap = new Map<string, string>();
-            snapshot.docs.forEach(doc => {
-                const eventData = doc.data() as SubEvent;
-                newMap.set(doc.id, eventData.title);
-            });
+            snapshot.docs.forEach(doc => newMap.set(doc.id, (doc.data() as SubEvent).title));
             setEventsMap(newMap);
         });
 
@@ -148,7 +144,6 @@ export default function StudentsPage() {
     }
   }, [userProfile, authLoading, canManageStudents, router, toast]);
 
-
   const enrichedStudents = useMemo(() => {
     return students.map(student => {
       const registeredEventIds = registrationsMap.get(student.uid) || [];
@@ -157,12 +152,11 @@ export default function StudentsPage() {
     });
   }, [students, registrationsMap, eventsMap]);
 
-
   const filteredStudents = useMemo(() => {
     return enrichedStudents.filter(student => {
       if (!activeFilters.length) return true;
       return activeFilters.every(filter => {
-        const value = (student as any)[filter.columnId]; // Basic filtering
+        const value = (student as any)[filter.columnId];
         if (filter.operator === 'contains' && typeof value === 'string') {
           return value.toLowerCase().includes(String(filter.value).toLowerCase());
         }
@@ -181,10 +175,10 @@ export default function StudentsPage() {
         const studentDoc = await transaction.get(studentRef);
         if (!studentDoc.exists()) throw new Error("Student document does not exist!");
         
-        const updateData: {[key: string]: any} = {};
+        let updateData: {[key: string]: any} = {};
         if (isCustom) {
             const currentCustomData = studentDoc.data()?.customData || {};
-            updateData[`customData.${field}`] = value;
+            updateData = { customData: { ...currentCustomData, [field]: value } };
         } else {
             updateData[field] = value;
         }
@@ -192,6 +186,16 @@ export default function StudentsPage() {
         
         transaction.update(studentRef, updateData);
       });
+      // Update local state for immediate feedback
+      setStudents(prev => prev.map(s => {
+        if (s.uid === studentId) {
+            if(isCustom) {
+                return {...s, customData: {...s.customData, [field]: value}};
+            }
+            return {...s, [field]: value};
+        }
+        return s;
+      }));
       toast({ title: "Update Successful", description: `Student record has been updated.` });
     } catch (error: any) {
       console.error("Error updating student:", error);
@@ -200,7 +204,11 @@ export default function StudentsPage() {
   };
 
   const handleAddCustomColumn = () => {
-    const newId = `custom_${newColumn.name.toLowerCase().replace(/\s/g, '_')}`;
+    if (!newColumn.name) {
+        toast({ title: "Column name is required.", variant: "destructive"});
+        return;
+    }
+    const newId = `custom_${newColumn.name.toLowerCase().replace(/\s/g, '_')}_${nanoid(4)}`;
     let finalOptions: string[] | undefined = undefined;
 
     if (newColumn.dataType === 'dropdown') {
@@ -215,17 +223,27 @@ export default function StudentsPage() {
     setCustomColumnDefinitions([...customColumnDefinitions, newDef]);
     setVisibleColumns([...visibleColumns, newId]);
     setIsAddColumnDialogOpen(false);
+    
+    // Mass update local state to reflect the new column with a default value
+    let defaultValue: any = null;
+    if (newDef.dataType === 'checkbox') defaultValue = false;
+    if (newDef.dataType === 'text' || newDef.dataType === 'dropdown') defaultValue = '';
+
+    setStudents(prev => prev.map(s => ({
+        ...s,
+        customData: {
+            ...s.customData,
+            [newId]: defaultValue
+        }
+    })));
+
     setNewColumn({ name: '', dataType: 'text' });
     setNewColumnOptions('');
-    toast({title: "Column Added", description: `Column "${newDef.name}" is now available.`});
+    toast({title: "Column Added", description: `Column "${newDef.name}" is now available. Note: This is a local-only prototype. In a real app, this would trigger a mass database update.`});
   };
   
   if (authLoading || (!canManageStudents && !authLoading) || loadingData) {
-    return (
-      <div className="flex h-full w-full items-center justify-center">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-      </div>
-    );
+    return <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
   
   if (!canManageStudents) {
@@ -243,16 +261,16 @@ export default function StudentsPage() {
     <div className="space-y-6">
        <Card className="shadow-lg">
         <CardHeader>
-          <div className="flex justify-between items-start">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
                 <CardTitle className="text-3xl font-headline text-primary flex items-center">
                     <GraduationCap className="mr-3 h-8 w-8"/>Student Management
                 </CardTitle>
                 <CardDescription>
-                    View, filter, and manage all student accounts across all events. ({filteredStudents.length} of {students.length} students showing)
+                    View, filter, and manage student accounts. ({filteredStudents.length} of {students.length} students showing)
                 </CardDescription>
             </div>
-             <div className="flex items-center gap-2">
+             <div className="flex items-center gap-2 self-start md:self-center">
                 <Button variant="outline" onClick={() => setIsFilterDialogOpen(true)}><Filter className="mr-2 h-4 w-4" />Filter ({activeFilters.length})</Button>
                 <Button variant="outline" onClick={() => setIsCustomizeDialogOpen(true)}><Columns className="mr-2 h-4 w-4" />Customize Columns</Button>
                 {canManageColumns && <Button onClick={() => setIsAddColumnDialogOpen(true)}><PlusCircle className="mr-2 h-4 w-4" />Add Column</Button>}
@@ -260,7 +278,7 @@ export default function StudentsPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="border rounded-md">
+          <div className="border rounded-md overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -279,13 +297,6 @@ export default function StudentsPage() {
                         const isCustom = !DEFAULT_COLUMNS.some(c => c.id === col.id);
                         const cellValue = isCustom ? student.customData?.[col.id] : student[col.id];
 
-                        if (col.id === 'phoneNumbers') {
-                            return <TableCell key={col.id}>{displayValue(student.phoneNumbers?.[0])}</TableCell>;
-                        }
-                        if (col.id === 'registeredEventNames') {
-                             return <TableCell key={col.id}>{displayValue(student.registeredEventNames)}</TableCell>
-                        }
-
                         if (col.dataType === 'checkbox') {
                           return (
                             <TableCell key={col.id} className="text-center">
@@ -293,7 +304,6 @@ export default function StudentsPage() {
                                 checked={!!cellValue}
                                 onCheckedChange={(checked) => handleStudentUpdate(student.uid, col.id, !!checked, isCustom)}
                                 disabled={!canManageStudents}
-                                aria-label={`Update ${col.name} for ${student.fullName}`}
                               />
                             </TableCell>
                           )
@@ -312,12 +322,10 @@ export default function StudentsPage() {
                           )
                         }
 
+                        if (col.id === 'phoneNumbers') return <TableCell key={col.id}>{displayValue(student.phoneNumbers?.[0])}</TableCell>;
+                        if (col.id === 'registeredEventNames') return <TableCell key={col.id}>{displayValue(student.registeredEventNames)}</TableCell>
 
-                        return (
-                          <TableCell key={col.id}>
-                            {displayValue(cellValue)}
-                          </TableCell>
-                        )
+                        return <TableCell key={col.id}>{displayValue(cellValue)}</TableCell>
                     })}
                   </TableRow>
                   ))
@@ -339,13 +347,7 @@ export default function StudentsPage() {
               <Label htmlFor="newColName">Column Name</Label>
               <Input id="newColName" value={newColumn.name} onChange={e => setNewColumn({...newColumn, name: e.target.value})} placeholder="e.g., T-Shirt Size"/>
               <Label htmlFor="newColType">Data Type</Label>
-              <Select 
-                value={newColumn.dataType} 
-                onValueChange={(val: any) => {
-                  setNewColumn({...newColumn, dataType: val});
-                  if (val !== 'dropdown') setNewColumnOptions('');
-                }}
-              >
+              <Select value={newColumn.dataType} onValueChange={(val: any) => setNewColumn({...newColumn, dataType: val})}>
                   <SelectTrigger><SelectValue placeholder="Select data type..." /></SelectTrigger>
                   <SelectContent>
                       <SelectItem value="text">Text</SelectItem>
@@ -357,12 +359,7 @@ export default function StudentsPage() {
                {newColumn.dataType === 'dropdown' && (
                 <div className="space-y-2">
                     <Label htmlFor="newColOptions">Dropdown Options</Label>
-                    <Textarea
-                        id="newColOptions"
-                        placeholder="Enter options separated by a comma. e.g., Small, Medium, Large"
-                        value={newColumnOptions}
-                        onChange={e => setNewColumnOptions(e.target.value)}
-                    />
+                    <Textarea id="newColOptions" placeholder="Enter options separated by a comma, e.g., Small, Medium, Large" value={newColumnOptions} onChange={e => setNewColumnOptions(e.target.value)} />
                 </div>
               )}
           </div>
@@ -379,16 +376,12 @@ export default function StudentsPage() {
           <div className="grid gap-2 py-4 max-h-80 overflow-y-auto">
             {availableColumns.map(col => (
               <div key={col.id} className="flex items-center gap-2 p-2 rounded-md hover:bg-muted">
-                <Checkbox id={`vis-${col.id}`} checked={visibleColumns.includes(col.id)} onCheckedChange={checked => {
-                    setVisibleColumns(prev => checked ? [...prev, col.id] : prev.filter(id => id !== col.id))
-                }}/>
+                <Checkbox id={`vis-${col.id}`} checked={visibleColumns.includes(col.id)} onCheckedChange={checked => setVisibleColumns(prev => checked ? [...prev, col.id] : prev.filter(id => id !== col.id))}/>
                 <Label htmlFor={`vis-${col.id}`}>{col.name}</Label>
               </div>
             ))}
           </div>
-          <DialogFooter>
-             <DialogClose asChild><Button>Done</Button></DialogClose>
-          </DialogFooter>
+          <DialogFooter><DialogClose asChild><Button>Done</Button></DialogClose></DialogFooter>
         </DialogContent>
       </Dialog>
       
@@ -407,25 +400,23 @@ export default function StudentsPage() {
                            <span className="text-sm text-muted-foreground">{filter.operator}</span>
                            <span className="text-sm font-semibold text-primary">{`"${filter.value}"`}</span>
                            <Button variant="ghost" size="icon" className="ml-auto h-6 w-6" onClick={() => setActiveFilters(prev => prev.filter(f => f.id !== filter.id))}>
-                                <X className="h-4 w-4"/>
+                               <X className="h-4 w-4"/>
                            </Button>
                         </div>
                     ))}
                     {activeFilters.length === 0 && <p className="text-sm text-muted-foreground text-center py-2">No filters applied.</p>}
                 </div>
                 <Button onClick={() => {
-                    const mockFilter: ActiveDynamicFilter = {
-                        id: nanoid(), columnId: 'fullName', columnName: 'Full Name', operator: 'contains', value: 'Test', isCustom: false
-                    };
+                    const mockFilter: ActiveDynamicFilter = {id: nanoid(), columnId: 'fullName', columnName: 'Full Name', operator: 'contains', value: 'Test', isCustom: false};
                     setActiveFilters(prev => [...prev, mockFilter]);
                     toast({title: "Filter Added", description: "This is a mock filter. Full filter builder UI coming soon."});
                 }}>Add Mock Filter</Button>
             </div>
-          <DialogFooter>
-             <DialogClose asChild><Button>Apply</Button></DialogClose>
-          </DialogFooter>
+          <DialogFooter><DialogClose asChild><Button>Apply</Button></DialogClose></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
   );
 }
+
+    
