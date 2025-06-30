@@ -1,3 +1,4 @@
-// This file is intentionally left blank to resolve a Next.js build error.
-// The conflicting route is handled by src/app/events/page.tsx, which contains
-// logic to redirect staff members to their appropriate dashboard view.
+// This file is intentionally not a page component to resolve a build error.
+// The /events route is now handled exclusively by src/app/events/page.tsx,
+// which includes logic to redirect staff members appropriately.
+export const placeholder = true;
