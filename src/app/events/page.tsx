@@ -4,13 +4,15 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/use-auth';
 import type { SubEvent } from '@/types';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Search, ListFilter, Loader2, CalendarDays, Tag } from 'lucide-react';
-import { collection, onSnapshot, query } from 'firebase/firestore'; // Changed to onSnapshot
+import { collection, onSnapshot, query } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 function SubEventCard({ event }: { event: SubEvent }) {
@@ -59,6 +61,21 @@ export default function SubEventsListPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
 
+  const { userProfile, loading: authLoading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    // This logic handles redirecting staff members away from the public events page
+    // to their own dedicated management page, resolving the routing conflict.
+    if (!authLoading && userProfile) {
+      const isStaff = ['admin', 'overall_head', 'event_representative', 'organizer'].includes(userProfile.role);
+      if (isStaff) {
+        router.replace('/my-events');
+        return; // Early return to prevent fetching public events for staff
+      }
+    }
+  }, [userProfile, authLoading, router]);
+  
   useEffect(() => {
     setLoading(true);
     const eventsQuery = query(collection(db, 'subEvents'));
@@ -72,7 +89,6 @@ export default function SubEventsListPage() {
       setLoading(false);
     });
 
-    // Cleanup the listener on component unmount
     return () => unsubscribe();
   }, []);
 
@@ -86,6 +102,16 @@ export default function SubEventsListPage() {
     );
   
   const uniqueCategories = ['all', ...new Set(events.map(event => event.superpowerCategory).filter(Boolean) as string[])];
+  
+  // Render a loading state if auth is checking or if the user is a staff member being redirected
+  const isRedirecting = !authLoading && userProfile && ['admin', 'overall_head', 'event_representative', 'organizer'].includes(userProfile.role);
+  if (authLoading || loading || isRedirecting) {
+    return (
+      <div className="flex justify-center items-center min-h-[50vh]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 animate-fade-in-up">
@@ -123,11 +149,7 @@ export default function SubEventsListPage() {
         </div>
       </div>
 
-      {loading ? (
-        <div className="flex justify-center items-center min-h-[30vh]">
-          <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        </div>
-      ) : filteredEvents.length > 0 ? (
+      {filteredEvents.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredEvents.map((event) => (
             <SubEventCard key={event.id} event={event} />
