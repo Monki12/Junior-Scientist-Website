@@ -8,14 +8,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { BellRing, Loader2, Info, CheckCircle, AlertTriangle } from 'lucide-react';
 
-// Mock notifications data
-const initialMockNotifications = [
-  { id: '1', type: 'info', title: 'Welcome to Junior Scientist!', message: 'Explore events and manage your activities seamlessly.', date: '2024-07-28', read: false },
-  { id: '2', type: 'success', title: 'Profile Updated', message: 'Your profile information has been successfully updated.', date: '2024-07-27', read: true },
-  { id: '3', type: 'warning', title: 'Upcoming Event Reminder', message: 'Tech Conference 2024 is starting in 3 days.', date: '2024-07-26', read: false },
-  { id: '4', type: 'info', title: 'New Event Posted', message: 'Check out the new "Art Workshop" event in your area.', date: '2024-07-25', read: true },
-];
-
 interface NotificationItem {
   id: string;
   type: string;
@@ -28,7 +20,7 @@ interface NotificationItem {
 export default function NotificationsPage() {
   const { authUser, loading } = useAuth();
   const router = useRouter();
-  const [notifications, setNotifications] = useState<NotificationItem[]>(initialMockNotifications);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
   const toggleReadStatus = (notificationId: string) => {
     setNotifications(prevNotifications =>
@@ -89,7 +81,7 @@ export default function NotificationsPage() {
       )}
       
        <div className="text-center mt-8">
-        <Button variant="outline" disabled>Load More Notifications (mock)</Button>
+        <Button variant="outline" disabled>Load More Notifications</Button>
       </div>
     </div>
   );
