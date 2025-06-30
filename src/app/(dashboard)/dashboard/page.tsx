@@ -22,42 +22,67 @@ const OverallHeadDashboard = () => {
   useEffect(() => {
     setLoading(true);
 
+    let eventsCache: SubEvent[] = [];
+    let initialLoads = { events: false, registrations: false, staff: false, students: false };
+
+    const checkAllLoaded = () => {
+      if (Object.values(initialLoads).every(Boolean)) {
+        setLoading(false);
+      }
+    };
+
     const eventsQuery = query(collection(db, 'subEvents'));
     const unsubEvents = onSnapshot(eventsQuery, (snapshot) => {
-        const eventsList = snapshot.docs.map(doc => ({...doc.data(), id: doc.id}) as SubEvent);
-        const totalParticipants = eventsList.reduce((acc, event) => acc + (event.registeredParticipantCount || 0), 0);
-        const avgParticipants = eventsList.length > 0 ? (totalParticipants / eventsList.length).toFixed(1) : '0.0';
+      eventsCache = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as SubEvent);
+      if (!initialLoads.events) { initialLoads.events = true; checkAllLoaded(); }
+    }, error => console.error("Error fetching events: ", error));
 
-        setStats(prev => ({...prev, events: snapshot.size, avgParticipants}));
-        
-        const topEvents = [...eventsList].sort((a, b) => (b.registeredParticipantCount || 0) - (a.registeredParticipantCount || 0)).slice(0, 10);
-        setEventParticipantData(topEvents.map(event => ({
-            name: event.title.length > 15 ? event.title.substring(0, 15) + '...' : event.title,
-            participants: event.registeredParticipantCount || 0,
-        })));
-    }, error => console.error("Error fetching events stats: ", error));
+    const registrationsQuery = query(collection(db, 'event_registrations'));
+    const unsubRegistrations = onSnapshot(registrationsQuery, (regSnapshot) => {
+      const totalParticipants = regSnapshot.size;
+      const avgParticipants = eventsCache.length > 0 ? (totalParticipants / eventsCache.length).toFixed(1) : '0.0';
+      setStats(prev => ({...prev, events: eventsCache.length, avgParticipants}));
+
+      const participantCountsByEvent: { [key: string]: number } = {};
+      regSnapshot.forEach(doc => {
+          const reg = doc.data() as EventRegistration;
+          participantCountsByEvent[reg.subEventId] = (participantCountsByEvent[reg.subEventId] || 0) + 1;
+      });
+
+      const topEvents = eventsCache
+          .map(event => ({
+              name: event.title,
+              participants: participantCountsByEvent[event.id] || 0,
+          }))
+          .sort((a, b) => b.participants - a.participants)
+          .slice(0, 10)
+          .map(event => ({
+              ...event,
+              name: event.name.length > 15 ? event.name.substring(0, 15) + '...' : event.name,
+          }));
+      setEventParticipantData(topEvents);
+
+      if (!initialLoads.registrations) { initialLoads.registrations = true; checkAllLoaded(); }
+    }, error => console.error("Error fetching registrations for stats: ", error));
 
     const staffQuery = query(collection(db, 'users'), where('role', 'in', ['admin', 'overall_head', 'event_representative', 'organizer']));
     const unsubStaff = onSnapshot(staffQuery, (snapshot) => {
         setStats(prev => ({...prev, staff: snapshot.size}));
-        
         const staffList = snapshot.docs.map(doc => doc.data() as UserProfileData);
         const leaderboard = staffList.sort((a, b) => (b.credibilityScore || 0) - (a.credibilityScore || 0)).slice(0, 3);
         setTopStaff(leaderboard);
-
+        if (!initialLoads.staff) { initialLoads.staff = true; checkAllLoaded(); }
     }, error => console.error("Error fetching staff stats: ", error));
 
     const studentsQuery = query(collection(db, 'users'), where('role', 'in', ['student', 'test']));
     const unsubStudents = onSnapshot(studentsQuery, (snapshot) => {
         setStats(prev => ({...prev, students: snapshot.size}));
-        if(loading) setLoading(false);
-    }, error => {
-        console.error("Error fetching students stats: ", error);
-        if(loading) setLoading(false);
-    });
+        if (!initialLoads.students) { initialLoads.students = true; checkAllLoaded(); }
+    }, error => console.error("Error fetching students stats: ", error));
 
     return () => {
         unsubEvents();
+        unsubRegistrations();
         unsubStaff();
         unsubStudents();
     };
@@ -81,7 +106,7 @@ const OverallHeadDashboard = () => {
             <Briefcase className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.events}</div>
+            <div className="text-2xl font-bold text-primary">{stats.events}</div>
             <p className="text-xs text-muted-foreground">Managed across the platform</p>
           </CardContent>
         </Card>
@@ -91,7 +116,7 @@ const OverallHeadDashboard = () => {
             <ShieldCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.staff}</div>
+            <div className="text-2xl font-bold text-accent">{stats.staff}</div>
             <p className="text-xs text-muted-foreground">Organizers, Reps, and Admins</p>
           </CardContent>
         </Card>
@@ -101,7 +126,7 @@ const OverallHeadDashboard = () => {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.students}</div>
+            <div className="text-2xl font-bold text-primary">{stats.students}</div>
             <p className="text-xs text-muted-foreground">Across all events</p>
           </CardContent>
         </Card>
@@ -111,7 +136,7 @@ const OverallHeadDashboard = () => {
             <BarChart3 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.avgParticipants}</div>
+            <div className="text-2xl font-bold text-accent">{stats.avgParticipants}</div>
             <p className="text-xs text-muted-foreground">Average engagement per event</p>
           </CardContent>
         </Card>
