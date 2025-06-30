@@ -99,6 +99,29 @@ export default function StaffPage() {
                 }
             }
         }
+
+        // Synchronize organizerUids on event documents based on studentDataEventAccess
+        if (editingUser.role === 'organizer') {
+            const accessMap = editingUser.studentDataEventAccess || {};
+            for (const event of allEvents) {
+                const eventRef = doc(db, 'subEvents', event.id);
+                // Use a fresh read of the event document to avoid stale data issues
+                const eventSnap = await getDoc(eventRef);
+                if (!eventSnap.exists()) continue;
+
+                const currentOrganizers = eventSnap.data().organizerUids || [];
+                const shouldBeAssigned = accessMap[event.id] === true;
+                const isCurrentlyAssigned = currentOrganizers.includes(editingUser.uid);
+
+                if (shouldBeAssigned && !isCurrentlyAssigned) {
+                    // Add organizer to the event's organizerUids array
+                    await updateDoc(eventRef, { organizerUids: [...currentOrganizers, editingUser.uid] });
+                } else if (!shouldBeAssigned && isCurrentlyAssigned) {
+                    // Remove organizer from the event's organizerUids array
+                    await updateDoc(eventRef, { organizerUids: currentOrganizers.filter((uid: string) => uid !== editingUser.uid) });
+                }
+            }
+        }
         
         toast({ title: "User Updated", description: `${editingUser.fullName}'s profile has been updated.`});
         setIsEditUserDialogOpen(false);
