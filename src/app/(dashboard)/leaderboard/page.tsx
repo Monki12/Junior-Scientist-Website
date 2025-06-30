@@ -92,45 +92,51 @@ export default function LeaderboardPage() {
         {/* 2nd Place */}
         <div className="flex justify-center md:order-1">
           {topThree.length > 1 && (
-            <Card className="relative w-full max-w-xs text-center p-4 border-2 border-slate-400 shadow-lg bg-card/80 backdrop-blur-sm transform hover:scale-105 transition-transform duration-300">
-              <div className="absolute top-2 right-2 text-2xl font-bold text-slate-400">#2</div>
-              <Avatar className="h-24 w-24 mx-auto mb-2 border-4 border-slate-300">
-                <AvatarImage src={topThree[1].photoURL || undefined} />
-                <AvatarFallback className="text-3xl">{(topThree[1].fullName || 'U')[0]}</AvatarFallback>
-              </Avatar>
-              <h3 className="text-lg font-semibold text-foreground">{topThree[1].fullName}</h3>
-              <p className="text-sm text-muted-foreground capitalize">{topThree[1].role?.replace(/_/g, ' ')}</p>
-              <p className="text-2xl font-bold text-accent mt-1">{topThree[1].credibilityScore}</p>
+            <Card className="relative w-full max-w-xs p-4 border-2 border-slate-400 shadow-lg bg-card/80 backdrop-blur-sm transform hover:scale-105 transition-transform duration-300">
+              <div className="flex flex-col items-center text-center">
+                <div className="absolute top-2 right-2 text-2xl font-bold text-slate-400">#2</div>
+                <Avatar className="h-24 w-24 mb-2 border-4 border-slate-300">
+                  <AvatarImage src={topThree[1].photoURL || undefined} />
+                  <AvatarFallback className="text-3xl">{(topThree[1].fullName || 'U')[0]}</AvatarFallback>
+                </Avatar>
+                <h3 className="text-lg font-semibold text-foreground">{topThree[1].fullName}</h3>
+                <p className="text-sm text-muted-foreground capitalize">{topThree[1].role?.replace(/_/g, ' ')}</p>
+                <p className="text-2xl font-bold text-accent mt-1">{topThree[1].credibilityScore}</p>
+              </div>
             </Card>
           )}
         </div>
         {/* 1st Place */}
         <div className="flex justify-center md:order-2">
           {topThree.length > 0 && (
-            <Card className="relative w-full max-w-xs text-center p-6 border-4 border-yellow-400 shadow-xl bg-card/90 backdrop-blur-sm scale-110 transform hover:scale-115 transition-transform duration-300 z-10">
-              <div className="absolute top-2 right-2 text-3xl font-bold text-yellow-400">#1</div>
-              <Avatar className="h-28 w-28 mx-auto mb-3 border-4 border-yellow-300">
-                <AvatarImage src={topThree[0].photoURL || undefined} />
-                <AvatarFallback className="text-4xl">{(topThree[0].fullName || 'U')[0]}</AvatarFallback>
-              </Avatar>
-              <h3 className="text-xl font-bold text-foreground">{topThree[0].fullName}</h3>
-              <p className="text-md text-muted-foreground capitalize">{topThree[0].role?.replace(/_/g, ' ')}</p>
-              <p className="text-3xl font-bold text-accent mt-1">{topThree[0].credibilityScore}</p>
+            <Card className="relative w-full max-w-xs p-6 border-4 border-yellow-400 shadow-xl bg-card/90 backdrop-blur-sm scale-110 transform hover:scale-115 transition-transform duration-300 z-10">
+              <div className="flex flex-col items-center text-center">
+                <div className="absolute top-2 right-2 text-3xl font-bold text-yellow-400">#1</div>
+                <Avatar className="h-28 w-28 mb-3 border-4 border-yellow-300">
+                  <AvatarImage src={topThree[0].photoURL || undefined} />
+                  <AvatarFallback className="text-4xl">{(topThree[0].fullName || 'U')[0]}</AvatarFallback>
+                </Avatar>
+                <h3 className="text-xl font-bold text-foreground">{topThree[0].fullName}</h3>
+                <p className="text-md text-muted-foreground capitalize">{topThree[0].role?.replace(/_/g, ' ')}</p>
+                <p className="text-3xl font-bold text-accent mt-1">{topThree[0].credibilityScore}</p>
+              </div>
             </Card>
           )}
         </div>
         {/* 3rd Place */}
         <div className="flex justify-center md:order-3">
           {topThree.length > 2 && (
-            <Card className="relative w-full max-w-xs text-center p-4 border-2 border-orange-500 shadow-lg bg-card/80 backdrop-blur-sm transform hover:scale-105 transition-transform duration-300">
-              <div className="absolute top-2 right-2 text-xl font-bold text-orange-500">#3</div>
-              <Avatar className="h-20 w-20 mx-auto mb-2 border-4 border-orange-400">
-                <AvatarImage src={topThree[2].photoURL || undefined} />
-                <AvatarFallback className="text-2xl">{(topThree[2].fullName || 'U')[0]}</AvatarFallback>
-              </Avatar>
-              <h3 className="text-md font-semibold text-foreground">{topThree[2].fullName}</h3>
-              <p className="text-sm text-muted-foreground capitalize">{topThree[2].role?.replace(/_/g, ' ')}</p>
-              <p className="text-xl font-bold text-accent mt-1">{topThree[2].credibilityScore}</p>
+            <Card className="relative w-full max-w-xs p-4 border-2 border-orange-500 shadow-lg bg-card/80 backdrop-blur-sm transform hover:scale-105 transition-transform duration-300">
+               <div className="flex flex-col items-center text-center">
+                <div className="absolute top-2 right-2 text-xl font-bold text-orange-500">#3</div>
+                <Avatar className="h-20 w-20 mb-2 border-4 border-orange-400">
+                  <AvatarImage src={topThree[2].photoURL || undefined} />
+                  <AvatarFallback className="text-2xl">{(topThree[2].fullName || 'U')[0]}</AvatarFallback>
+                </Avatar>
+                <h3 className="text-md font-semibold text-foreground">{topThree[2].fullName}</h3>
+                <p className="text-sm text-muted-foreground capitalize">{topThree[2].role?.replace(/_/g, ' ')}</p>
+                <p className="text-xl font-bold text-accent mt-1">{topThree[2].credibilityScore}</p>
+              </div>
             </Card>
           )}
         </div>
