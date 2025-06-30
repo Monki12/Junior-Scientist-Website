@@ -58,6 +58,8 @@ export interface UserProfileData {
   additionalNumber?: string | null;
   createdAt?: any; 
   updatedAt?: any; 
+  // For dynamic columns
+  customData?: Record<string, any>;
 }
 
 export interface SubEvent {

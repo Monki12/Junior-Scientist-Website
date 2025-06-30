@@ -4,7 +4,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
-import type { UserProfileData } from '@/types';
+import type { UserProfileData, CustomColumnDefinition, ActiveDynamicFilter } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,11 +12,22 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { Loader2, Users, Search, ShieldAlert, Filter, GraduationCap } from 'lucide-react';
+import { Loader2, Users, Search, ShieldAlert, Filter, GraduationCap, PlusCircle, Columns, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { nanoid } from 'nanoid';
+
+const DEFAULT_COLUMNS: CustomColumnDefinition[] = [
+    { id: 'fullName', name: 'Full Name', dataType: 'text' },
+    { id: 'email', name: 'Email', dataType: 'text' },
+    { id: 'schoolName', name: 'School', dataType: 'text' },
+    { id: 'standard', name: 'Standard', dataType: 'text' },
+    { id: 'schoolVerifiedByOrganizer', name: 'School Verified', dataType: 'checkbox' },
+];
 
 export default function StudentsPage() {
   const router = useRouter();
@@ -26,10 +37,23 @@ export default function StudentsPage() {
   const [students, setStudents] = useState<UserProfileData[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(true);
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [schoolFilter, setSchoolFilter] = useState('all');
-  
+  // --- Dynamic Column & Filter State ---
+  const [customColumnDefinitions, setCustomColumnDefinitions] = useState<CustomColumnDefinition[]>([]);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(DEFAULT_COLUMNS.map(c => c.id));
+  const [activeFilters, setActiveFilters] = useState<ActiveDynamicFilter[]>([]);
+
+  const availableColumns = useMemo(() => {
+    return [...DEFAULT_COLUMNS, ...customColumnDefinitions];
+  }, [customColumnDefinitions]);
+
+  // --- Dialog States ---
+  const [isAddColumnDialogOpen, setIsAddColumnDialogOpen] = useState(false);
+  const [isCustomizeDialogOpen, setIsCustomizeDialogOpen] = useState(false);
+  const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
+  const [newColumn, setNewColumn] = useState<Omit<CustomColumnDefinition, 'id'>>({ name: '', dataType: 'text' });
+
   const canViewPage = userProfile?.role === 'admin' || userProfile?.role === 'overall_head' || userProfile?.role === 'event_representative';
+  const canManageColumns = userProfile?.role === 'admin' || userProfile?.role === 'overall_head';
 
   useEffect(() => {
     if (!authLoading && !canViewPage) {
@@ -56,24 +80,32 @@ export default function StudentsPage() {
     }
   }, [userProfile, authLoading, canViewPage, router, toast]);
 
-  const uniqueSchoolNames = useMemo(() => {
-    const schools = new Set(students.map(p => p.schoolName).filter(Boolean) as string[]);
-    return ['all', ...Array.from(schools).sort()];
-  }, [students]);
 
   const filteredStudents = useMemo(() => {
     return students.filter(student => {
-      const searchTermLower = searchTerm.toLowerCase();
-      const matchesSearch = searchTermLower === '' ||
-        (student.fullName && student.fullName.toLowerCase().includes(searchTermLower)) ||
-        (student.email && student.email.toLowerCase().includes(searchTermLower)) ||
-        (student.schoolName && student.schoolName.toLowerCase().includes(searchTermLower));
-      
-      const matchesSchool = schoolFilter === 'all' || student.schoolName === schoolFilter;
-      
-      return matchesSearch && matchesSchool;
+      if (!activeFilters.length) return true;
+      return activeFilters.every(filter => {
+        const value = (student as any)[filter.columnId]; // Basic filtering
+        if (filter.operator === 'contains' && typeof value === 'string') {
+          return value.toLowerCase().includes(String(filter.value).toLowerCase());
+        }
+        if (filter.operator === 'equals') {
+          return String(value) === String(filter.value);
+        }
+        return true;
+      });
     });
-  }, [students, searchTerm, schoolFilter]);
+  }, [students, activeFilters]);
+
+  const handleAddCustomColumn = () => {
+    const newId = `custom_${newColumn.name.toLowerCase().replace(/\s/g, '_')}`;
+    const newDef: CustomColumnDefinition = { ...newColumn, id: newId };
+    setCustomColumnDefinitions([...customColumnDefinitions, newDef]);
+    setVisibleColumns([...visibleColumns, newId]);
+    setIsAddColumnDialogOpen(false);
+    setNewColumn({ name: '', dataType: 'text' });
+    toast({title: "Column Added", description: `Column "${newDef.name}" is now available.`});
+  };
   
   if (authLoading || (!canViewPage && !authLoading)) {
     return (
@@ -98,58 +130,143 @@ export default function StudentsPage() {
     <div className="space-y-6">
        <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle className="text-3xl font-headline text-primary flex items-center">
-            <GraduationCap className="mr-3 h-8 w-8"/>Student Management
-          </CardTitle>
-          <CardDescription>
-            View, filter, and manage all student accounts across all events.
-          </CardDescription>
+          <div className="flex justify-between items-start">
+            <div>
+                <CardTitle className="text-3xl font-headline text-primary flex items-center">
+                    <GraduationCap className="mr-3 h-8 w-8"/>Student Management
+                </CardTitle>
+                <CardDescription>
+                    View, filter, and manage all student accounts across all events.
+                </CardDescription>
+            </div>
+            {canManageColumns && (
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" onClick={() => setIsFilterDialogOpen(true)}><Filter className="mr-2 h-4 w-4" />Filter ({activeFilters.length})</Button>
+                    <Button variant="outline" onClick={() => setIsCustomizeDialogOpen(true)}><Columns className="mr-2 h-4 w-4" />Customize Columns</Button>
+                    <Button onClick={() => setIsAddColumnDialogOpen(true)}><PlusCircle className="mr-2 h-4 w-4" />Add Column</Button>
+                </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end mb-4 p-4 border rounded-lg bg-background">
-            <div className="relative">
-                <Label htmlFor="search-students">Search by Name/Email/School</Label>
-                <Search className="absolute left-2.5 top-[calc(50%+0.3rem)] -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input id="search-students" type="search" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9"/>
-            </div>
-            <div>
-                <Label htmlFor="school-filter">Filter by School</Label>
-                <Select value={schoolFilter} onValueChange={setSchoolFilter}>
-                <SelectTrigger id="school-filter"><SelectValue placeholder="Filter by school" /></SelectTrigger>
-                <SelectContent>{uniqueSchoolNames.map(school => (<SelectItem key={school} value={school}>{school === 'all' ? 'All Schools' : school}</SelectItem>))}</SelectContent>
-                </Select>
-            </div>
-             <Button variant="outline" onClick={() => { setSearchTerm(''); setSchoolFilter('all'); }}>Clear Filters</Button>
-          </div>
-
           <div className="border rounded-md">
             <Table>
-              <TableHeader><TableRow><TableHead>Full Name</TableHead><TableHead>Email</TableHead><TableHead>School</TableHead><TableHead>Standard</TableHead><TableHead>School Verified</TableHead></TableRow></TableHeader>
+              <TableHeader>
+                <TableRow>
+                  {availableColumns.filter(c => visibleColumns.includes(c.id)).map(col => (
+                    <TableHead key={col.id}>{col.name}</TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
               <TableBody>
                 {loadingStudents ? (
-                    <TableRow><TableCell colSpan={5} className="text-center py-10"><Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" /></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-10"><Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" /></TableCell></TableRow>
                 ) : filteredStudents.length > 0 ? (
                   filteredStudents.map((student) => (
                   <TableRow key={student.uid}>
-                    <TableCell className="font-medium">{student.fullName || student.displayName}</TableCell>
-                    <TableCell>{student.email}</TableCell>
-                    <TableCell>{student.schoolName}</TableCell>
-                    <TableCell>{student.standard}</TableCell>
-                    <TableCell>
-                        <Badge variant={student.schoolVerifiedByOrganizer ? "default" : "outline"} className={cn(student.schoolVerifiedByOrganizer ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700')}>
-                            {student.schoolVerifiedByOrganizer ? 'Verified' : 'Pending'}
-                        </Badge>
-                    </TableCell>
+                    {availableColumns.filter(c => visibleColumns.includes(c.id)).map(col => (
+                        <TableCell key={col.id}>
+                            {(() => {
+                                const value = (student as any)[col.id];
+                                switch (col.dataType) {
+                                    case 'checkbox':
+                                    return <Checkbox checked={!!value} disabled />;
+                                    default:
+                                    return <span className="text-sm">{value || 'N/A'}</span>;
+                                }
+                            })()}
+                        </TableCell>
+                    ))}
                   </TableRow>
                   ))
                 ) : (
-                    <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">No students found matching your criteria.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-10 text-muted-foreground">No students found matching your criteria.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
           </div>
         </CardContent>
       </Card>
+
+    {/* --- DIALOGS --- */}
+
+    <Dialog open={isAddColumnDialogOpen} onOpenChange={setIsAddColumnDialogOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Add New Custom Column</DialogTitle></DialogHeader>
+          <div className="grid gap-4 py-4">
+              <Label htmlFor="newColName">Column Name</Label>
+              <Input id="newColName" value={newColumn.name} onChange={e => setNewColumn({...newColumn, name: e.target.value})} placeholder="e.g., T-Shirt Size"/>
+              <Label htmlFor="newColType">Data Type</Label>
+              <Select value={newColumn.dataType} onValueChange={(val: any) => setNewColumn({...newColumn, dataType: val})}>
+                  <SelectTrigger><SelectValue/></SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="text">Text</SelectItem>
+                      <SelectItem value="number">Number</SelectItem>
+                      <SelectItem value="checkbox">Checkbox (True/False)</SelectItem>
+                      {/* More types can be added here */}
+                  </SelectContent>
+              </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddColumnDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddCustomColumn} disabled={!newColumn.name}>Add Column</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={isCustomizeDialogOpen} onOpenChange={setIsCustomizeDialogOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Customize Visible Columns</DialogTitle></DialogHeader>
+          <div className="grid gap-2 py-4 max-h-80 overflow-y-auto">
+            {availableColumns.map(col => (
+              <div key={col.id} className="flex items-center gap-2 p-2 rounded-md hover:bg-muted">
+                <Checkbox id={`vis-${col.id}`} checked={visibleColumns.includes(col.id)} onCheckedChange={checked => {
+                    setVisibleColumns(prev => checked ? [...prev, col.id] : prev.filter(id => id !== col.id))
+                }}/>
+                <Label htmlFor={`vis-${col.id}`}>{col.name}</Label>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+             <DialogClose asChild><Button>Done</Button></DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={isFilterDialogOpen} onOpenChange={setIsFilterDialogOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Filter Students</DialogTitle></DialogHeader>
+            <div className="space-y-4 py-4">
+                <div className="flex items-center justify-between">
+                    <Label>Active Filters</Label>
+                    {activeFilters.length > 0 && <Button variant="link" size="sm" onClick={() => setActiveFilters([])}>Clear All</Button>}
+                </div>
+                <div className="space-y-2">
+                    {activeFilters.map((filter) => (
+                        <div key={filter.id} className="flex items-center gap-2 p-2 border rounded-md">
+                           <span className="text-sm font-medium">{filter.columnName}</span>
+                           <span className="text-sm text-muted-foreground">{filter.operator}</span>
+                           <span className="text-sm font-semibold text-primary">{`"${filter.value}"`}</span>
+                           <Button variant="ghost" size="icon" className="ml-auto h-6 w-6" onClick={() => setActiveFilters(prev => prev.filter(f => f.id !== filter.id))}>
+                                <X className="h-4 w-4"/>
+                           </Button>
+                        </div>
+                    ))}
+                    {activeFilters.length === 0 && <p className="text-sm text-muted-foreground text-center py-2">No filters applied.</p>}
+                </div>
+                <Button onClick={() => {
+                    const mockFilter: ActiveDynamicFilter = {
+                        id: nanoid(), columnId: 'fullName', columnName: 'Full Name', operator: 'contains', value: 'Test', isCustom: false
+                    };
+                    setActiveFilters(prev => [...prev, mockFilter]);
+                    toast({title: "Filter Added", description: "This is a mock filter. Full filter builder UI coming soon."});
+                }}>Add Mock Filter</Button>
+            </div>
+          <DialogFooter>
+             <DialogClose asChild><Button>Apply</Button></DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
