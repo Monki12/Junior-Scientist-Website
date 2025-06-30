@@ -3,20 +3,11 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // HELPER FUNCTIONS
-
+    // HELPER FUNCTIONS (Using Custom Claims for efficiency)
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // --- OPTION 1: Using getUserData (Less efficient) ---
-    // NOTE: Each get() is a billable read operation. Use with caution.
-    function _getUserDoc(uid) {
-      return get(/databases/$(database)/documents/users/$(uid));
-    }
-
-    // --- OPTION 2: RECOMMENDED - Using Custom Claims ---
-    // This is the most performant and recommended approach.
     function getAuthRole() {
       return request.auth.token.role;
     }
@@ -29,13 +20,9 @@ service cloud.firestore {
     function getAuthStudentDataEventAccess() {
       return request.auth.token.get('studentDataEventAccess', {});
     }
-    // -------------------------------------------------------------------------
 
-    // Use this line to choose your role-finding strategy.
-    // To switch, comment one and uncomment the other.
     function getUserRole() {
-        // return _getUserDoc(request.auth.uid).data.role; // Option 1: Live read from document
-        return getAuthRole(); // Option 2: Read from Custom Claim (Recommended)
+        return getAuthRole(); // Using Custom Claim (Recommended)
     }
 
     function isRole(role) {
@@ -58,36 +45,34 @@ service cloud.firestore {
       return isRoleIn(['overall_head', 'admin']);
     }
 
-    // CORRECTED isManagerForEvent function
     function isManagerForEvent(eventId) {
-      // Logic is broken down into separate boolean expressions and combined at the end.
-      // This avoids illegal 'if' and 'let' statements.
       let hasAdminAccess = isOverallHeadOrAdmin();
-
+      // Ensure the key exists before trying to access it
       let isEventRepForEvent = getUserRole() == 'event_representative'
-                              && eventId in getAuthAssignedEventUids();
-
+                               && getAuthAssignedEventUids().hasAny([eventId]);
       let isOrganizerForEvent = getUserRole() == 'organizer'
-                               && getAuthStudentDataEventAccess()[eventId] == true;
-
+                                 && getAuthStudentDataEventAccess()[eventId] == true;
       return isSignedIn() && (hasAdminAccess || isEventRepForEvent || isOrganizerForEvent);
     }
 
     // RULES FOR COLLECTIONS
 
-    // USERS
+    // USERS (includes student profiles, staff profiles)
     match /users/{userId} {
+      // Read: Any staff, or user reading their own profile
       allow read: if isStaff() || (isSignedIn() && request.auth.uid == userId);
+      // Create: User can create their own profile (e.g., on signup), or Admin can create any
       allow create: if (isSignedIn() && request.auth.uid == userId) || isOverallHeadOrAdmin();
+      // Update: User can update own. Admin can update any. Staff can update credibilityScore/updatedAt.
       allow update: if (isSignedIn() && request.auth.uid == userId) || isOverallHeadOrAdmin()
                       || (isStaff() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['credibilityScore', 'updatedAt']));
       allow delete: if isOverallHeadOrAdmin();
     }
 
-    // SUBEVENTS
+    // SUBEVENTS (Event definitions)
     match /subEvents/{eventId} {
-      allow read: if true;
-      allow write: if isOverallHeadOrAdmin();
+      allow read: if true; // Publicly readable for event Browse/display
+      allow write: if isOverallHeadOrAdmin(); // Only Admin/Overall Head can create/edit/delete events
     }
 
     // EVENT REGISTRATIONS
@@ -95,26 +80,28 @@ service cloud.firestore {
       function isOwner() {
         return isSignedIn() && resource.data.userId == request.auth.uid;
       }
-      // CORRECTED: The eventId must be retrieved from the incoming or existing data
-      function getEventId() {
-        // When creating, the document `resource` doesn't exist yet, so check `request.resource`.
+      function getEventId() { // Gets eventId from new or existing doc
         return request.resource.data.subEventId != null ? request.resource.data.subEventId : resource.data.subEventId;
       }
 
+      // Read: Owner of registration, or manager of the event
       allow read: if isOwner() || isManagerForEvent(getEventId());
-      // A signed-in user can create a registration for themselves. This allows mock "student" users to work.
+      // Create: Signed in user can create registration for themselves
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      // Update: Manager can update any field. Owner can only cancel their own registration.
       allow update: if isManagerForEvent(getEventId()) || (isOwner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['registrationStatus']) && request.resource.data.registrationStatus == 'cancelled');
+      // Delete: Only manager can delete registrations
       allow delete: if isManagerForEvent(getEventId());
     }
 
     // EVENT TEAMS
     match /event_teams/{teamId} {
-      allow read: if true;
-      // A signed-in user can create a team, as long as they are the leader. This allows mock "student" users to work.
+      allow read: if true; // Teams can be publicly read (e.g., for display in event details)
+      // Create: Signed in user can create a team if they are the leader of the new team
       allow create: if isSignedIn() && request.resource.data.teamLeaderId == request.auth.uid;
-      allow update: if isOverallHeadOrAdmin() || (isSignedIn() && resource.data.teamLeaderId == request.auth.uid);
-      allow delete: if isOverallHeadOrAdmin();
+      // Update: Admin/Overall Head can update any team. Team leader can update their own team.
+      allow update: if isOverallHeadOrAdmin() || (isSignedIn() && resource.data.teamLeaderId == request.auth.uid) || (isSignedIn() && request.auth.uid in resource.data.memberUids);
+      allow delete: if isOverallHeadOrAdmin(); // Only Admin/Overall Head can delete teams
     }
 
     // TASKS
@@ -125,31 +112,31 @@ service cloud.firestore {
       function isAssigner() {
         return isSignedIn() && request.auth.uid == resource.data.assignedByUserId;
       }
-      // CORRECTED: The eventId must be retrieved from the incoming or existing data
-      function getEventId() {
+      function getEventId() { // Gets eventId from new or existing doc
         return request.resource.data.subEventId != null ? request.resource.data.subEventId : resource.data.subEventId;
       }
 
+      // Read: Assignee, Assigner, or Manager of the event
       allow read: if isAssignee() || isAssigner() || isManagerForEvent(getEventId());
+      // Create: Staff can create tasks
       allow create: if isStaff() && request.resource.data.assignedByUserId == request.auth.uid;
-      allow update, delete: if isAssigner() || isManagerForEvent(getEventId());
+      // Update/Delete: Assigner or Manager of the event
+      allow update: if isAssigner() || isManagerForEvent(getEventId()) || isAssignee();
+      allow delete: if isAssigner() || isManagerForEvent(getEventId());
     }
 
     // CUSTOM COLUMN DEFINITIONS
+    // Global/System-wide column definitions (visible to all staff)
     match /systemPreferences/columnDefinitions/studentData/{columnId} {
-        allow read: if isStaff();
-        allow write: if isOverallHeadOrAdmin();
+        allow read: if isStaff(); // All staff can read global definitions
+        allow write: if isOverallHeadOrAdmin(); // Only Overall Head/Admin can create/update/delete global definitions
     }
+    // User-specific column definitions (visible "Only me")
     match /users/{userId}/preferences/columnDefinitions/studentData/{columnId} {
-        allow read, write: if isSignedIn() && request.auth.uid == userId;
-    }
-    // CORRECTED: Path variable must match the variable used in the function call
-    match /events/{eventPathId}/columnDefinitions/{columnId} {
-        allow read: if isOverallHeadOrAdmin() || isManagerForEvent(eventPathId);
-        allow write: if isOverallHeadOrAdmin() || isManagerForEvent(eventPathId); // Simplified from create, update, delete
+        allow read, write: if isSignedIn() && request.auth.uid == userId; // User can read/write their own column definitions
     }
 
-    // Default catch-all
+    // Default catch-all - Deny all other unmatched paths by default for security
     match /{document=**} {
       allow read, write: if false;
     }

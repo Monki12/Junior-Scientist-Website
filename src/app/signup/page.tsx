@@ -102,8 +102,8 @@ export default function SignUpPage() {
           schoolName: formData.schoolName,
           standard: formData.standard,
           division: formData.division || null,
-          schoolId: null, // School ID is no longer determined from mock data
-          schoolVerifiedByOrganizer: false, // All new schools are unverified
+          schoolId: null, 
+          schoolVerifiedByOrganizer: false,
           role: 'student' as const,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),

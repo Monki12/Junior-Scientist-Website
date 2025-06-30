@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useAuth } from '@/hooks/use-auth';
 import type { SubEvent, EventRegistration } from '@/types';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
+import { collection, query, onSnapshot, where, getDocs } from 'firebase/firestore';
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -41,6 +41,7 @@ export default function MyRegistrationsPage() {
       return;
     }
 
+    setLoadingRegistrations(true);
     const q = query(collection(db, 'event_registrations'), where('userId', '==', userProfile.uid));
 
     const unsubscribe = onSnapshot(q, async (querySnapshot) => {
@@ -55,22 +56,28 @@ export default function MyRegistrationsPage() {
       // Fetch details for all unique event IDs
       const eventIds = [...new Set(regs.map(r => r.subEventId))];
       if (eventIds.length > 0) {
-        const eventsQuery = query(collection(db, 'subEvents'), where('__name__', 'in', eventIds));
-        const eventsSnapshot = await getDocs(eventsQuery);
-        const eventsMap = new Map(eventsSnapshot.docs.map(doc => [doc.id, {id: doc.id, ...doc.data()} as SubEvent]));
-        
-        const registrationsWithDetails = regs.map(reg => ({
-          ...reg,
-          eventDetails: eventsMap.get(reg.subEventId)
-        })).sort((a, b) => {
-            // Sort by event date, most recent first
-            const dateA = a.eventDetails?.eventDate ? new Date(a.eventDetails.eventDate) : 0;
-            const dateB = b.eventDetails?.eventDate ? new Date(b.eventDetails.eventDate) : 0;
-            if (!dateA || !dateB) return 0;
-            return dateB.getTime() - dateA.getTime();
-        });
-        
-        setRegistrations(registrationsWithDetails);
+        try {
+          const eventsQuery = query(collection(db, 'subEvents'), where('__name__', 'in', eventIds));
+          const eventsSnapshot = await getDocs(eventsQuery);
+          const eventsMap = new Map(eventsSnapshot.docs.map(doc => [doc.id, {id: doc.id, ...doc.data()} as SubEvent]));
+          
+          const registrationsWithDetails = regs.map(reg => ({
+            ...reg,
+            eventDetails: eventsMap.get(reg.subEventId)
+          })).sort((a, b) => {
+              // Sort by event date, most recent first
+              const dateA = a.eventDetails?.eventDate ? new Date(a.eventDetails.eventDate) : 0;
+              const dateB = b.eventDetails?.eventDate ? new Date(b.eventDetails.eventDate) : 0;
+              if (!dateA || !dateB) return 0;
+              return dateB.getTime() - dateA.getTime();
+          });
+          
+          setRegistrations(registrationsWithDetails);
+        } catch (error) {
+          console.error("Error fetching event details for registrations: ", error);
+          setRegistrations([]);
+        }
+
       } else {
          setRegistrations([]);
       }
@@ -89,12 +96,13 @@ export default function MyRegistrationsPage() {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <span className="ml-4">Loading your registrations...</span>
       </div>
     );
   }
 
   return (
-    <div className="animate-fade-in-up space-y-6">
+    <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-2xl">

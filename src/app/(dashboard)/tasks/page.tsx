@@ -24,7 +24,7 @@ import { format, parseISO, isValid } from 'date-fns';
 import {
   ListChecks, Loader2, PlusCircle, Edit2, Trash2, CalendarIcon, ChevronDown
 } from 'lucide-react';
-import { collection, query, where, getDocs, onSnapshot, addDoc, updateDoc, deleteDoc, doc, Unsubscribe, runTransaction, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, onSnapshot, addDoc, updateDoc, deleteDoc, doc, Unsubscribe, runTransaction, serverTimestamp, increment } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 const defaultTaskFormState: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'assignedToUserIds'> & { assignedToUserIds: string[] } = {
@@ -79,36 +79,41 @@ export default function GlobalTasksPage() {
     
     const setupListeners = async () => {
         setLoadingData(true);
-        
-        const eventsQuery = query(collection(db, 'subEvents'));
-        const eventsSnapshot = await getDocs(eventsQuery);
-        const eventsList = eventsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SubEvent));
-        setAllEvents(eventsList);
-        
-        const staffRoles = ['organizer', 'event_representative', 'overall_head', 'admin'];
-        const staffQuery = query(collection(db, 'users'), where('role', 'in', staffRoles));
-        const staffSnapshot = await getDocs(staffQuery);
-        const staffList = staffSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfileData));
-        setAllStaff(staffList);
+        try {
+          const eventsQuery = query(collection(db, 'subEvents'));
+          const eventsSnapshot = await getDocs(eventsQuery);
+          const eventsList = eventsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SubEvent));
+          setAllEvents(eventsList);
+          
+          const staffRoles = ['organizer', 'event_representative', 'overall_head', 'admin'];
+          const staffQuery = query(collection(db, 'users'), where('role', 'in', staffRoles));
+          const staffSnapshot = await getDocs(staffQuery);
+          const staffList = staffSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfileData));
+          setAllStaff(staffList);
 
-        let tasksQuery;
-        if (userProfile.role === 'admin' || userProfile.role === 'overall_head') {
-            tasksQuery = query(collection(db, 'tasks'));
-        } else if (userProfile.role === 'event_representative' && userProfile.assignedEventUids) {
-            tasksQuery = query(collection(db, 'tasks'), where('subEventId', 'in', userProfile.assignedEventUids));
-        } else {
-            tasksQuery = query(collection(db, 'tasks'), where('assignedToUserIds', 'array-contains', userProfile.uid));
+          let tasksQuery;
+          if (userProfile.role === 'admin' || userProfile.role === 'overall_head') {
+              tasksQuery = query(collection(db, 'tasks'));
+          } else if (userProfile.role === 'event_representative' && userProfile.assignedEventUids) {
+              tasksQuery = query(collection(db, 'tasks'), where('subEventId', 'in', userProfile.assignedEventUids));
+          } else {
+              tasksQuery = query(collection(db, 'tasks'), where('assignedToUserIds', 'array-contains', userProfile.uid));
+          }
+
+          unsubscribe = onSnapshot(tasksQuery, (snapshot) => {
+              const tasksList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
+              setTasks(tasksList);
+              setLoadingData(false);
+          }, (error) => {
+              console.error("Error fetching tasks:", error);
+              toast({ title: "Error", description: "Could not fetch tasks.", variant: "destructive" });
+              setLoadingData(false);
+          });
+        } catch (error) {
+          console.error("Error setting up listeners:", error);
+          toast({ title: "Error", description: "Could not initialize page data.", variant: "destructive" });
+          setLoadingData(false);
         }
-
-        unsubscribe = onSnapshot(tasksQuery, (snapshot) => {
-            const tasksList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
-            setTasks(tasksList);
-            setLoadingData(false);
-        }, (error) => {
-            console.error("Error fetching tasks:", error);
-            toast({ title: "Error", description: "Could not fetch tasks.", variant: "destructive" });
-            setLoadingData(false);
-        });
     }
 
     setupListeners();
@@ -169,27 +174,21 @@ export default function GlobalTasksPage() {
               completedAt: serverTimestamp()
           });
 
+          const pointsToAdd = task.pointsOnCompletion || 10;
           for (const assigneeId of task.assignedToUserIds) {
               const assigneeRef = doc(db, "users", assigneeId);
-              transaction.update(assigneeRef, {
-                  credibilityScore: (await transaction.get(assigneeRef)).data()?.credibilityScore + (task.pointsOnCompletion || 10)
-              });
+              transaction.update(assigneeRef, { credibilityScore: increment(pointsToAdd) });
           }
 
           if (task.assignedByUserId) {
               const assignerRef = doc(db, "users", task.assignedByUserId);
-              const assignerDoc = await transaction.get(assignerRef);
-              if (assignerDoc.exists()) {
-                  transaction.update(assignerRef, {
-                      credibilityScore: assignerDoc.data()?.credibilityScore + 2
-                  });
-              }
+              transaction.update(assignerRef, { credibilityScore: increment(2) });
           }
         });
         toast({ title: "Task Completed", description: `Credibility scores have been updated.` });
-      } catch (e) {
+      } catch (e: any) {
         console.error("Transaction failed: ", e);
-        toast({ title: "Error", description: "Failed to update task and scores.", variant: "destructive" });
+        toast({ title: "Error", description: e.message || "Failed to update task and scores.", variant: "destructive" });
       }
   };
 

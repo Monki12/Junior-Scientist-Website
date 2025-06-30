@@ -339,7 +339,7 @@ export default function StudentsPage() {
   };
 
   const handleOptimisticUpdate = (studentId: string, field: string, value: any, isCustom: boolean) => {
-    const originalStudents = students.map(s => ({...s, customData: {...s.customData}})); // Deep copy for rollback
+    const originalStudents = JSON.parse(JSON.stringify(students)); // Deep copy for rollback
     
     // Optimistically update local state
     setStudents(prevStudents => 
@@ -482,4 +482,3 @@ export default function StudentsPage() {
     </div>
   );
 }
-

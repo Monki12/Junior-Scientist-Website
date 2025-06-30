@@ -8,9 +8,10 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useEffect, useState }from 'react';
-import type { SubEvent, UserProfileData } from '@/types';
-import { collection, onSnapshot, query, orderBy, limit, where } from 'firebase/firestore';
+import type { SubEvent, UserProfileData, EventRegistration } from '@/types';
+import { collection, onSnapshot, query, orderBy, limit, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { Badge } from '@/components/ui/badge';
 
 const OverallHeadDashboard = () => {
   const [stats, setStats] = useState({ events: 0, staff: 0, students: 0, avgParticipants: '0.0' });
@@ -186,9 +187,69 @@ const OrganizerDashboard = () => (
 );
 
 const StudentDashboard = ({ userProfile }: { userProfile: UserProfileData }) => {
-  // Mock data for now, will be replaced with real data fetching
-  const registeredEventsCount = 0;
-  const upcomingEventsCount = 0;
+  const [registrations, setRegistrations] = useState<(EventRegistration & { eventDetails?: SubEvent })[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
+
+  useEffect(() => {
+    if (!userProfile?.uid) {
+        setLoadingData(false);
+        return;
+    }
+
+    setLoadingData(true);
+    const q = query(collection(db, 'event_registrations'), where('userId', '==', userProfile.uid));
+
+    const unsubscribe = onSnapshot(q, async (querySnapshot) => {
+      if (querySnapshot.empty) {
+        setRegistrations([]);
+        setLoadingData(false);
+        return;
+      }
+      
+      const regs = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EventRegistration));
+      const eventIds = [...new Set(regs.map(r => r.subEventId))];
+
+      if (eventIds.length > 0) {
+        try {
+          const eventsQuery = query(collection(db, 'subEvents'), where('__name__', 'in', eventIds));
+          const eventsSnapshot = await getDocs(eventsQuery);
+          const eventsMap = new Map(eventsSnapshot.docs.map(doc => [doc.id, {id: doc.id, ...doc.data()} as SubEvent]));
+          
+          const registrationsWithDetails = regs.map(reg => ({
+            ...reg,
+            eventDetails: eventsMap.get(reg.subEventId)
+          }));
+          
+          setRegistrations(registrationsWithDetails);
+        } catch (error) {
+          console.error("Error fetching event details for dashboard: ", error);
+          setRegistrations(regs); // Set registrations without details on error
+        }
+      } else {
+         setRegistrations([]);
+      }
+      setLoadingData(false);
+    }, (error) => {
+      console.error("Error fetching registrations for dashboard: ", error);
+      setLoadingData(false);
+    });
+
+    return () => unsubscribe();
+  }, [userProfile?.uid]);
+  
+  const registeredEventsCount = registrations.length;
+  
+  const upcomingEvents = registrations.filter(reg => {
+    if (!reg.eventDetails?.eventDate) return false;
+    const eventDate = new Date(reg.eventDetails.eventDate);
+    return eventDate >= new Date(); // Today or in the future
+  }).sort((a, b) => { // Sort upcoming events by soonest first
+      const dateA = a.eventDetails?.eventDate ? new Date(a.eventDetails.eventDate) : new Date(0);
+      const dateB = b.eventDetails?.eventDate ? new Date(b.eventDetails.eventDate) : new Date(0);
+      return dateA.getTime() - dateB.getTime();
+  });
+  
+  const upcomingEventsCount = upcomingEvents.length;
 
   return (
     <div className="space-y-8 animate-fade-in-up">
@@ -201,7 +262,7 @@ const StudentDashboard = ({ userProfile }: { userProfile: UserProfileData }) => 
             <Ticket className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{registeredEventsCount}</div>
+            {loadingData ? <Loader2 className="h-6 w-6 animate-spin" /> : <div className="text-2xl font-bold">{registeredEventsCount}</div>}
             <p className="text-xs text-muted-foreground">Events you are part of</p>
           </CardContent>
         </Card>
@@ -211,7 +272,7 @@ const StudentDashboard = ({ userProfile }: { userProfile: UserProfileData }) => 
             <Briefcase className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{upcomingEventsCount}</div>
+            {loadingData ? <Loader2 className="h-6 w-6 animate-spin" /> : <div className="text-2xl font-bold">{upcomingEventsCount}</div>}
             <p className="text-xs text-muted-foreground">Events on the horizon</p>
           </CardContent>
         </Card>
@@ -222,9 +283,35 @@ const StudentDashboard = ({ userProfile }: { userProfile: UserProfileData }) => 
           <CardTitle>My Upcoming Events</CardTitle>
           <CardDescription>A list of your registered events that are coming up soon.</CardDescription>
         </CardHeader>
-        <CardContent className="text-center text-muted-foreground">
-          <p>You have no upcoming events registered.</p>
-          <p className="text-sm">Why not explore some new ones?</p>
+        <CardContent>
+          {loadingData ? (
+            <div className="flex justify-center items-center py-4">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          ) : upcomingEvents.length > 0 ? (
+            <ul className="space-y-4">
+              {upcomingEvents.slice(0, 5).map(reg => ( // Show max 5 upcoming
+                <li key={reg.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                  <div>
+                    <Link href={`/events/${reg.eventDetails?.slug || ''}`} className="font-semibold text-primary hover:underline">
+                      {reg.eventDetails?.title || 'Event details loading...'}
+                    </Link>
+                    <p className="text-sm text-muted-foreground">
+                      {reg.eventDetails?.eventDate ? new Date(reg.eventDetails.eventDate).toLocaleDateString('en-US', {
+                          year: 'numeric', month: 'long', day: 'numeric'
+                      }) : 'Date TBD'}
+                    </p>
+                  </div>
+                  <Badge variant={reg.registrationStatus === 'approved' ? 'default' : 'secondary'} className="capitalize">{reg.registrationStatus}</Badge>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="text-center text-muted-foreground py-4">
+              <p>You have no upcoming events registered.</p>
+              <p className="text-sm">Why not explore some new ones?</p>
+            </div>
+          )}
         </CardContent>
       </Card>
       
