@@ -16,7 +16,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { Loader2, Users, Search, ShieldAlert, Filter, GraduationCap, PlusCircle, Columns, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { nanoid } from 'nanoid';
@@ -24,6 +24,7 @@ import { nanoid } from 'nanoid';
 // Enriched student type for local display
 interface DisplayStudent extends UserProfileData {
   registeredEventNames?: string[];
+  schoolVerifiedByOrganizer: boolean;
 }
 
 const DEFAULT_COLUMNS: CustomColumnDefinition[] = [
@@ -84,17 +85,17 @@ export default function StudentsPage() {
   const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
   const [newColumn, setNewColumn] = useState<Omit<CustomColumnDefinition, 'id'>>({ name: '', dataType: 'text' });
 
-  const canViewPage = userProfile?.role === 'admin' || userProfile?.role === 'overall_head' || userProfile?.role === 'event_representative';
+  const canManageStudents = userProfile?.role === 'admin' || userProfile?.role === 'overall_head' || userProfile?.role === 'event_representative';
   const canManageColumns = userProfile?.role === 'admin' || userProfile?.role === 'overall_head';
 
   useEffect(() => {
-    if (!authLoading && !canViewPage) {
+    if (!authLoading && !canManageStudents) {
         toast({ title: 'Access Denied', description: 'You do not have permission to view this page.', variant: 'destructive' });
         router.push('/dashboard');
         return;
     }
 
-    if (canViewPage) {
+    if (canManageStudents) {
         setLoadingData(true);
         const studentsQuery = query(collection(db, 'users'), where('role', 'in', ['student', 'test']));
         const eventsQuery = query(collection(db, 'subEvents'));
@@ -102,7 +103,7 @@ export default function StudentsPage() {
 
         const unsubStudents = onSnapshot(studentsQuery, (snapshot) => {
             const fetchedStudents = snapshot.docs.map(doc => ({...doc.data(), uid: doc.id} as UserProfileData));
-            setStudents(fetchedStudents);
+            setStudents(fetchedStudents as DisplayStudent[]);
             if (loadingData) setLoadingData(false);
         }, (error) => {
             console.error("Error fetching students:", error);
@@ -135,14 +136,14 @@ export default function StudentsPage() {
             unsubRegistrations();
         };
     }
-  }, [userProfile, authLoading, canViewPage, router, toast]);
+  }, [userProfile, authLoading, canManageStudents, router, toast]);
 
 
   const enrichedStudents = useMemo(() => {
     return students.map(student => {
       const registeredEventIds = registrationsMap.get(student.uid) || [];
       const registeredEventNames = registeredEventIds.map(id => eventsMap.get(id) || 'Unknown Event').filter(Boolean);
-      return { ...student, registeredEventNames };
+      return { ...student, registeredEventNames, schoolVerifiedByOrganizer: !!student.schoolVerifiedByOrganizer };
     });
   }, [students, registrationsMap, eventsMap]);
 
@@ -163,6 +164,26 @@ export default function StudentsPage() {
     });
   }, [enrichedStudents, activeFilters]);
 
+  const handleStudentUpdate = async (studentId: string, field: string, value: any) => {
+    const studentRef = doc(db, 'users', studentId);
+    try {
+      await runTransaction(db, async (transaction) => {
+        const studentDoc = await transaction.get(studentRef);
+        if (!studentDoc.exists()) {
+          throw new Error("Student document does not exist!");
+        }
+        transaction.update(studentRef, {
+          [field]: value,
+          updatedAt: serverTimestamp(),
+        });
+      });
+      toast({ title: "Update Successful", description: `Student record has been updated.` });
+    } catch (error: any) {
+      console.error("Error updating student:", error);
+      toast({ title: "Update Failed", description: error.message, variant: "destructive" });
+    }
+  };
+
   const handleAddCustomColumn = () => {
     const newId = `custom_${newColumn.name.toLowerCase().replace(/\s/g, '_')}`;
     const newDef: CustomColumnDefinition = { ...newColumn, id: newId };
@@ -173,7 +194,7 @@ export default function StudentsPage() {
     toast({title: "Column Added", description: `Column "${newDef.name}" is now available.`});
   };
   
-  if (authLoading || (!canViewPage && !authLoading) || loadingData) {
+  if (authLoading || (!canManageStudents && !authLoading) || loadingData) {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -181,7 +202,7 @@ export default function StudentsPage() {
     );
   }
   
-  if (!canViewPage) {
+  if (!canManageStudents) {
       return (
         <div className="flex flex-col h-full w-full items-center justify-center text-center p-4">
             <ShieldAlert className="h-16 w-16 text-destructive mb-4" />
@@ -239,14 +260,24 @@ export default function StudentsPage() {
                         } else {
                             cellValue = (student as any)[col.id];
                         }
-                        return (
-                            <TableCell key={col.id}>
-                                {col.dataType === 'checkbox' ? (
-                                    <Checkbox checked={!!cellValue} disabled />
-                                ) : (
-                                    displayValue(cellValue)
-                                )}
+                        
+                        if (col.dataType === 'checkbox') {
+                          return (
+                            <TableCell key={col.id} className="text-center">
+                              <Checkbox 
+                                checked={!!cellValue}
+                                onCheckedChange={(checked) => handleStudentUpdate(student.uid, col.id, !!checked)}
+                                disabled={!canManageStudents}
+                                aria-label={`Verify school for ${student.fullName}`}
+                              />
                             </TableCell>
+                          )
+                        }
+
+                        return (
+                          <TableCell key={col.id}>
+                            {displayValue(cellValue)}
+                          </TableCell>
                         )
                     })}
                   </TableRow>
@@ -342,4 +373,3 @@ export default function StudentsPage() {
     </div>
   );
 }
-

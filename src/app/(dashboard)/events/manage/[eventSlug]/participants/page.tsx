@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { db, storage } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, runTransaction, serverTimestamp, getDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { ArrowLeft, Loader2, Users, Search, Filter, PlusCircle, UploadCloud, FileCog, Columns, X } from 'lucide-react';
 import { nanoid } from 'nanoid';
@@ -182,19 +182,24 @@ export default function ManageParticipantsPage() {
   }, [participants, activeFilters]);
 
   const handleUpdateRegistrationField = async (registrationId: string, field: keyof EventRegistration | string, value: any) => {
-    // For custom fields, we would update a 'customData' map on the registration document.
-    // For now, this only handles default fields.
     if (!DEFAULT_COLUMNS.find(c => c.id === field)) {
-        console.warn("Updating custom fields is not fully implemented in Firestore yet.");
-        // Simulate local update
-        setParticipants(prev => prev.map(p => p.registrationId === registrationId ? { ...p, [field]: value } : p));
-        toast({ title: "Success (Local)", description: `Participant ${String(field)} updated locally.` });
-        return;
+      console.warn("Updating custom fields is not fully implemented in Firestore yet.");
+      setParticipants(prev => prev.map(p => p.registrationId === registrationId ? { ...p, [field]: value } : p));
+      toast({ title: "Success (Local)", description: `Participant ${String(field)} updated locally.` });
+      return;
     }
     
+    const regDocRef = doc(db, 'event_registrations', registrationId);
     try {
-      const regDocRef = doc(db, 'event_registrations', registrationId);
-      await updateDoc(regDocRef, { [field]: value, lastUpdatedAt: serverTimestamp() });
+      await runTransaction(db, async (transaction) => {
+        const regDoc = await transaction.get(regDocRef);
+        if (!regDoc.exists()) {
+          throw new Error("Registration document does not exist!");
+        }
+        transaction.update(regDocRef, { [field]: value, lastUpdatedAt: serverTimestamp() });
+      });
+
+      // Update local state for immediate UI feedback
       setParticipants(prev => prev.map(p => p.registrationId === registrationId ? { ...p, [field]: value } : p));
       toast({ title: "Success", description: `Participant ${String(field)} updated.` });
     } catch (error: any) {
