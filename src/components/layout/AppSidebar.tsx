@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -24,7 +25,9 @@ import {
   LogOut,
   HelpCircle,
   Menu,
-  ScanLine
+  ScanLine,
+  Search,
+  Ticket
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from './logo';
@@ -39,8 +42,8 @@ const getNavLinksForRole = (role: string | undefined) => {
 
   const studentLinks = [
     ...baseLinks,
-    { href: '/events', label: 'Browse Events', icon: Calendar },
-    { href: '/leaderboard', label: 'Leaderboard', icon: Trophy },
+    { href: '/events', label: 'Explore Events', icon: Search },
+    { href: '/my-registrations', label: 'My Registrations', icon: Ticket },
   ];
 
   const organizerLinks = [

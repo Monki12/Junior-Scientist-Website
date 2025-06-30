@@ -34,7 +34,8 @@ export default function DashboardHeader() {
     '/dashboard': 'Dashboard Overview',
     '/staff': 'Staff Management',
     '/students': 'Student Data',
-    '/events': 'Event Management',
+    '/my-events': 'Event Management',
+    '/my-registrations': 'My Registrations',
     '/tasks': 'Task Management',
     '/leaderboard': 'Leaderboard',
     '/profile': 'My Profile',
@@ -53,6 +54,8 @@ export default function DashboardHeader() {
     return matchedTitle ? matchedTitle[1] : 'Junior Scientist';
   };
 
+  const showOcrButton = userProfile && !['student', 'test'].includes(userProfile.role);
+
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:px-6">
        <div className="lg:hidden">
@@ -67,9 +70,11 @@ export default function DashboardHeader() {
         <h1 className="text-lg font-semibold tracking-wide">{getPageTitle()}</h1>
       </div>
       <div className="flex items-center gap-2 md:gap-4">
-        <Button variant="ghost" size="icon" onClick={() => router.push('/ocr-tool')} aria-label="OCR Scan">
-          <Camera className="h-5 w-5" />
-        </Button>
+        {showOcrButton && (
+          <Button variant="ghost" size="icon" onClick={() => router.push('/ocr-tool')} aria-label="OCR Scan">
+            <Camera className="h-5 w-5" />
+          </Button>
+        )}
         <Button variant="ghost" size="icon" onClick={() => router.push('/notifications')} aria-label="Notifications">
           <Bell className="h-5 w-5" />
         </Button>

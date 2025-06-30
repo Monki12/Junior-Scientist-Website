@@ -2,7 +2,7 @@
 'use client';
 
 import { useAuth } from '@/hooks/use-auth';
-import { Loader2, Users, ShieldCheck, Trophy, Briefcase, ListChecks, Award, BarChart3, LineChart } from 'lucide-react';
+import { Loader2, Users, ShieldCheck, Trophy, Briefcase, ListChecks, Award, BarChart3, LineChart, Ticket, Compass } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -168,17 +168,64 @@ const OrganizerDashboard = () => (
     </Card>
 );
 
-const StudentDashboard = () => (
-    <Card>
+const StudentDashboard = ({ userProfile }: { userProfile: UserProfileData }) => {
+  // Mock data for now, will be replaced with real data fetching
+  const registeredEventsCount = 0;
+  const upcomingEventsCount = 0;
+
+  return (
+    <div className="space-y-8 animate-fade-in-up">
+      <h1 className="text-3xl font-bold text-primary">Welcome, {userProfile.fullName || userProfile.displayName}!</h1>
+
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Registered Events</CardTitle>
+            <Ticket className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{registeredEventsCount}</div>
+            <p className="text-xs text-muted-foreground">Events you are part of</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Upcoming Events</CardTitle>
+            <Briefcase className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{upcomingEventsCount}</div>
+            <p className="text-xs text-muted-foreground">Events on the horizon</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
         <CardHeader>
-            <CardTitle>Student Dashboard</CardTitle>
-            <CardDescription>Welcome! Your registered events and teams will be displayed here.</CardDescription>
+          <CardTitle>My Upcoming Events</CardTitle>
+          <CardDescription>A list of your registered events that are coming up soon.</CardDescription>
+        </CardHeader>
+        <CardContent className="text-center text-muted-foreground">
+          <p>You have no upcoming events registered.</p>
+          <p className="text-sm">Why not explore some new ones?</p>
+        </CardContent>
+      </Card>
+      
+      <Card className="bg-accent/10">
+        <CardHeader>
+          <CardTitle className="text-accent flex items-center gap-2"><Compass /> Explore More Events</CardTitle>
+          <CardDescription>Discover new challenges and opportunities waiting for you.</CardDescription>
         </CardHeader>
         <CardContent>
-             <Button asChild><Link href="/events">Explore Events</Link></Button>
+           <Button asChild className="bg-accent text-accent-foreground hover:bg-accent/90">
+             <Link href="/events">Explore All Events</Link>
+           </Button>
         </CardContent>
-    </Card>
-);
+      </Card>
+
+    </div>
+  );
+};
 
 
 export default function DashboardPage() {
@@ -204,7 +251,7 @@ export default function DashboardPage() {
       case 'student':
       case 'test':
       default:
-        return <StudentDashboard />;
+        return <StudentDashboard userProfile={userProfile} />;
     }
   };
 

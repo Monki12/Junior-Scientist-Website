@@ -8,46 +8,75 @@ import { collection, query, orderBy, limit, getDocs, where } from 'firebase/fire
 import { db } from '@/lib/firebase';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Loader2, Trophy, Award } from 'lucide-react';
+import { Loader2, Trophy, Award, ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
 
 export default function LeaderboardPage() {
-  const { userProfile } = useAuth();
+  const { userProfile, loading: authLoading } = useAuth();
+  const router = useRouter();
+  const { toast } = useToast();
+  
   const [leaderboard, setLeaderboard] = useState<UserProfileData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingData, setLoadingData] = useState(true);
+
+  const canViewPage = userProfile && userProfile.role !== 'student' && userProfile.role !== 'test';
 
   useEffect(() => {
-    const fetchLeaderboard = async () => {
-      setLoading(true);
-      try {
-        const usersRef = collection(db, 'users');
-        const q = query(
-          usersRef,
-          where('role', 'in', ['organizer', 'event_representative', 'overall_head', 'admin']),
-          orderBy('credibilityScore', 'desc'),
-          limit(50)
-        );
-        const querySnapshot = await getDocs(q);
-        const leaders = querySnapshot.docs.map(doc => doc.data() as UserProfileData);
-        setLeaderboard(leaders);
-      } catch (error) {
-        console.error("Error fetching leaderboard data:", error);
-      } finally {
-        setLoading(false);
+    if (!authLoading) {
+      if (!canViewPage) {
+        toast({ title: "Access Denied", description: "The leaderboard is not available for students.", variant: "destructive"});
+        router.push('/dashboard');
+        return;
       }
-    };
-    fetchLeaderboard();
-  }, []);
+
+      const fetchLeaderboard = async () => {
+        setLoadingData(true);
+        try {
+          const usersRef = collection(db, 'users');
+          const q = query(
+            usersRef,
+            where('role', 'in', ['organizer', 'event_representative', 'overall_head', 'admin']),
+            orderBy('credibilityScore', 'desc'),
+            limit(50)
+          );
+          const querySnapshot = await getDocs(q);
+          const leaders = querySnapshot.docs.map(doc => doc.data() as UserProfileData);
+          setLeaderboard(leaders);
+        } catch (error) {
+          console.error("Error fetching leaderboard data:", error);
+          toast({ title: "Error", description: "Could not fetch leaderboard data.", variant: "destructive" });
+        } finally {
+          setLoadingData(false);
+        }
+      };
+      
+      fetchLeaderboard();
+    }
+  }, [userProfile, authLoading, canViewPage, router, toast]);
 
   const topThree = leaderboard.slice(0, 3);
   const restOfBoard = leaderboard.slice(3);
 
   const userRank = leaderboard.findIndex(u => u.uid === userProfile?.uid) + 1;
 
-  if (loading) {
+  if (authLoading || loadingData) {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!canViewPage) {
+    return (
+      <div className="flex flex-col h-full w-full items-center justify-center text-center p-4">
+        <ShieldAlert className="h-16 w-16 text-destructive mb-4" />
+        <h1 className="text-2xl font-bold text-destructive">Access Denied</h1>
+        <p className="text-muted-foreground">The leaderboard is only available for staff members.</p>
+        <Button onClick={() => router.push('/dashboard')} className="mt-4">Go to Dashboard</Button>
       </div>
     );
   }
