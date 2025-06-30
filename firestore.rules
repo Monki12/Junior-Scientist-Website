@@ -74,9 +74,11 @@ service cloud.firestore {
       function isOwner() {
         return isSignedIn() && resource.data.userId == request.auth.uid;
       }
+
       function getSubEventId(doc) {
         return doc.data.subEventId;
       }
+
       allow list: if isStaff();
       allow get: if isOwner() || isManagerForEvent(getSubEventId(resource));
       allow create: if isStudent() && request.resource.data.userId == request.auth.uid;
@@ -90,7 +92,14 @@ service cloud.firestore {
       allow update: if isOverallHeadOrAdmin() || (isSignedIn() && resource.data.teamLeaderId == request.auth.uid);
       allow delete: if isOverallHeadOrAdmin();
     }
+    
+    // NOTIFICATIONS
+    match /notifications/{notificationId} {
+        allow read, update: if isSignedIn() && resource.data.userId == request.auth.uid;
+        allow create: if isStaff();
+    }
 
+    // TASKS
     match /tasks/{taskId} {
       function isAssignee() {
         return isSignedIn() && request.auth.uid in resource.data.assignedToUserIds;
@@ -98,24 +107,24 @@ service cloud.firestore {
       function isAssigner() {
         return isSignedIn() && request.auth.uid == resource.data.assignedByUserId;
       }
-      function getTaskSubEventId(taskResource) {
-        return taskResource.data.subEventId;
+      function getTaskSubEventId(doc) {
+        return doc.data.subEventId;
       }
-      
-      allow read: if isAssignee() || isAssigner() || isOverallHeadOrAdmin() || isManagerForEvent(getTaskSubEventId(resource));
-      
-      allow create: if isStaff();
 
-      allow update: if (isAssigner() || isOverallHeadOrAdmin() || isManagerForEvent(getTaskSubEventId(request.resource))) ||
-                       (isAssignee() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'completedByUserId', 'completedAt']));
+      allow read: if isAssignee() || isAssigner() || isManagerForEvent(getTaskSubEventId(resource));
       
-      allow delete: if isAssigner() || isOverallHeadOrAdmin() || isManagerForEvent(getTaskSubEventId(resource));
+      // Only event representatives or higher can create tasks. Organizers are excluded.
+      allow create: if isRoleIn(['event_representative', 'overall_head', 'admin']);
+      
+      // Update: Full update for managers/assigners. Partial update for any assignee.
+      allow update: if (isAssigner() || isRoleIn(['event_representative', 'overall_head', 'admin'])) ||
+                       (isAssignee() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']));
+
+      // Delete: Only managers or the original assigner can delete. Organizers cannot.
+      allow delete: if isAssigner() || isRoleIn(['event_representative', 'overall_head', 'admin']);
     }
 
-    match /notifications/{notificationId} {
-        allow read, write: if isSignedIn() && request.auth.uid == resource.data.userId;
-    }
-
+    // CUSTOM COLUMN DEFINITIONS
     match /systemPreferences/columnDefinitions/studentData/{columnId} {
         allow read: if isStaff();
         allow write: if isOverallHeadOrAdmin();
@@ -123,11 +132,13 @@ service cloud.firestore {
     match /users/{userId}/preferences/columnDefinitions/studentData/{columnId} {
         allow read, write: if isSignedIn() && request.auth.uid == userId;
     }
-    match /events/{eventPathId}/columnDefinitions/{columnId} {
-        allow read: if isOverallHeadOrAdmin() || isManagerForEvent(eventPathId);
-        allow write: if isOverallHeadOrAdmin() || isManagerForEvent(eventPathId);
+    
+    // Catch-all for safety
+    match /{path=**}/columnDefinitions/{columnId} {
+      allow read, write: if false; 
     }
 
+    // Default Deny: All other paths are protected.
     match /{document=**} {
       allow read, write: if false;
     }
