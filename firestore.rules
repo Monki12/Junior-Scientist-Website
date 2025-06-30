@@ -4,141 +4,118 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions
-    function isAuthenticated() {
+    // Helper function to check if a user is authenticated.
+    function isAuth() {
       return request.auth != null;
     }
 
-    function isRole(uid, role) {
-      return getUserData(uid).role == role;
+    // Helper function to check if the authenticated user has a specific role.
+    function isRole(role) {
+      return isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
     }
 
-    function isOneOfRoles(uid, roles) {
-        return getUserData(uid).role in roles;
-    }
-
-    function getUserData(uid) {
-      return get(/databases/$(database)/documents/users/$(uid)).data;
+    // Helper function to check if the authenticated user has one of the specified roles.
+    function isOneOfRoles(roles) {
+      return isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in roles;
     }
     
-    function isAssignedToSubEventAsManager(subEventId, uid) {
-      let eventData = get(/databases/$(database)/documents/subEvents/$(subEventId)).data;
-      return isOneOfRoles(uid, ['admin', 'overall_head']) || 
-             (eventData.eventReps is list && uid in eventData.eventReps);
+    // Helper function to check if the authenticated user is the owner of a document.
+    function isOwner(userId) {
+      return isAuth() && request.auth.uid == userId;
     }
     
-    function canViewStudentData(subEventId, uid) {
-      let userData = getUserData(uid);
-      return isAssignedToSubEventAsManager(subEventId, uid) ||
-             (isRole(uid, 'organizer') && userData.studentDataEventAccess is map && userData.studentDataEventAccess[subEventId] == true);
+    // Helper function to access the data of an incoming request.
+    function incomingData() {
+      return request.resource.data;
     }
 
-    // --- Validation Functions ---
-    function isValidStudentProfile(data) {
-        return data.fullName is string && data.fullName.size() > 0 &&
-               data.email is string &&
-               data.schoolName is string && data.schoolName.size() > 0 &&
-               data.standard is string && data.standard.size() > 0 &&
-               data.phoneNumbers is list && data.phoneNumbers.size() > 0 &&
-               data.role == 'student';
-    }
-    
-    function isValidStaffProfile(data) {
-        return data.fullName is string && data.fullName.size() > 0 &&
-               data.email is string &&
-               data.collegeRollNumber is string && data.collegeRollNumber.matches('^[A-Z]{2}\\d{2}[A-Z]{3}\\d{3}$') &&
-               data.department is string && data.department.size() > 0 &&
-               data.phoneNumbers is list && data.phoneNumbers.size() > 0 &&
-               data.role in ['organizer', 'event_representative', 'overall_head', 'admin'];
-    }
-
-    // --- Collection Rules ---
-
+    // ====== Users Collection ======
+    // Defines rules for user profile documents.
     match /users/{userId} {
-      allow create: if
-        (request.auth.uid == userId && isValidStudentProfile(request.resource.data)) ||
-        (request.auth.uid == userId && isValidStaffProfile(request.resource.data)) ||
-        (isOneOfRoles(request.auth.uid, ['admin', 'overall_head']) && isValidStaffProfile(request.resource.data));
+      // Allow authenticated users to read profiles (e.g., to see names, roles).
+      allow read: if isAuth();
 
-      allow read: if isAuthenticated();
+      // Allow a new user to create their own 'student' profile upon signup.
+      // Allow admins/overall_heads to create staff accounts.
+      allow create: if (isOwner(userId) && incomingData().role == 'student') ||
+                       (isOneOfRoles(['admin', 'overall_head']) && incomingData().role != 'student');
 
-      allow update: if
-        (request.auth.uid == userId && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'displayName', 'photoURL', 'phoneNumbers', 'additionalNumber', 'schoolName',
-            'standard', 'division', 'department', 'updatedAt'
-        ])) ||
-        (isOneOfRoles(request.auth.uid, ['admin', 'overall_head'])) ||
-        (isRole(request.auth.uid, 'event_representative') && isRole(userId, 'organizer') && 
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['studentDataEventAccess', 'updatedAt']));
-            
-      allow delete: if isOneOfRoles(request.auth.uid, ['admin', 'overall_head']);
-    }
-
-    match /subEvents/{subEventId} {
-      allow read: if isAuthenticated();
-      allow create, delete: if isOneOfRoles(request.auth.uid, ['admin', 'overall_head']);
+      // A user can update their own profile.
+      // Admins/Overall Heads can update any profile (e.g., to verify a school or update a role).
+      allow update: if isOwner(userId) || isOneOfRoles(['admin', 'overall_head']);
       
-      allow update: if 
-        (isOneOfRoles(request.auth.uid, ['admin', 'overall_head'])) ||
-        (isRole(request.auth.uid, 'event_representative') && request.auth.uid in resource.data.eventReps &&
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-                'title', 'shortDescription', 'detailedDescription', 'eventDate', 'status', 'venue', 'mainImage'
-            ]));
+      // Nobody can delete user documents directly to maintain data integrity.
+      // Deletions should be handled by a secure administrative process.
+      allow delete: if false;
+
+        // --- Custom Column Preferences (Subcollection) ---
+        // Defines rules for user-specific custom column definitions.
+        match /preferences/columnDefinitions/studentData/{docId} {
+            // A user can read and write to their own column preferences.
+            allow read, write: if isOwner(userId);
+        }
     }
-    
+
+    // ====== Sub-Events Collection ======
+    // Defines rules for sub-event documents.
+    match /subEvents/{eventId} {
+      // Anyone, including unauthenticated visitors, can view event details.
+      allow read: if true;
+      // Only Admins or Overall Heads can create, update, or delete events.
+      allow write: if isOneOfRoles(['admin', 'overall_head']);
+    }
+
+    // ====== Event Registrations Collection ======
+    // Defines rules for event registration documents.
     match /event_registrations/{registrationId} {
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+      // Allow users to read their own registration details.
+      // Allow Admins/Overall Heads to read any registration.
+      // TODO: Extend to allow Event Reps to read registrations for their assigned events.
+      allow read: if isOwner(resource.data.userId) || isOneOfRoles(['admin', 'overall_head']);
+
+      // Allow authenticated students to create their own registration.
+      allow create: if isOwner(request.resource.data.userId) && isRole('student');
+
+      // Allow Admins/Overall Heads to update any registration (e.g., approve/decline status).
+      // TODO: Extend to allow Event Reps to update registrations for their events.
+      allow update: if isOneOfRoles(['admin', 'overall_head']);
       
-      allow read: if isAuthenticated() && (
-        request.auth.uid == resource.data.userId ||
-        canViewStudentData(resource.data.subEventId, request.auth.uid)
-      );
+      // Only Admins/Overall Heads can delete registrations.
+      allow delete: if isOneOfRoles(['admin', 'overall_head']);
+    }
 
-      allow update: if isAuthenticated() && (
-        isAssignedToSubEventAsManager(resource.data.subEventId, request.auth.uid)
-      );
-
-      allow delete: if isOneOfRoles(request.auth.uid, ['admin', 'overall_head']);
+    // ====== Event Teams Collection ======
+    // Defines rules for team documents for team-based events.
+    match /event_teams/{teamId} {
+        // Any authenticated user can read team information (e.g., to search for a team to join).
+        allow read: if isAuth();
+        // A user can create a team if they are the designated leader.
+        allow create: if isAuth() && request.resource.data.teamLeaderId == request.auth.uid;
+        // Any member of a team can update it (e.g., to add another member).
+        allow update: if isAuth() && resource.data.memberUids.hasAny([request.auth.uid]);
+        // Only Admins/Overall Heads can delete teams.
+        allow delete: if isOneOfRoles(['admin', 'overall_head']);
     }
     
-    match /event_teams/{teamId} {
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.teamLeaderId;
-      allow read, update: if isAuthenticated() && (
-        resource.data.memberUids.hasAny([request.auth.uid]) || 
-        isAssignedToSubEventAsManager(resource.data.eventId, request.auth.uid)
-      );
-      allow delete: if isOneOfRoles(request.auth.uid, ['admin', 'overall_head']);
-    }
-
+    // ====== Tasks Collection ======
+    // Defines rules for task management documents.
     match /tasks/{taskId} {
-      allow create: if isAuthenticated();
-
-      allow read: if isAuthenticated() && (
-        isOneOfRoles(request.auth.uid, ['admin', 'overall_head']) ||
-        (resource.data.assignedToUserIds is list && request.auth.uid in resource.data.assignedToUserIds) ||
-        (isRole(request.auth.uid, 'event_representative') && isAssignedToSubEventAsManager(resource.data.subEventId, request.auth.uid))
-      );
-
-      allow update: if isAuthenticated() && (
-        isOneOfRoles(request.auth.uid, ['admin', 'overall_head']) ||
-        (isAssignedToSubEventAsManager(resource.data.subEventId, request.auth.uid)) ||
-        (resource.data.assignedToUserIds is list && request.auth.uid in resource.data.assignedToUserIds &&
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'completedByUserId', 'completedAt']))
-      );
-      allow delete: if isOneOfRoles(request.auth.uid, ['admin', 'overall_head']);
+        // Admins/Overall Heads can read any task.
+        // Other users can read tasks assigned to them.
+        allow read: if isOneOfRoles(['admin', 'overall_head']) || (isAuth() && request.auth.uid in resource.data.assignedToUserIds);
+        
+        // Admins/Overall Heads can write to any task.
+        // Other users can write to tasks assigned to them (e.g., to change status).
+        allow write: if isOneOfRoles(['admin', 'overall_head']) || (isAuth() && request.auth.uid in resource.data.assignedToUserIds);
     }
-
-    match /userColumnPreferences/{preferenceId} {
-      allow read: if isAuthenticated() && (
-        request.auth.uid == resource.data.userId ||
-        isOneOfRoles(request.auth.uid, ['admin', 'overall_head']) ||
-        (resource.data.isSharedAcrossEvent == true && resource.data.subEventId is string && isAssignedToSubEventAsManager(resource.data.subEventId, request.auth.uid))
-      );
-      allow write, delete: if isAuthenticated() && (
-        request.auth.uid == request.resource.data.userId ||
-        isOneOfRoles(request.auth.uid, ['admin', 'overall_head']) ||
-        (isRole(request.auth.uid, 'event_representative') && isAssignedToSubEventAsManager(request.resource.data.subEventId, request.auth.uid) && request.resource.data.isSharedAcrossEvent == true)
-      );
+    
+    // ====== Global System Preferences ======
+    // Defines rules for system-wide configurations, like shared custom columns.
+    match /systemPreferences/columnDefinitions/studentData/{docId} {
+        // Any authenticated user can read global column definitions to render their table view.
+        allow read: if isAuth();
+        // Only Admins/Overall Heads can create, update, or delete global column definitions.
+        allow write: if isOneOfRoles(['admin', 'overall_head']);
     }
   }
 }
