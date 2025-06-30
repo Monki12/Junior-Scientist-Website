@@ -9,8 +9,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Bell, Camera, HelpCircle, LogOut, UserCircle, Menu } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
-import { Logo } from './logo';
 
 export default function DashboardHeader() {
   const { userProfile, authUser, logOut } = useAuth();
@@ -46,7 +44,12 @@ export default function DashboardHeader() {
   };
 
   const getPageTitle = () => {
-    const matchedTitle = Object.entries(pageTitles).find(([path]) => pathname.startsWith(path));
+    // Exact match first
+    if (pageTitles[pathname]) {
+        return pageTitles[pathname];
+    }
+    // Partial match for dynamic routes
+    const matchedTitle = Object.entries(pageTitles).find(([path]) => pathname.startsWith(path) && path !== '/');
     return matchedTitle ? matchedTitle[1] : 'Junior Scientist';
   };
 

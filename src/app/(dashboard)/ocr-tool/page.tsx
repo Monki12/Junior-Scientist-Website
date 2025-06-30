@@ -1,17 +1,15 @@
 
 'use client';
 
-import { useState, ChangeEvent, FormEvent, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, ChangeEvent, FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/use-auth';
 import { processRegistrationForm } from '@/actions/ocr';
 import type { StudentData } from '@/types';
-import { Loader2, UploadCloud, FileText, User, School, BookOpen, Phone, Mail, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { Loader2, UploadCloud, FileText, User, School, BookOpen, Phone, Mail, AlertTriangle } from 'lucide-react';
 import Image from 'next/image';
 
 const fileToDataUri = (file: File): Promise<string> => {
@@ -23,11 +21,7 @@ const fileToDataUri = (file: File): Promise<string> => {
   });
 };
 
-const ALLOWED_OCR_ROLES = ['organizer', 'event_representative', 'overall_head', 'admin', 'test'];
-
 export default function OcrToolPage() {
-  const { userProfile } = useAuth();
-  
   const [file, setFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -92,7 +86,6 @@ export default function OcrToolPage() {
 
       if (result.success && result.data) {
         setExtractedData(result.data);
-        // Non-error toast, so omitted as per guidelines.
       } else {
         toast({
           title: 'OCR Processing Failed',
@@ -110,18 +103,6 @@ export default function OcrToolPage() {
       setIsLoading(false);
     }
   };
-  
-  if (userProfile && !ALLOWED_OCR_ROLES.includes(userProfile.role)) {
-    return (
-       <div className="flex flex-col min-h-full items-center justify-center text-center p-4">
-        <ShieldAlert className="h-16 w-16 text-destructive mb-4" />
-        <h1 className="text-2xl font-bold text-destructive mb-2">Access Denied</h1>
-        <p className="text-muted-foreground mb-4">
-          You do not have the necessary permissions to use the OCR tool.
-        </p>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto">

@@ -21,22 +21,18 @@ export interface Task {
   title: string;
   description?: string;
   assignedToUserIds: string[]; // UIDs of assigned users
-  assignedTo?: string[]; // Kept for display names if needed, but logic should use UIDs
   assignedByUserId?: string; // UID of the user who assigned the task
-  eventSlug?: string;
   subEventId?: string; // Explicit link to event
   dueDate?: string; // ISO Date string
   priority: TaskPriority;
   status: TaskStatus;
   pointsOnCompletion?: number; // Points awarded for completion
   completedByUserId?: string | null; // UID of user who marked it complete
-  completedAt?: string | null; // ISO Date string
+  completedAt?: any; // serverTimestamp or ISO string
   attachments?: { name: string, url: string }[];
   subtasks?: { text: string, completed: boolean }[];
-  createdBy?: string; // UID of creator
-  createdAt: string; // ISO Date string
-  updatedAt: string; // ISO Date string
-  customTaskData?: Record<string, any>;
+  createdAt: any; // serverTimestamp or ISO string
+  updatedAt: any; // serverTimestamp or ISO string
 }
 
 export interface UserProfileData {
@@ -57,16 +53,11 @@ export interface UserProfileData {
   assignedEventUids?: string[]; // For Event Reps/Overall Heads
   studentDataEventAccess?: Record<string, boolean>; // For Organizers
   credibilityScore: number;
-  points: number; // Legacy, may be merged with credibilityScore or used for gamification
-  subEventsManaged?: string[];
+  points?: number; 
   phoneNumbers?: string[];
   additionalNumber?: string | null;
-  tasks?: Task[];
   createdAt?: any; 
   updatedAt?: any; 
-  registeredEventIds?: string[]; 
-  teamIds?: string[];
-  registeredEvents?: any[];
 }
 
 export interface SubEvent {
@@ -78,7 +69,7 @@ export interface SubEvent {
   detailedDescription: string;
   mainImage: { src: string; alt: string; dataAiHint: string };
   galleryImages?: Array<{ src: string; alt: string; dataAiHint: string }>;
-  registrationLink: string;
+  registrationLink?: string;
   deadline?: string | null; // ISO Date string
   eventDate?: string | null; // ISO Date string
   isTeamBased: boolean;
@@ -118,33 +109,6 @@ export interface StudentData {
   email: string;
 }
 
-export interface CustomColumnDefinition {
-  id: string;
-  name: string;
-  dataType: 'text' | 'number' | 'checkbox' | 'dropdown' | 'date';
-  options?: string[];
-  defaultValue?: any;
-  description?: string;
-}
-
-export interface ActiveDynamicFilter {
-  id: string;
-  columnId: string;
-  columnName: string;
-  value: string;
-  isCustom: boolean;
-}
-
-export interface UserColumnPreference {
-    id?: string;
-    userId: string | null;
-    subEventId: string | null;
-    dashboardArea: 'studentList' | 'taskList' | 'eventDetails' | 'userList';
-    columnsVisible: string[];
-    filtersApplied: Record<string, any>; // or stringified JSON
-    isSharedAcrossEvent: boolean;
-}
-
 
 // For Firestore event_registrations collection
 export type EventRegistration = {
@@ -179,17 +143,6 @@ export type EventTeam = {
   updatedAt: any; // Firestore Timestamp
 };
 
-export type StudentRegisteredEventDisplay = SubEvent & {
-  registrationId: string;
-  teamId?: string;
-  teamName?: string;
-  teamLeaderId?: string;
-  teamMembers?: string[];
-  teamMembersNames?: Record<string, string>;
-  admitCardUrl?: string | null;
-  registrationStatus?: RegistrationStatus;
-};
-
 
 // Form data for creating a new team
 export type CreateTeamFormData = {
@@ -200,3 +153,34 @@ export type CreateTeamFormData = {
 export type JoinTeamFormData = {
   teamCodeOrName: string; 
 };
+
+
+export interface CustomColumnDefinition {
+  id: string; // e.g., 'custom_field_1'
+  name: string; // e.g., 'T-Shirt Size'
+  dataType: 'text' | 'number' | 'checkbox' | 'date' | 'dropdown' | 'file' | 'reference';
+  options?: string[]; // For 'dropdown' type
+  defaultValue?: any;
+  description?: string;
+}
+
+export interface UserColumnPreference {
+    id?: string; // Document ID in Firestore
+    userId: string | null; // UID of user or null if shared
+    subEventId: string | null; // Event ID or null if global
+    dashboardArea: 'studentList' | 'taskList' | 'eventDetails' | 'userList';
+    columnsVisible: string[]; // Array of column IDs/keys
+    columnOrder: string[];
+    columnWidths: Record<string, number>;
+    filtersApplied: ActiveDynamicFilter[]; // Using the new type for filters
+    isSharedAcrossEvent: boolean;
+}
+
+export interface ActiveDynamicFilter {
+  id: string; // Unique ID for the filter instance
+  columnId: string; // ID of the column to filter on
+  columnName: string; // Display name of the column
+  operator: 'contains' | 'equals' | 'gt' | 'lt' | 'in' | 'is'; // Filter operator
+  value: any; // The value to filter by
+  isCustom: boolean; // Whether it's a filter on a custom column
+}

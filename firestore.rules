@@ -8,48 +8,32 @@ service cloud.firestore {
     function isAuthenticated() {
       return request.auth != null;
     }
-    
+
+    function isRole(uid, role) {
+      return getUserData(uid).role == role;
+    }
+
+    function isOneOfRoles(uid, roles) {
+        return getUserData(uid).role in roles;
+    }
+
     function getUserData(uid) {
       return get(/databases/$(database)/documents/users/$(uid)).data;
     }
     
-    function getRole(uid) {
-      return getUserData(uid).role;
-    }
-
-    function isOverallOrAdmin() {
-      return isAuthenticated() && getRole(request.auth.uid) in ['overall_head', 'admin'];
+    function isAssignedToSubEventAsManager(subEventId, uid) {
+      let eventData = get(/databases/$(database)/documents/subEvents/$(subEventId)).data;
+      return isOneOfRoles(uid, ['admin', 'overall_head']) || 
+             (eventData.eventReps is list && uid in eventData.eventReps);
     }
     
-    function isEventRepresentative() {
-      return isAuthenticated() && getRole(request.auth.uid) == 'event_representative';
+    function canViewStudentData(subEventId, uid) {
+      let userData = getUserData(uid);
+      return isAssignedToSubEventAsManager(subEventId, uid) ||
+             (isRole(uid, 'organizer') && userData.studentDataEventAccess is map && userData.studentDataEventAccess[subEventId] == true);
     }
 
-    function isOrganizer() {
-      return isAuthenticated() && getRole(request.auth.uid) == 'organizer';
-    }
-
-    function isAssignedToSubEvent(subEventId) {
-      let eventRef = get(/databases/$(database)/documents/subEvents/$(subEventId));
-      if (!eventRef.exists()) {
-        return false;
-      }
-      let eventData = eventRef.data;
-      let userUID = request.auth.uid;
-      
-      return isAuthenticated() && (
-        isOverallOrAdmin() ||
-        (eventData.eventReps is list && userUID in eventData.eventReps) ||
-        (eventData.organizerUids is list && userUID in eventData.organizerUids)
-      );
-    }
-
-    function canOrganizerViewStudentDataForEvent(subEventId) {
-        let userData = getUserData(request.auth.uid);
-        return isOrganizer() && 
-               (userData.studentDataEventAccess is map && userData.studentDataEventAccess[subEventId] == true);
-    }
-    
+    // --- Validation Functions ---
     function isValidStudentProfile(data) {
         return data.fullName is string && data.fullName.size() > 0 &&
                data.email is string &&
@@ -68,12 +52,13 @@ service cloud.firestore {
                data.role in ['organizer', 'event_representative', 'overall_head', 'admin'];
     }
 
-    // users collection
+    // --- Collection Rules ---
+
     match /users/{userId} {
       allow create: if
         (request.auth.uid == userId && isValidStudentProfile(request.resource.data)) ||
         (request.auth.uid == userId && isValidStaffProfile(request.resource.data)) ||
-        (isOverallOrAdmin() && isValidStaffProfile(request.resource.data));
+        (isOneOfRoles(request.auth.uid, ['admin', 'overall_head']) && isValidStaffProfile(request.resource.data));
 
       allow read: if isAuthenticated();
 
@@ -82,82 +67,78 @@ service cloud.firestore {
             'displayName', 'photoURL', 'phoneNumbers', 'additionalNumber', 'schoolName',
             'standard', 'division', 'department', 'updatedAt'
         ])) ||
-        (isOverallOrAdmin()) || // Admins/Overalls can update any field for management
-        (isEventRepresentative() && request.resource.data.diff(resource.data).affectedKeys().hasAny([
-            'studentDataEventAccess', 'updatedAt', 'credibilityScore' // Allow reps to update scores
-        ]));
-        
-      allow delete: if isOverallOrAdmin();
+        (isOneOfRoles(request.auth.uid, ['admin', 'overall_head'])) ||
+        (isRole(request.auth.uid, 'event_representative') && isRole(userId, 'organizer') && 
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['studentDataEventAccess', 'updatedAt']));
+            
+      allow delete: if isOneOfRoles(request.auth.uid, ['admin', 'overall_head']);
     }
 
-    // subEvents collection
     match /subEvents/{subEventId} {
       allow read: if isAuthenticated();
-      allow create: if isOverallOrAdmin();
+      allow create, delete: if isOneOfRoles(request.auth.uid, ['admin', 'overall_head']);
+      
       allow update: if 
-        isOverallOrAdmin() || 
-        (isEventRepresentative() && request.auth.uid in resource.data.eventReps);
-      allow delete: if isOverallOrAdmin();
+        (isOneOfRoles(request.auth.uid, ['admin', 'overall_head'])) ||
+        (isRole(request.auth.uid, 'event_representative') && request.auth.uid in resource.data.eventReps &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'title', 'shortDescription', 'detailedDescription', 'eventDate', 'status', 'venue', 'mainImage'
+            ]));
     }
     
-    // event_registrations collection (Student data is here)
     match /event_registrations/{registrationId} {
       allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
-
+      
       allow read: if isAuthenticated() && (
         request.auth.uid == resource.data.userId ||
-        isOverallOrAdmin() ||
-        (isEventRepresentative() && isAssignedToSubEvent(resource.data.subEventId)) ||
-        (isOrganizer() && canOrganizerViewStudentDataForEvent(resource.data.subEventId))
+        canViewStudentData(resource.data.subEventId, request.auth.uid)
       );
 
       allow update: if isAuthenticated() && (
-        isOverallOrAdmin() ||
-        (isEventRepresentative() && isAssignedToSubEvent(resource.data.subEventId)) ||
-        (isOrganizer() && canOrganizerViewStudentDataForEvent(resource.data.subEventId))
+        isAssignedToSubEventAsManager(resource.data.subEventId, request.auth.uid)
       );
-      allow delete: if isOverallOrAdmin();
+
+      allow delete: if isOneOfRoles(request.auth.uid, ['admin', 'overall_head']);
     }
     
-    // event_teams collection
     match /event_teams/{teamId} {
       allow create: if isAuthenticated() && request.auth.uid == request.resource.data.teamLeaderId;
-      allow read: if isAuthenticated() && (resource.data.memberUids.hasAny([request.auth.uid]) || isAssignedToSubEvent(resource.data.eventId));
-      allow update: if (isAuthenticated() && request.auth.uid == resource.data.teamLeaderId) || isAssignedToSubEvent(resource.data.eventId);
-      allow delete: if isOverallOrAdmin();
+      allow read, update: if isAuthenticated() && (
+        resource.data.memberUids.hasAny([request.auth.uid]) || 
+        isAssignedToSubEventAsManager(resource.data.eventId, request.auth.uid)
+      );
+      allow delete: if isOneOfRoles(request.auth.uid, ['admin', 'overall_head']);
     }
 
-    // tasks collection
     match /tasks/{taskId} {
-      allow create: if isAuthenticated(); // Allow any authenticated user to create tasks, client logic will control specifics.
+      allow create: if isAuthenticated();
 
       allow read: if isAuthenticated() && (
-        isOverallOrAdmin() ||
+        isOneOfRoles(request.auth.uid, ['admin', 'overall_head']) ||
         (resource.data.assignedToUserIds is list && request.auth.uid in resource.data.assignedToUserIds) ||
-        isAssignedToSubEvent(resource.data.subEventId)
+        (isRole(request.auth.uid, 'event_representative') && isAssignedToSubEventAsManager(resource.data.subEventId, request.auth.uid))
       );
 
       allow update: if isAuthenticated() && (
-        isOverallOrAdmin() ||
-        (isEventRepresentative() && isAssignedToSubEvent(resource.data.subEventId)) ||
+        isOneOfRoles(request.auth.uid, ['admin', 'overall_head']) ||
+        (isAssignedToSubEventAsManager(resource.data.subEventId, request.auth.uid)) ||
         (resource.data.assignedToUserIds is list && request.auth.uid in resource.data.assignedToUserIds &&
          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'completedByUserId', 'completedAt']))
       );
-      allow delete: if isOverallOrAdmin() || (isEventRepresentative() && isAssignedToSubEvent(resource.data.subEventId));
+      allow delete: if isOneOfRoles(request.auth.uid, ['admin', 'overall_head']);
     }
 
-    // userColumnPreferences collection
     match /userColumnPreferences/{preferenceId} {
-      allow write: if isAuthenticated() && (
-        request.auth.uid == request.resource.data.userId ||
-        isOverallOrAdmin() ||
-        (isEventRepresentative() && isAssignedToSubEvent(request.resource.data.subEventId) && request.resource.data.isSharedAcrossEvent == true)
-      );
       allow read: if isAuthenticated() && (
         request.auth.uid == resource.data.userId ||
-        (resource.data.isSharedAcrossEvent == true && resource.data.subEventId is string && isAssignedToSubEvent(resource.data.subEventId))
+        isOneOfRoles(request.auth.uid, ['admin', 'overall_head']) ||
+        (resource.data.isSharedAcrossEvent == true && resource.data.subEventId is string && isAssignedToSubEventAsManager(resource.data.subEventId, request.auth.uid))
       );
-      allow delete: if isAuthenticated() && (request.auth.uid == resource.data.userId || isOverallOrAdmin());
+      allow write, delete: if isAuthenticated() && (
+        request.auth.uid == request.resource.data.userId ||
+        isOneOfRoles(request.auth.uid, ['admin', 'overall_head']) ||
+        (isRole(request.auth.uid, 'event_representative') && isAssignedToSubEventAsManager(request.resource.data.subEventId, request.auth.uid) && request.resource.data.isSharedAcrossEvent == true)
+      );
     }
   }
 }

@@ -10,9 +10,7 @@ import {
   SidebarHeader,
   SidebarTrigger,
   SidebarGroup,
-  SidebarGroupLabel,
 } from '@/components/ui/sidebar';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/hooks/use-auth';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -26,6 +24,7 @@ import {
   GraduationCap,
   LogOut,
   HelpCircle,
+  Menu
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from './logo';
@@ -47,7 +46,6 @@ const getNavLinksForRole = (role: string | undefined) => {
     ...baseLinks,
     { href: '/tasks', label: 'My Tasks', icon: ClipboardList },
     { href: '/events', label: 'My Events', icon: Calendar },
-    // Student data link is conditional and added below
   ];
 
   const repLinks = [
@@ -79,12 +77,12 @@ const getNavLinksForRole = (role: string | undefined) => {
     case 'test':
       return studentLinks;
     default:
-      return baseLinks;
+      return [];
   }
 };
 
 export default function AppSidebar() {
-  const { userProfile, authUser, logOut } = useAuth();
+  const { userProfile, logOut } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const { toast } = useToast();
@@ -105,9 +103,11 @@ export default function AppSidebar() {
 
   const navLinks = getNavLinksForRole(userProfile?.role);
   
-  // Conditionally add Student Data link for organizers
   if (userProfile?.role === 'organizer' && userProfile.studentDataEventAccess && Object.values(userProfile.studentDataEventAccess).some(v => v === true)) {
-    navLinks.push({ href: '/students', label: 'Student Data', icon: GraduationCap });
+    const studentDataLink = { href: '/students', label: 'Student Data', icon: GraduationCap };
+    if (!navLinks.some(link => link.href === studentDataLink.href)) {
+      navLinks.splice(3, 0, studentDataLink);
+    }
   }
 
   return (
@@ -129,7 +129,7 @@ export default function AppSidebar() {
             <SidebarMenuItem key={link.href}>
               <SidebarMenuButton
                 onClick={() => router.push(link.href)}
-                isActive={pathname === link.href}
+                isActive={pathname === link.href || (pathname.startsWith(link.href) && link.href !== '/dashboard')}
                 tooltip={{ children: link.label }}
               >
                 <link.icon />
@@ -143,7 +143,7 @@ export default function AppSidebar() {
          <SidebarGroup>
             <SidebarMenu>
                 <SidebarMenuItem>
-                    <SidebarMenuButton onClick={() => router.push('/profile')} tooltip={{ children: 'Profile' }}>
+                    <SidebarMenuButton onClick={() => router.push('/profile')} isActive={pathname === '/profile'} tooltip={{ children: 'Profile' }}>
                         <UserCircle />
                         <span>Profile</span>
                     </SidebarMenuButton>
