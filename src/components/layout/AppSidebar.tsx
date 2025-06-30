@@ -19,12 +19,10 @@ import {
   Calendar,
   ClipboardList,
   Trophy,
-  Settings,
   UserCircle,
   GraduationCap,
   LogOut,
   HelpCircle,
-  Menu,
   ScanLine,
   Search,
   Ticket
@@ -70,7 +68,6 @@ const getNavLinksForRole = (role: string | undefined) => {
     { href: '/tasks', label: 'Global Tasks', icon: ClipboardList },
     { href: '/leaderboard', label: 'Leaderboard', icon: Trophy },
     { href: '/ocr-tool', label: 'OCR Scanner', icon: ScanLine },
-    { href: '/settings', label: 'Settings', icon: Settings },
   ];
 
   switch (role) {
@@ -123,10 +120,12 @@ export default function AppSidebar() {
       <SidebarHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Logo className="h-10 w-8" />
-            <span className="font-semibold text-lg group-data-[collapsible=icon]:hidden">
-              Junior Scientist
-            </span>
+            <button onClick={() => router.push('/dashboard')} className="flex items-center gap-2">
+              <Logo className="h-10 w-8" />
+              <span className="font-semibold text-lg group-data-[collapsible=icon]:hidden">
+                Junior Scientist
+              </span>
+            </button>
           </div>
           <SidebarTrigger className="group-data-[collapsible=icon]:hidden" />
         </div>
@@ -137,7 +136,7 @@ export default function AppSidebar() {
             <SidebarMenuItem key={link.href}>
               <SidebarMenuButton
                 onClick={() => router.push(link.href)}
-                isActive={pathname === link.href || (pathname.startsWith(link.href) && link.href !== '/dashboard')}
+                isActive={pathname.startsWith(link.href) && (link.href !== '/dashboard' || pathname === '/dashboard')}
                 tooltip={{ children: link.label }}
               >
                 <link.icon />

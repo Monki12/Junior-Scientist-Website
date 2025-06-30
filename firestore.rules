@@ -1,136 +1,157 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- Helper Functions ---
+    // HELPER FUNCTIONS
+
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function getUserData(uid) {
-      return get(/databases/$(database)/documents/users/$(uid)).data;
-    }
-    
-    function getUserRole(uid) {
-      return getUserData(uid).role;
+    // --- OPTION 1: Using getUserData (Less efficient) ---
+    // NOTE: Each get() is a billable read operation. Use with caution.
+    function _getUserDoc(uid) {
+      return get(/databases/$(database)/documents/users/$(uid));
     }
 
-    function isRole(uid, role) {
-      return isSignedIn() && getUserRole(uid) == role;
+    // --- OPTION 2: RECOMMENDED - Using Custom Claims ---
+    // This is the most performant and recommended approach.
+    function getAuthRole() {
+      return request.auth.token.role;
     }
 
-    function isRoleIn(uid, roles) {
-      return isSignedIn() && getUserRole(uid) in roles;
+    function getAuthAssignedEventUids() {
+      // Use the 'get' method with a default value to prevent errors if the claim is missing.
+      return request.auth.token.get('assignedEventUids', []);
     }
 
-    function isStaff(uid) {
-      return isRoleIn(uid, ['organizer', 'event_representative', 'overall_head', 'admin']);
+    function getAuthStudentDataEventAccess() {
+      return request.auth.token.get('studentDataEventAccess', {});
+    }
+    // -------------------------------------------------------------------------
+
+    // Use this line to choose your role-finding strategy.
+    // To switch, comment one and uncomment the other.
+    function getUserRole() {
+        // return _getUserDoc(request.auth.uid).data.role; // Option 1: Live read from document
+        return getAuthRole(); // Option 2: Read from Custom Claim (Recommended)
     }
 
-    function isOverallHeadOrAdmin(uid) {
-      return isRoleIn(uid, ['overall_head', 'admin']);
+    function isRole(role) {
+      return isSignedIn() && getUserRole() == role;
     }
 
-    function isOwner(uid) {
-      return request.auth.uid == uid;
+    function isRoleIn(roles) {
+      return isSignedIn() && getUserRole() in roles;
     }
 
-    // --- Collection Rules ---
+    function isStudent() {
+      return isRoleIn(['student', 'test']);
+    }
 
-    // Users can be read by any staff member or by the user themselves.
-    // Users can only be created during signup or by an admin.
-    // Users can be updated by themselves or by an admin. Staff can update credibility scores.
-    // Users can only be deleted by an admin.
+    function isStaff() {
+      return isRoleIn(['organizer', 'event_representative', 'overall_head', 'admin']);
+    }
+
+    function isOverallHeadOrAdmin() {
+      return isRoleIn(['overall_head', 'admin']);
+    }
+
+    // CORRECTED isManagerForEvent function
+    function isManagerForEvent(eventId) {
+      // Logic is broken down into separate boolean expressions and combined at the end.
+      // This avoids illegal 'if' and 'let' statements.
+      let hasAdminAccess = isOverallHeadOrAdmin();
+
+      let isEventRepForEvent = getUserRole() == 'event_representative'
+                              && eventId in getAuthAssignedEventUids();
+
+      let isOrganizerForEvent = getUserRole() == 'organizer'
+                               && getAuthStudentDataEventAccess()[eventId] == true;
+
+      return isSignedIn() && (hasAdminAccess || isEventRepForEvent || isOrganizerForEvent);
+    }
+
+    // RULES FOR COLLECTIONS
+
+    // USERS
     match /users/{userId} {
-      allow read: if isStaff(request.auth.uid) || isOwner(userId);
-      
-      allow create: if isOwner(userId) || isOverallHeadOrAdmin(request.auth.uid);
-
-      allow update: if isOwner(userId) || isOverallHeadOrAdmin(request.auth.uid) || 
-                      (isStaff(request.auth.uid) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['credibilityScore', 'updatedAt']));
-      
-      allow delete: if isOverallHeadOrAdmin(request.auth.uid);
+      allow read: if isStaff() || (isSignedIn() && request.auth.uid == userId);
+      allow create: if (isSignedIn() && request.auth.uid == userId) || isOverallHeadOrAdmin();
+      allow update: if (isSignedIn() && request.auth.uid == userId) || isOverallHeadOrAdmin()
+                      || (isStaff() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['credibilityScore', 'updatedAt']));
+      allow delete: if isOverallHeadOrAdmin();
     }
 
-    // SubEvents are public to read.
-    // Only Overall Heads or Admins can create, update, or delete events.
+    // SUBEVENTS
     match /subEvents/{eventId} {
       allow read: if true;
-      allow write: if isOverallHeadOrAdmin(request.auth.uid);
-    }
-    
-    // An Event Registration can be read by its owner or an authorized manager for that event.
-    // It can only be created by a student for themselves.
-    // It can be updated by an event manager, or cancelled by the owner.
-    match /event_registrations/{registrationId} {
-      function isManagerForThisEvent() {
-        let eventId = resource.data.subEventId;
-        let managerData = getUserData(request.auth.uid);
-        
-        return isOverallHeadOrAdmin(request.auth.uid) ||
-               (managerData.role == 'event_representative' && eventId in managerData.assignedEventUids) ||
-               (managerData.role == 'organizer' && eventId in managerData.studentDataEventAccess && managerData.studentDataEventAccess[eventId] == true);
-      }
-      
-      allow read: if isOwner(resource.data.userId) || isManagerForThisEvent();
-      
-      allow create: if isRoleIn(request.auth.uid, ['student', 'test']) && request.resource.data.userId == request.auth.uid;
-      
-      allow update: if isManagerForThisEvent() || 
-                      (isOwner(resource.data.userId) && request.resource.data.registrationStatus == 'cancelled');
-      
-      allow delete: if isManagerForThisEvent();
+      allow write: if isOverallHeadOrAdmin();
     }
 
-    // Event teams are public to read.
-    // They can be created by students.
-    // They can be updated by the team leader or an Overall Head/Admin.
+    // EVENT REGISTRATIONS
+    match /event_registrations/{registrationId} {
+      function isOwner() {
+        return isSignedIn() && resource.data.userId == request.auth.uid;
+      }
+      // CORRECTED: The eventId must be retrieved from the incoming or existing data
+      function getEventId() {
+        // When creating, the document `resource` doesn't exist yet, so check `request.resource`.
+        return request.resource.data.subEventId != null ? request.resource.data.subEventId : resource.data.subEventId;
+      }
+
+      allow read: if isOwner() || isManagerForEvent(getEventId());
+      // A signed-in user can create a registration for themselves. This allows mock "student" users to work.
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isManagerForEvent(getEventId()) || (isOwner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['registrationStatus']) && request.resource.data.registrationStatus == 'cancelled');
+      allow delete: if isManagerForEvent(getEventId());
+    }
+
+    // EVENT TEAMS
     match /event_teams/{teamId} {
       allow read: if true;
-      allow create: if isRoleIn(request.auth.uid, ['student', 'test']);
-      allow update: if isOwner(resource.data.teamLeaderId) || isOverallHeadOrAdmin(request.auth.uid);
-      allow delete: if isOverallHeadOrAdmin(request.auth.uid);
+      // A signed-in user can create a team, as long as they are the leader. This allows mock "student" users to work.
+      allow create: if isSignedIn() && request.resource.data.teamLeaderId == request.auth.uid;
+      allow update: if isOverallHeadOrAdmin() || (isSignedIn() && resource.data.teamLeaderId == request.auth.uid);
+      allow delete: if isOverallHeadOrAdmin();
     }
 
-    // Tasks can be read by assignees, the assigner, or an event manager.
-    // They can be created by any staff member for themselves or others.
-    // They can be updated/deleted by the assigner or an event manager.
-    // Assignees can update the status.
+    // TASKS
     match /tasks/{taskId} {
-       function isAssignee() {
-        return request.auth.uid in resource.data.assignedToUserIds;
+      function isAssignee() {
+        return isSignedIn() && request.auth.uid in resource.data.assignedToUserIds;
       }
       function isAssigner() {
-        return request.auth.uid == resource.data.assignedByUserId;
+        return isSignedIn() && request.auth.uid == resource.data.assignedByUserId;
       }
-       function isManagerForThisEvent() {
-        let eventId = resource.data.subEventId;
-         if (eventId == 'general') {
-           return isOverallHeadOrAdmin(request.auth.uid);
-         }
-        let managerData = getUserData(request.auth.uid);
-        return isOverallHeadOrAdmin(request.auth.uid) ||
-               (managerData.role == 'event_representative' && eventId in managerData.assignedEventUids);
+      // CORRECTED: The eventId must be retrieved from the incoming or existing data
+      function getEventId() {
+        return request.resource.data.subEventId != null ? request.resource.data.subEventId : resource.data.subEventId;
       }
 
-      allow read: if isAssignee() || isAssigner() || isManagerForThisEvent();
-      allow create: if isStaff(request.auth.uid) && request.resource.data.assignedByUserId == request.auth.uid;
-      allow update: if isAssigner() || isManagerForThisEvent() || 
-                      (isAssignee() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']));
-      allow delete: if isAssigner() || isManagerForThisEvent();
+      allow read: if isAssignee() || isAssigner() || isManagerForEvent(getEventId());
+      allow create: if isStaff() && request.resource.data.assignedByUserId == request.auth.uid;
+      allow update, delete: if isAssigner() || isManagerForEvent(getEventId());
     }
-    
-    // Custom column definitions for all admins (global)
+
+    // CUSTOM COLUMN DEFINITIONS
     match /systemPreferences/columnDefinitions/studentData/{columnId} {
-        allow read: if isStaff(request.auth.uid);
-        allow write: if isOverallHeadOrAdmin(request.auth.uid);
+        allow read: if isStaff();
+        allow write: if isOverallHeadOrAdmin();
     }
-    
-    // Custom column definitions for a specific user (private)
     match /users/{userId}/preferences/columnDefinitions/studentData/{columnId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+    }
+    // CORRECTED: Path variable must match the variable used in the function call
+    match /events/{eventPathId}/columnDefinitions/{columnId} {
+        allow read: if isOverallHeadOrAdmin() || isManagerForEvent(eventPathId);
+        allow write: if isOverallHeadOrAdmin() || isManagerForEvent(eventPathId); // Simplified from create, update, delete
+    }
+
+    // Default catch-all
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

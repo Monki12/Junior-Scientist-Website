@@ -1,9 +1,9 @@
 
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation'; // Added useSearchParams
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,22 +12,28 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import type { UserRole, LoginFormData } from '@/types';
 import { Loader2, User, Shield, LogIn, KeyRound, UserPlus } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
 
 const mockRolesToTest: UserRole[] = ['student', 'organizer', 'event_representative', 'overall_head', 'admin', 'test'];
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isFirebaseLoading, setIsFirebaseLoading] = useState(false);
-  const { logIn, setMockUserRole, loading: authLoading } = useAuth();
+  const { authUser, logIn, setMockUserRole, loading: authLoading } = useAuth();
   const router = useRouter();
-  const searchParams = useSearchParams(); // For redirect
+  const searchParams = useSearchParams();
   const { toast } = useToast();
 
   const [formData, setFormData] = useState<LoginFormData>({
     email: '',
     password: '',
   });
+
+  useEffect(() => {
+    if (!authLoading && authUser) {
+      const redirectUrl = searchParams.get('redirect') || '/dashboard';
+      router.replace(redirectUrl);
+    }
+  }, [authLoading, authUser, router, searchParams]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.id]: e.target.value });
@@ -47,8 +53,7 @@ export default function LoginPage() {
         toast({ title: "Login Failed", description: errorMessage, variant: "destructive" });
       } else {
         toast({ title: "Login Successful!", description: "Redirecting..." });
-        const redirectUrl = searchParams.get('redirect') || '/dashboard';
-        router.push(redirectUrl);
+        // The useEffect hook will handle the redirection.
       }
     } catch (error: any) {
       toast({ title: "Login Error", description: error.message || "An unexpected error occurred.", variant: "destructive" });
@@ -60,16 +65,9 @@ export default function LoginPage() {
   const handleMockLogin = async (role: UserRole) => {
     setIsLoading(true);
     setMockUserRole(role);
-    // logIn(role) will also work if preferred to set via mock path in logIn
-    setTimeout(() => {
-      setIsLoading(false);
-      toast({ title: `Mock Login: ${role}`, description: "Successfully logged in with mock role. Redirecting..."});
-      const redirectUrl = searchParams.get('redirect') || '/dashboard';
-      router.push(redirectUrl);
-    }, 300);
   };
 
-  if (authLoading && !isLoading && !isFirebaseLoading) {
+  if (authLoading || authUser) {
     return (
       <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -78,7 +76,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-15rem)] items-center justify-center py-12 animate-fade-in-up">
+    <div className="flex min-h-[calc(100vh-15rem)] items-center justify-center py-12">
       <Card className="w-full max-w-lg shadow-xl">
         <CardHeader className="text-center">
           <KeyRound className="mx-auto h-12 w-12 text-primary mb-4" />

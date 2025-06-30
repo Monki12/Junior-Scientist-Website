@@ -1,15 +1,35 @@
 
 'use client';
 
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/use-auth';
 import MagnetLines from "@/components/ui/magnet-lines";
 import { motion } from "framer-motion";
 import { Logo } from "@/components/layout/logo";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { ArrowDown } from "lucide-react";
+import { ArrowDown, Loader2 } from "lucide-react";
 import PageContent from "@/components/landing/page-content";
 
 export default function JuniorScientistHomePage() {
+  const { authUser, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && authUser) {
+      router.replace('/dashboard');
+    }
+  }, [loading, authUser, router]);
+
+  if (loading || authUser) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col items-center text-foreground -mt-[6.5rem] md:-mt-[5rem]">
       {/* Hero Section */}

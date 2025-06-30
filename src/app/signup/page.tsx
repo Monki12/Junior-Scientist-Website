@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/use-auth';
 import type { SignUpFormData, UserProfileData } from '@/types';
 import { UserPlus, Loader2, LogIn, School as SchoolIconLucide } from 'lucide-react';
 
@@ -30,6 +31,7 @@ function generateShortId(length: number = 5): string {
 export default function SignUpPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { authUser, loading: authLoading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
   const [formData, setFormData] = useState<SignUpFormData>({
@@ -43,6 +45,13 @@ export default function SignUpPage() {
     phoneNumber: '',
     additionalNumber: '',
   });
+  
+  useEffect(() => {
+    if (!authLoading && authUser) {
+      router.replace('/dashboard');
+    }
+  }, [authLoading, authUser, router]);
+
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.id]: e.target.value });
@@ -101,9 +110,6 @@ export default function SignUpPage() {
           phoneNumbers: [formData.phoneNumber],
           additionalNumber: formData.additionalNumber || null,
           photoURL: null,
-          registeredEvents: [],
-          subEventsManaged: [],
-          points: 0,
           credibilityScore: 0,
           shortId: shortId,
       };
@@ -164,9 +170,17 @@ export default function SignUpPage() {
       console.log("--- SIGN UP PROCESS ENDED ---");
     }
   };
+  
+  if (authLoading || authUser) {
+    return (
+      <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
-    <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center animate-fade-in-up py-12">
+    <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center py-12">
       <Card className="w-full max-w-lg shadow-xl">
         <CardHeader className="text-center">
           <UserPlus className="mx-auto h-12 w-12 text-primary mb-4" />
