@@ -82,6 +82,8 @@ export interface SubEvent {
   registeredParticipantCount?: number;
   isFeatured?: boolean;
   customData?: Record<string, any>;
+  createdAt?: any;
+  updatedAt?: any;
 }
 
 export interface SignUpFormData {

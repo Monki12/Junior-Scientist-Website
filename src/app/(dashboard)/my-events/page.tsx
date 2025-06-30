@@ -14,12 +14,15 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, PlusCircle, Edit } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
+import CreateEventForm from '@/components/admin/CreateEventForm';
 
 export default function MyEventsPage() {
   const { userProfile, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [events, setEvents] = useState<SubEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
+  const [isCreateEventDialogOpen, setIsCreateEventDialogOpen] = useState(false);
 
   const canCreateEvents = userProfile?.role === 'admin' || userProfile?.role === 'overall_head';
 
@@ -80,9 +83,22 @@ export default function MyEventsPage() {
             </CardDescription>
           </div>
           {canCreateEvents && (
-            <Button disabled> {/* Create Event form not yet implemented */}
-              <PlusCircle className="mr-2 h-4 w-4" /> Create New Event
-            </Button>
+             <Dialog open={isCreateEventDialogOpen} onOpenChange={setIsCreateEventDialogOpen}>
+                <DialogTrigger asChild>
+                    <Button>
+                        <PlusCircle className="mr-2 h-4 w-4" /> Create New Event
+                    </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Create New Sub-Event</DialogTitle>
+                        <DialogDescription>
+                            Fill in the initial details. More options will be available on the edit page after creation.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <CreateEventForm onSuccess={() => setIsCreateEventDialogOpen(false)} />
+                </DialogContent>
+            </Dialog>
           )}
         </CardHeader>
         <CardContent>
