@@ -4,7 +4,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
-import type { UserProfileData, CustomColumnDefinition, ActiveDynamicFilter } from '@/types';
+import type { UserProfileData, CustomColumnDefinition, ActiveDynamicFilter, SubEvent, EventRegistration } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -21,21 +21,53 @@ import { Loader2, Users, Search, ShieldAlert, Filter, GraduationCap, PlusCircle,
 import { cn } from '@/lib/utils';
 import { nanoid } from 'nanoid';
 
+// Enriched student type for local display
+interface DisplayStudent extends UserProfileData {
+  registeredEventNames?: string[];
+}
+
 const DEFAULT_COLUMNS: CustomColumnDefinition[] = [
     { id: 'fullName', name: 'Full Name', dataType: 'text' },
     { id: 'email', name: 'Email', dataType: 'text' },
+    { id: 'shortId', name: 'Student ID', dataType: 'text' },
+    { id: 'standard', name: 'Grade', dataType: 'text' },
     { id: 'schoolName', name: 'School', dataType: 'text' },
-    { id: 'standard', name: 'Standard', dataType: 'text' },
+    { id: 'phoneNumbers', name: 'Primary Phone', dataType: 'text'},
+    { id: 'additionalNumber', name: 'Additional Phone', dataType: 'text'},
     { id: 'schoolVerifiedByOrganizer', name: 'School Verified', dataType: 'checkbox' },
+    { id: 'registeredEventNames', name: 'Registered Events', dataType: 'text' },
 ];
+
+const displayValue = (value: any, placeholder: string = '(N/A)') => {
+    if (value === null || value === undefined || value === '') {
+        return <span className="text-muted-foreground italic">{placeholder}</span>;
+    }
+    if (Array.isArray(value) && value.length === 0) {
+        return <span className="text-muted-foreground italic">(None)</span>;
+    }
+    if (typeof value === 'boolean') {
+        return value ? <Badge variant="default">Yes</Badge> : <Badge variant="outline">No</Badge>;
+    }
+    if (value && typeof value.toDate === 'function') {
+        return value.toDate().toLocaleDateString();
+    }
+    if (Array.isArray(value)) {
+        return value.join(', ');
+    }
+    return value.toString();
+};
 
 export default function StudentsPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { userProfile, loading: authLoading } = useAuth();
   
-  const [students, setStudents] = useState<UserProfileData[]>([]);
-  const [loadingStudents, setLoadingStudents] = useState(true);
+  const [students, setStudents] = useState<DisplayStudent[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
+
+  // For joining data
+  const [eventsMap, setEventsMap] = useState<Map<string, string>>(new Map());
+  const [registrationsMap, setRegistrationsMap] = useState<Map<string, string[]>>(new Map());
 
   // --- Dynamic Column & Filter State ---
   const [customColumnDefinitions, setCustomColumnDefinitions] = useState<CustomColumnDefinition[]>([]);
@@ -63,26 +95,60 @@ export default function StudentsPage() {
     }
 
     if (canViewPage) {
-        setLoadingStudents(true);
+        setLoadingData(true);
         const studentsQuery = query(collection(db, 'users'), where('role', 'in', ['student', 'test']));
-        
-        const unsubscribe = onSnapshot(studentsQuery, (querySnapshot) => {
-            const fetchedStudents = querySnapshot.docs.map(doc => ({...doc.data(), uid: doc.id} as UserProfileData));
+        const eventsQuery = query(collection(db, 'subEvents'));
+        const registrationsQuery = query(collection(db, 'event_registrations'));
+
+        const unsubStudents = onSnapshot(studentsQuery, (snapshot) => {
+            const fetchedStudents = snapshot.docs.map(doc => ({...doc.data(), uid: doc.id} as UserProfileData));
             setStudents(fetchedStudents);
-            setLoadingStudents(false);
+            if (loadingData) setLoadingData(false);
         }, (error) => {
             console.error("Error fetching students:", error);
             toast({ title: "Error", description: "Could not fetch student data.", variant: "destructive" });
-            setLoadingStudents(false);
         });
 
-        return () => unsubscribe();
+        const unsubEvents = onSnapshot(eventsQuery, (snapshot) => {
+            const newMap = new Map<string, string>();
+            snapshot.docs.forEach(doc => {
+                const eventData = doc.data() as SubEvent;
+                newMap.set(doc.id, eventData.title);
+            });
+            setEventsMap(newMap);
+        });
+
+        const unsubRegistrations = onSnapshot(registrationsQuery, (snapshot) => {
+            const newMap = new Map<string, string[]>();
+            snapshot.docs.forEach(doc => {
+                const regData = doc.data() as EventRegistration;
+                const userRegs = newMap.get(regData.userId) || [];
+                userRegs.push(regData.subEventId);
+                newMap.set(regData.userId, userRegs);
+            });
+            setRegistrationsMap(newMap);
+        });
+
+        return () => {
+            unsubStudents();
+            unsubEvents();
+            unsubRegistrations();
+        };
     }
   }, [userProfile, authLoading, canViewPage, router, toast]);
 
 
+  const enrichedStudents = useMemo(() => {
+    return students.map(student => {
+      const registeredEventIds = registrationsMap.get(student.uid) || [];
+      const registeredEventNames = registeredEventIds.map(id => eventsMap.get(id) || 'Unknown Event').filter(Boolean);
+      return { ...student, registeredEventNames };
+    });
+  }, [students, registrationsMap, eventsMap]);
+
+
   const filteredStudents = useMemo(() => {
-    return students.filter(student => {
+    return enrichedStudents.filter(student => {
       if (!activeFilters.length) return true;
       return activeFilters.every(filter => {
         const value = (student as any)[filter.columnId]; // Basic filtering
@@ -95,7 +161,7 @@ export default function StudentsPage() {
         return true;
       });
     });
-  }, [students, activeFilters]);
+  }, [enrichedStudents, activeFilters]);
 
   const handleAddCustomColumn = () => {
     const newId = `custom_${newColumn.name.toLowerCase().replace(/\s/g, '_')}`;
@@ -107,7 +173,7 @@ export default function StudentsPage() {
     toast({title: "Column Added", description: `Column "${newDef.name}" is now available.`});
   };
   
-  if (authLoading || (!canViewPage && !authLoading)) {
+  if (authLoading || (!canViewPage && !authLoading) || loadingData) {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -136,7 +202,7 @@ export default function StudentsPage() {
                     <GraduationCap className="mr-3 h-8 w-8"/>Student Management
                 </CardTitle>
                 <CardDescription>
-                    View, filter, and manage all student accounts across all events.
+                    View, filter, and manage all student accounts across all events. ({filteredStudents.length} of {students.length} students showing)
                 </CardDescription>
             </div>
             {canManageColumns && (
@@ -159,24 +225,30 @@ export default function StudentsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {loadingStudents ? (
+                {loadingData ? (
                     <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-10"><Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" /></TableCell></TableRow>
                 ) : filteredStudents.length > 0 ? (
                   filteredStudents.map((student) => (
                   <TableRow key={student.uid}>
-                    {availableColumns.filter(c => visibleColumns.includes(c.id)).map(col => (
-                        <TableCell key={col.id}>
-                            {(() => {
-                                const value = (student as any)[col.id];
-                                switch (col.dataType) {
-                                    case 'checkbox':
-                                    return <Checkbox checked={!!value} disabled />;
-                                    default:
-                                    return <span className="text-sm">{value || 'N/A'}</span>;
-                                }
-                            })()}
-                        </TableCell>
-                    ))}
+                    {availableColumns.filter(c => visibleColumns.includes(c.id)).map(col => {
+                        let cellValue;
+                        if (col.id === 'phoneNumbers') {
+                            cellValue = student.phoneNumbers?.[0];
+                        } else if (col.id === 'registeredEventNames') {
+                            cellValue = student.registeredEventNames;
+                        } else {
+                            cellValue = (student as any)[col.id];
+                        }
+                        return (
+                            <TableCell key={col.id}>
+                                {col.dataType === 'checkbox' ? (
+                                    <Checkbox checked={!!cellValue} disabled />
+                                ) : (
+                                    displayValue(cellValue)
+                                )}
+                            </TableCell>
+                        )
+                    })}
                   </TableRow>
                   ))
                 ) : (
@@ -270,3 +342,4 @@ export default function StudentsPage() {
     </div>
   );
 }
+
