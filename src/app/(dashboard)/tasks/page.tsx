@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -228,7 +227,7 @@ export default function GlobalTasksPage() {
 
       const taskRef = doc(db, "tasks", task.id);
       
-      const originalTasks = tasks;
+      const originalTasks = JSON.parse(JSON.stringify(tasks));
       const updatedTasks = tasks.map(t => t.id === task.id ? {...t, status: newStatus} : t);
       setManagedTasks(updatedTasks.filter(t => managedTasks.some(mt => mt.id === t.id)));
       setPersonalTasks(updatedTasks.filter(t => personalTasks.some(pt => pt.id === t.id)));
@@ -286,8 +285,8 @@ export default function GlobalTasksPage() {
           } catch(e: any) {
              console.error("Transaction failed: ", e);
              toast({ title: "Error", description: e.message || "Failed to update task and scores.", variant: "destructive" });
-             setManagedTasks(originalTasks.filter(t => managedTasks.some(mt => mt.id === t.id)));
-             setPersonalTasks(originalTasks.filter(t => personalTasks.some(pt => pt.id === t.id)));
+             setManagedTasks(originalTasks.filter((t: Task) => managedTasks.some(mt => mt.id === t.id)));
+             setPersonalTasks(originalTasks.filter((t: Task) => personalTasks.some(pt => pt.id === t.id)));
           }
       } else {
           try {
@@ -295,8 +294,8 @@ export default function GlobalTasksPage() {
           } catch (e: any) {
               console.error("Status update failed: ", e);
               toast({ title: "Error", description: "Could not update task status.", variant: "destructive" });
-              setManagedTasks(originalTasks.filter(t => managedTasks.some(mt => mt.id === t.id)));
-              setPersonalTasks(originalTasks.filter(t => personalTasks.some(pt => pt.id === t.id)));
+              setManagedTasks(originalTasks.filter((t: Task) => managedTasks.some(mt => mt.id === t.id)));
+              setPersonalTasks(originalTasks.filter((t: Task) => personalTasks.some(pt => pt.id === t.id)));
           }
       }
   };
@@ -341,6 +340,7 @@ export default function GlobalTasksPage() {
   };
   
   const canSelfAssignOnly = userProfile?.role === 'organizer';
+  const canCreateTasks = userProfile && ['admin', 'overall_head', 'event_representative'].includes(userProfile.role);
 
   return (
     <div className="space-y-6">
@@ -352,9 +352,11 @@ export default function GlobalTasksPage() {
             </CardTitle>
             <CardDescription>Manage, assign, and track tasks for all events.</CardDescription>
           </div>
-           <Button className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-soft" onClick={openCreateTaskDialog}>
-                <PlusCircle className="mr-2 h-5 w-5" /> Add New Task
+           {canCreateTasks && (
+            <Button className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-soft" onClick={openCreateTaskDialog}>
+              <PlusCircle className="mr-2 h-5 w-5" /> Add New Task
             </Button>
+           )}
         </CardHeader>
         <CardContent>
           {loadingData ? (
