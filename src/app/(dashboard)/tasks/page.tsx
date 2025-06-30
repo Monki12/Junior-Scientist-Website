@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -236,27 +237,23 @@ export default function GlobalTasksPage() {
           const assigneeOldScores = new Map<string, number>();
           try {
             await runTransaction(db, async (transaction) => {
-              // --- 1. READ PHASE ---
-              const taskDoc = await transaction.get(taskRef);
-              
               const assigneeRefs = task.assignedToUserIds.map(id => doc(db, "users", id));
               const assigneeDocs = await Promise.all(assigneeRefs.map(ref => transaction.get(ref)));
               
               let assignerRef = null;
-              let assignerDoc = null;
               if (task.assignedByUserId) {
                 assignerRef = doc(db, "users", task.assignedByUserId);
-                assignerDoc = await transaction.get(assignerRef);
               }
+              const [taskDoc, assignerDoc] = await Promise.all([
+                  transaction.get(taskRef),
+                  assignerRef ? transaction.get(assignerRef) : Promise.resolve(null)
+              ]);
 
-              // --- 2. VALIDATION PHASE ---
               if (!taskDoc.exists() || taskDoc.data().status === 'Completed') {
                   throw new Error("Task is already completed or does not exist.");
               }
               
               const pointsToAdd = task.pointsOnCompletion || 10;
-
-              // --- 3. WRITE PHASE ---
               transaction.update(taskRef, {
                   status: 'Completed',
                   completedByUserId: userProfile.uid,
@@ -361,6 +358,18 @@ export default function GlobalTasksPage() {
         <CardContent>
           {loadingData ? (
              <div className="flex justify-center items-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+          ) : tasks.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground border-2 border-dashed rounded-lg">
+                <ListChecks className="h-12 w-12 mx-auto mb-3 text-primary/30" />
+                <h3 className="text-lg font-semibold text-foreground mb-1">No Tasks Found</h3>
+                <p className="text-sm">It looks like there are no tasks here!</p>
+                {canCreateTasks && (
+                    <Button onClick={openCreateTaskDialog} className="mt-4">
+                        <PlusCircle className="mr-2 h-4 w-4" /> Create a Task
+                    </Button>
+                )}
+                {!canCreateTasks && <p className="text-xs mt-1">If you believe there should be tasks here, please contact your event manager.</p>}
+            </div>
           ) : (
             <div className="overflow-x-auto rounded-md border">
               <Table>

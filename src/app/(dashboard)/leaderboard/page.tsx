@@ -34,7 +34,6 @@ export default function LeaderboardPage() {
 
       setLoadingData(true);
       const usersRef = collection(db, 'users');
-      // Fetch all staff and sort on the client to avoid needing a composite index in Firestore
       const q = query(
         usersRef,
         where('role', 'in', ['organizer', 'event_representative', 'overall_head', 'admin'])
@@ -55,14 +54,6 @@ export default function LeaderboardPage() {
     }
   }, [userProfile, authLoading, canViewPage, router, toast]);
 
-  const topThree = leaderboard.slice(0, 3);
-  const nextSeven = leaderboard.slice(3, 10);
-  const restOfBoard = leaderboard.slice(10);
-
-  const userRank = leaderboard.findIndex(u => u.uid === userProfile?.uid) + 1;
-  const currentUserOnLeaderboard = leaderboard.find(u => u.uid === userProfile?.uid);
-
-
   if (authLoading || loadingData) {
     return (
       <div className="flex h-full w-full items-center justify-center">
@@ -81,6 +72,23 @@ export default function LeaderboardPage() {
       </div>
     );
   }
+  
+  if (leaderboard.length === 0) {
+      return (
+         <div className="text-center py-10">
+            <Trophy className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-2xl font-semibold mb-2">Leaderboard is Empty</h3>
+            <p className="text-muted-foreground">No staff members found. Scores will appear here as tasks are completed.</p>
+        </div>
+      )
+  }
+
+  const topThree = leaderboard.slice(0, 3);
+  const nextSeven = leaderboard.slice(3, 10);
+  const restOfBoard = leaderboard.slice(10);
+
+  const userRank = leaderboard.findIndex(u => u.uid === userProfile?.uid) + 1;
+  const currentUserOnLeaderboard = leaderboard.find(u => u.uid === userProfile?.uid);
 
   return (
     <div className="flex flex-col items-center p-4 md:p-6 space-y-8 bg-background/50 rounded-lg">
@@ -91,9 +99,8 @@ export default function LeaderboardPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8 items-end w-full max-w-4xl">
-        {/* 2nd Place */}
-        <div className="flex justify-center md:order-1">
-          {topThree.length > 1 && (
+        {topThree.length > 1 && (
+          <div className="flex justify-center md:order-1">
             <Card className="relative w-full max-w-xs p-4 border-2 border-slate-400 shadow-lg bg-card/80 backdrop-blur-sm transform hover:scale-105 transition-transform duration-300">
               <div className="flex flex-col items-center text-center">
                 <div className="absolute top-2 right-2 text-2xl font-bold text-slate-400">#2</div>
@@ -106,11 +113,10 @@ export default function LeaderboardPage() {
                 <p className="text-2xl font-bold text-accent mt-1">{topThree[1].credibilityScore}</p>
               </div>
             </Card>
-          )}
-        </div>
-        {/* 1st Place */}
-        <div className="flex justify-center md:order-2">
-          {topThree.length > 0 && (
+          </div>
+        )}
+        {topThree.length > 0 && (
+          <div className="flex justify-center md:order-2">
             <Card className="relative w-full max-w-xs p-6 border-4 border-yellow-400 shadow-xl bg-card/90 backdrop-blur-sm scale-110 transform hover:scale-115 transition-transform duration-300 z-10">
               <div className="flex flex-col items-center text-center">
                 <div className="absolute top-2 right-2 text-3xl font-bold text-yellow-400">#1</div>
@@ -123,13 +129,12 @@ export default function LeaderboardPage() {
                 <p className="text-3xl font-bold text-accent mt-1">{topThree[0].credibilityScore}</p>
               </div>
             </Card>
-          )}
-        </div>
-        {/* 3rd Place */}
-        <div className="flex justify-center md:order-3">
-          {topThree.length > 2 && (
+          </div>
+        )}
+        {topThree.length > 2 && (
+          <div className="flex justify-center md:order-3">
             <Card className="relative w-full max-w-xs p-4 border-2 border-orange-500 shadow-lg bg-card/80 backdrop-blur-sm transform hover:scale-105 transition-transform duration-300">
-               <div className="flex flex-col items-center text-center">
+              <div className="flex flex-col items-center text-center">
                 <div className="absolute top-2 right-2 text-xl font-bold text-orange-500">#3</div>
                 <Avatar className="h-20 w-20 mb-2 border-4 border-orange-400">
                   <AvatarImage src={topThree[2].photoURL || undefined} />
@@ -140,8 +145,8 @@ export default function LeaderboardPage() {
                 <p className="text-xl font-bold text-accent mt-1">{topThree[2].credibilityScore}</p>
               </div>
             </Card>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <Card className="w-full max-w-4xl shadow-lg">

@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { db, storage } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, runTransaction, serverTimestamp, getDoc, addDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, runTransaction, serverTimestamp, getDoc, addDoc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { ArrowLeft, Loader2, Users, Search, Filter, PlusCircle, UploadCloud, FileCog, Columns, X } from 'lucide-react';
 import { nanoid } from 'nanoid';
@@ -200,7 +200,6 @@ export default function ManageParticipantsPage() {
   }, [participants, activeFilters]);
   
   const handleOptimisticUpdate = (registrationId: string, field: string, value: any, isCustom: boolean) => {
-    // Optimistically update local state for instant UI feedback
     setParticipants(prev => prev.map(p => {
         if (p.registrationId === registrationId) {
             if (isCustom) {
@@ -211,7 +210,6 @@ export default function ManageParticipantsPage() {
         return p;
     }));
     
-    // Perform database update in the background
     const regDocRef = doc(db, 'event_registrations', registrationId);
     runTransaction(db, async (transaction) => {
         const regDoc = await transaction.get(regDocRef);
@@ -227,9 +225,6 @@ export default function ManageParticipantsPage() {
         transaction.update(regDocRef, updatePayload);
     }).catch((error: any) => {
         toast({ title: "Update Failed", description: error.message || `Could not update ${field}.`, variant: "destructive" });
-        // Revert local state on failure
-        // A more robust implementation might store original state before optimistic update
-        // For now, we rely on a page refresh or subsequent fetch to correct the view
     });
   };
 
@@ -241,7 +236,6 @@ export default function ManageParticipantsPage() {
       await uploadBytes(storageRef, admitCardFile);
       const downloadURL = await getDownloadURL(storageRef);
 
-      // Optimistically update UI
       setParticipants(prev => prev.map(p => 
         p.registrationId === selectedParticipantForAdmitCard.registrationId ? { ...p, admitCardUrl: downloadURL } : p
       ));
@@ -249,7 +243,6 @@ export default function ManageParticipantsPage() {
       const regDocRef = doc(db, 'event_registrations', selectedParticipantForAdmitCard.registrationId);
       await updateDoc(regDocRef, { admitCardUrl: downloadURL, lastUpdatedAt: serverTimestamp() });
       
-      // No success toast for better UX
       setIsAdmitCardUploadOpen(false);
     } catch (error: any) {
        toast({ title: "Upload Failed", description: error.message, variant: "destructive" });
@@ -330,7 +323,28 @@ export default function ManageParticipantsPage() {
               <TableBody>
                 {loadingParticipants ? (
                   <TableRow><TableCell colSpan={visibleColumns.length} className="text-center h-24"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
-                ) : filteredParticipants.map(p => (
+                ) : participants.length === 0 ? (
+                    <TableRow>
+                        <TableCell colSpan={visibleColumns.length}>
+                            <div className="text-center py-12 text-muted-foreground">
+                                <Users className="h-16 w-16 mx-auto mb-4 text-primary/30" />
+                                <h3 className="text-xl font-semibold text-foreground mb-2">No Participants Yet</h3>
+                                <p>No one has registered for this event. Share the event to get registrations!</p>
+                            </div>
+                        </TableCell>
+                    </TableRow>
+                ) : filteredParticipants.length === 0 ? (
+                    <TableRow>
+                        <TableCell colSpan={visibleColumns.length}>
+                            <div className="text-center py-12 text-muted-foreground">
+                                <Filter className="h-16 w-16 mx-auto mb-4 text-primary/30" />
+                                <h3 className="text-xl font-semibold text-foreground mb-2">No Matches Found</h3>
+                                <p>No participants match your current filter criteria.</p>
+                            </div>
+                        </TableCell>
+                    </TableRow>
+                ) : (
+                  filteredParticipants.map(p => (
                   <TableRow key={p.registrationId}>
                     {availableColumns.filter(c => visibleColumns.includes(c.id)).map(col => (
                       <TableCell key={`${p.registrationId}-${col.id}`}>
@@ -363,7 +377,8 @@ export default function ManageParticipantsPage() {
                       </TableCell>
                     ))}
                   </TableRow>
-                ))}
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
@@ -489,4 +504,3 @@ export default function ManageParticipantsPage() {
     </div>
   );
 }
-

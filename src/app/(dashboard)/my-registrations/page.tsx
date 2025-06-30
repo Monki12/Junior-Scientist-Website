@@ -11,9 +11,8 @@ import { collection, query, onSnapshot, where, getDocs } from 'firebase/firestor
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Ticket, FileDown, Users, Calendar, AlertCircle } from 'lucide-react';
+import { Loader2, Ticket, FileDown, Users, Calendar, AlertCircle, Search } from 'lucide-react';
 
-// Combined type for easy rendering
 interface RegistrationDetails extends EventRegistration {
   eventDetails?: SubEvent;
 }
@@ -53,7 +52,6 @@ export default function MyRegistrationsPage() {
       
       const regs = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EventRegistration));
       
-      // Fetch details for all unique event IDs
       const eventIds = [...new Set(regs.map(r => r.subEventId))];
       if (eventIds.length > 0) {
         try {
@@ -65,7 +63,6 @@ export default function MyRegistrationsPage() {
             ...reg,
             eventDetails: eventsMap.get(reg.subEventId)
           })).sort((a, b) => {
-              // Sort by event date, most recent first
               const dateA = a.eventDetails?.eventDate ? new Date(a.eventDetails.eventDate) : 0;
               const dateB = b.eventDetails?.eventDate ? new Date(b.eventDetails.eventDate) : 0;
               if (!dateA || !dateB) return 0;
@@ -118,10 +115,10 @@ export default function MyRegistrationsPage() {
         <Card className="text-center py-12">
            <CardContent>
             <AlertCircle className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-xl font-semibold">No Registrations Found</h3>
-            <p className="text-muted-foreground mt-2">You have not registered for any events yet. Time to explore!</p>
-            <Button asChild variant="default" className="mt-4 bg-accent text-accent-foreground hover:bg-accent/90">
-              <Link href="/events">Explore Events Now</Link>
+            <h3 className="text-2xl font-semibold mb-2">No Registrations Found</h3>
+            <p className="text-muted-foreground max-w-md mx-auto mb-6">You haven't registered for any events yet. Head over to the 'Explore Events' section to find exciting opportunities.</p>
+            <Button asChild variant="default" className="bg-accent text-accent-foreground hover:bg-accent/90">
+              <Link href="/events"><Search className="mr-2 h-4 w-4"/>Explore Events Now</Link>
             </Button>
            </CardContent>
         </Card>

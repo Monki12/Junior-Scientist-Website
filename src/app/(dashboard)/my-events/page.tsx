@@ -12,7 +12,7 @@ import { collection, query, onSnapshot, where } from 'firebase/firestore';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, PlusCircle, Edit } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Calendar } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import CreateEventForm from '@/components/admin/CreateEventForm';
@@ -103,8 +103,11 @@ export default function MyEventsPage() {
         </CardHeader>
         <CardContent>
           {events.length === 0 ? (
-            <div className="text-center py-10">
-              <p className="text-muted-foreground">You are not assigned to any events.</p>
+            <div className="text-center py-10 text-muted-foreground border-2 border-dashed rounded-lg">
+                <Calendar className="h-12 w-12 mx-auto mb-3 text-primary/30" />
+                <h3 className="text-lg font-semibold text-foreground mb-1">No Events Found</h3>
+                <p className="text-sm">You are not currently assigned to manage any events.</p>
+                <p className="text-xs mt-1">Event details will appear here once assigned by an admin.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

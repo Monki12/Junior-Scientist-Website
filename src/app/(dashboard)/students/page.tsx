@@ -329,19 +329,17 @@ export default function StudentsPage() {
         
         transaction.update(studentRef, updateData);
       });
-      // Success: No toast needed for optimistic updates. The UI already reflects the change.
-      return true; // Indicate success for potential chaining
+      return true;
     } catch (error: any) {
       console.error("Error updating student:", error);
       toast({ title: "Update Failed", description: error.message, variant: "destructive" });
-      return false; // Indicate failure
+      return false;
     }
   };
 
   const handleOptimisticUpdate = (studentId: string, field: string, value: any, isCustom: boolean) => {
-    const originalStudents = JSON.parse(JSON.stringify(students)); // Deep copy for rollback
+    const originalStudents = JSON.parse(JSON.stringify(students));
     
-    // Optimistically update local state
     setStudents(prevStudents => 
       prevStudents.map(s => {
         if (s.uid === studentId) {
@@ -354,10 +352,9 @@ export default function StudentsPage() {
       })
     );
 
-    // Call async update and revert on failure
     handleStudentUpdate(studentId, field, value, isCustom).then(success => {
       if (!success) {
-        setStudents(originalStudents); // Revert on failure
+        setStudents(originalStudents);
         toast({ title: "Reverted Change", description: "The update failed and was reverted.", variant: "destructive" });
       }
     });
@@ -428,6 +425,16 @@ export default function StudentsPage() {
               <TableBody>
                 {loadingData ? (
                     <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-10"><Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" /></TableCell></TableRow>
+                ) : enrichedStudents.length === 0 ? (
+                    <TableRow>
+                        <TableCell colSpan={visibleColumns.length}>
+                            <div className="text-center py-12 text-muted-foreground">
+                                <GraduationCap className="h-16 w-16 mx-auto mb-4 text-primary/30" />
+                                <h3 className="text-xl font-semibold text-foreground mb-2">No Students Found</h3>
+                                <p>No student accounts have been created yet. Students can sign up on the public site.</p>
+                            </div>
+                        </TableCell>
+                    </TableRow>
                 ) : filteredStudents.length > 0 ? (
                   filteredStudents.map((student) => (
                   <TableRow key={student.uid}>

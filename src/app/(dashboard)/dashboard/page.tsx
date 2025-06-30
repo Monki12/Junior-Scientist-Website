@@ -2,7 +2,7 @@
 'use client';
 
 import { useAuth } from '@/hooks/use-auth';
-import { Loader2, Users, ShieldCheck, Trophy, Briefcase, ListChecks, Award, BarChart3, LineChart, Ticket, Compass, CheckCircle } from 'lucide-react';
+import { Loader2, Users, ShieldCheck, Trophy, Briefcase, ListChecks, Award, BarChart3, LineChart, Ticket, Compass, CheckCircle, Search, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -301,7 +301,11 @@ const EventRepDashboard = ({ userProfile }: { userProfile: UserProfileData }) =>
                         ))}
                     </div>
                 ) : (
-                    <p className="text-muted-foreground text-center">You are not assigned to any events.</p>
+                    <div className="text-center py-10 text-muted-foreground">
+                        <Briefcase className="h-12 w-12 mx-auto mb-3 text-primary/30" />
+                        <h3 className="text-lg font-semibold text-foreground mb-1">No Events Assigned</h3>
+                        <p className="text-sm">Event details will appear here once you are assigned to an event by an admin.</p>
+                    </div>
                 )}
             </CardContent>
          </Card>
@@ -336,13 +340,14 @@ const StudentDashboard = ({ userProfile }: { userProfile: UserProfileData }) => 
     const q = query(collection(db, 'event_registrations'), where('userId', '==', userProfile.uid));
 
     const unsubscribe = onSnapshot(q, async (querySnapshot) => {
-      if (querySnapshot.empty) {
+      const regs = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EventRegistration));
+      
+      if (regs.length === 0) {
         setRegistrations([]);
         setLoadingData(false);
         return;
       }
       
-      const regs = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EventRegistration));
       const eventIds = [...new Set(regs.map(r => r.subEventId))];
 
       if (eventIds.length > 0) {
@@ -359,7 +364,7 @@ const StudentDashboard = ({ userProfile }: { userProfile: UserProfileData }) => 
           setRegistrations(registrationsWithDetails);
         } catch (error) {
           console.error("Error fetching event details for dashboard: ", error);
-          setRegistrations(regs); // Set registrations without details on error
+          setRegistrations(regs); 
         }
       } else {
          setRegistrations([]);
@@ -373,19 +378,37 @@ const StudentDashboard = ({ userProfile }: { userProfile: UserProfileData }) => 
     return () => unsubscribe();
   }, [userProfile?.uid]);
   
-  const registeredEventsCount = registrations.length;
+  if (loadingData) {
+      return (
+        <div className="flex h-full w-full items-center justify-center">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <span className="ml-4">Loading Your Dashboard...</span>
+        </div>
+      )
+  }
   
   const upcomingEvents = registrations.filter(reg => {
     if (!reg.eventDetails?.eventDate) return false;
     const eventDate = new Date(reg.eventDetails.eventDate);
-    return eventDate >= new Date(); // Today or in the future
-  }).sort((a, b) => { // Sort upcoming events by soonest first
+    return eventDate >= new Date();
+  }).sort((a, b) => {
       const dateA = a.eventDetails?.eventDate ? new Date(a.eventDetails.eventDate) : new Date(0);
       const dateB = b.eventDetails?.eventDate ? new Date(b.eventDetails.eventDate) : new Date(0);
       return dateA.getTime() - dateB.getTime();
   });
-  
-  const upcomingEventsCount = upcomingEvents.length;
+
+  if (registrations.length === 0) {
+    return (
+        <div className="text-center py-10">
+            <AlertCircle className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-2xl font-semibold mb-2">You haven't registered for any events yet!</h3>
+            <p className="text-muted-foreground max-w-md mx-auto mb-6">Head over to the 'Explore Events' section to find exciting opportunities and challenges waiting for you.</p>
+            <Button asChild className="bg-accent text-accent-foreground hover:bg-accent/90">
+                <Link href="/events"><Search className="mr-2 h-4 w-4"/>Explore Events Now</Link>
+            </Button>
+        </div>
+    )
+  }
 
   return (
     <div className="space-y-8 animate-fade-in-up">
@@ -398,7 +421,7 @@ const StudentDashboard = ({ userProfile }: { userProfile: UserProfileData }) => 
             <Ticket className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {loadingData ? <Loader2 className="h-6 w-6 animate-spin" /> : <div className="text-2xl font-bold">{registeredEventsCount}</div>}
+            <div className="text-2xl font-bold">{registrations.length}</div>
             <p className="text-xs text-muted-foreground">Events you are part of</p>
           </CardContent>
         </Card>
@@ -408,7 +431,7 @@ const StudentDashboard = ({ userProfile }: { userProfile: UserProfileData }) => 
             <Briefcase className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {loadingData ? <Loader2 className="h-6 w-6 animate-spin" /> : <div className="text-2xl font-bold">{upcomingEventsCount}</div>}
+            <div className="text-2xl font-bold">{upcomingEvents.length}</div>
             <p className="text-xs text-muted-foreground">Events on the horizon</p>
           </CardContent>
         </Card>
@@ -420,13 +443,9 @@ const StudentDashboard = ({ userProfile }: { userProfile: UserProfileData }) => 
           <CardDescription>A list of your registered events that are coming up soon.</CardDescription>
         </CardHeader>
         <CardContent>
-          {loadingData ? (
-            <div className="flex justify-center items-center py-4">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            </div>
-          ) : upcomingEvents.length > 0 ? (
+          {upcomingEvents.length > 0 ? (
             <ul className="space-y-4">
-              {upcomingEvents.slice(0, 5).map(reg => ( // Show max 5 upcoming
+              {upcomingEvents.slice(0, 5).map(reg => (
                 <li key={reg.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                   <div>
                     <Link href={`/events/${reg.eventDetails?.slug || ''}`} className="font-semibold text-primary hover:underline">
@@ -444,8 +463,9 @@ const StudentDashboard = ({ userProfile }: { userProfile: UserProfileData }) => 
             </ul>
           ) : (
             <div className="text-center text-muted-foreground py-4">
-              <p>You have no upcoming events registered.</p>
-              <p className="text-sm">Why not explore some new ones?</p>
+              <p>You have no upcoming events.</p>
+              <p className="text-sm">Check "My Registrations" to see your past event history.</p>
+              <Button asChild variant="link" className="mt-2"><Link href="/my-registrations">View All Registrations</Link></Button>
             </div>
           )}
         </CardContent>
