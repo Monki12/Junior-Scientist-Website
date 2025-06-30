@@ -4,8 +4,9 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { auth, db } from '@/lib/firebase';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { db } from '@/lib/firebase'; // Keep 'db' for Firestore operations
+import { initializeApp, deleteApp } from 'firebase/app'; // Import app management functions
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth'; // Import auth functions
 import { doc, setDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
@@ -14,6 +15,19 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 import { organizerSignupSchema, type OrganizerSignupFormData } from '@/schemas/organizerSignupSchema';
+
+// Reconstruct Firebase config to initialize a temporary app instance.
+// This is necessary to create a user without signing out the current admin.
+const firebaseConfig = {
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
+};
+
 
 interface CreateOrganizerFormProps {
   currentAdminRole: 'overall_head' | 'admin';
@@ -44,6 +58,13 @@ export default function CreateOrganizerForm({ currentAdminRole, onSuccess }: Cre
 
   const onSubmit = async (data: OrganizerSignupFormData) => {
     setIsSubmitting(true);
+
+    // Create a temporary, secondary Firebase App instance for user creation.
+    // This prevents the admin from being logged out upon new user creation.
+    const tempAppName = `auth-worker-${Date.now()}`;
+    const tempApp = initializeApp(firebaseConfig, tempAppName);
+    const tempAuth = getAuth(tempApp);
+
     try {
       const usersRef = collection(db, 'users');
       const q = query(usersRef, where('collegeRollNumber', '==', data.collegeRollNumber));
@@ -52,10 +73,12 @@ export default function CreateOrganizerForm({ currentAdminRole, onSuccess }: Cre
         setError('collegeRollNumber', { type: 'manual', message: 'This College Roll Number is already registered.' });
         toast({ title: "Registration Failed", description: "The College Roll Number provided is already in use.", variant: "destructive" });
         setIsSubmitting(false);
+        await deleteApp(tempApp); // Clean up temp app on early exit
         return;
       }
 
-      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      // Use the temporary auth instance to create the user.
+      const userCredential = await createUserWithEmailAndPassword(tempAuth, data.email, data.password);
       const newUserUid = userCredential.user.uid;
 
       const userProfileData = {
@@ -117,6 +140,8 @@ export default function CreateOrganizerForm({ currentAdminRole, onSuccess }: Cre
       });
     } finally {
       setIsSubmitting(false);
+      // Always delete the temporary app instance to avoid memory leaks.
+      await deleteApp(tempApp);
     }
   };
 
