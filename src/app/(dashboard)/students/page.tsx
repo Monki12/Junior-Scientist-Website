@@ -26,6 +26,7 @@ import { Textarea } from '@/components/ui/textarea';
 interface DisplayStudent extends UserProfileData {
   registeredEventNames?: string[];
   schoolVerifiedByOrganizer: boolean;
+  [key: string]: any; // For custom columns
 }
 
 const DEFAULT_COLUMNS: CustomColumnDefinition[] = [
@@ -104,8 +105,15 @@ export default function StudentsPage() {
         const registrationsQuery = query(collection(db, 'event_registrations'));
 
         const unsubStudents = onSnapshot(studentsQuery, (snapshot) => {
-            const fetchedStudents = snapshot.docs.map(doc => ({...doc.data(), uid: doc.id} as UserProfileData));
-            setStudents(fetchedStudents as DisplayStudent[]);
+            const fetchedStudents = snapshot.docs.map(doc => {
+              const data = doc.data();
+              return {
+                ...data,
+                uid: doc.id,
+                customData: data.customData || {},
+              } as DisplayStudent
+            });
+            setStudents(fetchedStudents);
             if (loadingData) setLoadingData(false);
         }, (error) => {
             console.error("Error fetching students:", error);
@@ -166,18 +174,23 @@ export default function StudentsPage() {
     });
   }, [enrichedStudents, activeFilters]);
 
-  const handleStudentUpdate = async (studentId: string, field: string, value: any) => {
+  const handleStudentUpdate = async (studentId: string, field: string, value: any, isCustom: boolean) => {
     const studentRef = doc(db, 'users', studentId);
     try {
       await runTransaction(db, async (transaction) => {
         const studentDoc = await transaction.get(studentRef);
-        if (!studentDoc.exists()) {
-          throw new Error("Student document does not exist!");
+        if (!studentDoc.exists()) throw new Error("Student document does not exist!");
+        
+        const updateData: {[key: string]: any} = {};
+        if (isCustom) {
+            const currentCustomData = studentDoc.data()?.customData || {};
+            updateData[`customData.${field}`] = value;
+        } else {
+            updateData[field] = value;
         }
-        transaction.update(studentRef, {
-          [field]: value,
-          updatedAt: serverTimestamp(),
-        });
+        updateData.updatedAt = serverTimestamp();
+        
+        transaction.update(studentRef, updateData);
       });
       toast({ title: "Update Successful", description: `Student record has been updated.` });
     } catch (error: any) {
@@ -239,13 +252,11 @@ export default function StudentsPage() {
                     View, filter, and manage all student accounts across all events. ({filteredStudents.length} of {students.length} students showing)
                 </CardDescription>
             </div>
-            {canManageColumns && (
-                <div className="flex items-center gap-2">
-                    <Button variant="outline" onClick={() => setIsFilterDialogOpen(true)}><Filter className="mr-2 h-4 w-4" />Filter ({activeFilters.length})</Button>
-                    <Button variant="outline" onClick={() => setIsCustomizeDialogOpen(true)}><Columns className="mr-2 h-4 w-4" />Customize Columns</Button>
-                    <Button onClick={() => setIsAddColumnDialogOpen(true)}><PlusCircle className="mr-2 h-4 w-4" />Add Column</Button>
-                </div>
-            )}
+             <div className="flex items-center gap-2">
+                <Button variant="outline" onClick={() => setIsFilterDialogOpen(true)}><Filter className="mr-2 h-4 w-4" />Filter ({activeFilters.length})</Button>
+                <Button variant="outline" onClick={() => setIsCustomizeDialogOpen(true)}><Columns className="mr-2 h-4 w-4" />Customize Columns</Button>
+                {canManageColumns && <Button onClick={() => setIsAddColumnDialogOpen(true)}><PlusCircle className="mr-2 h-4 w-4" />Add Column</Button>}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -265,27 +276,42 @@ export default function StudentsPage() {
                   filteredStudents.map((student) => (
                   <TableRow key={student.uid}>
                     {availableColumns.filter(c => visibleColumns.includes(c.id)).map(col => {
-                        let cellValue;
+                        const isCustom = !DEFAULT_COLUMNS.some(c => c.id === col.id);
+                        const cellValue = isCustom ? student.customData?.[col.id] : student[col.id];
+
                         if (col.id === 'phoneNumbers') {
-                            cellValue = student.phoneNumbers?.[0];
-                        } else if (col.id === 'registeredEventNames') {
-                            cellValue = student.registeredEventNames;
-                        } else {
-                            cellValue = (student as any)[col.id];
+                            return <TableCell key={col.id}>{displayValue(student.phoneNumbers?.[0])}</TableCell>;
                         }
-                        
+                        if (col.id === 'registeredEventNames') {
+                             return <TableCell key={col.id}>{displayValue(student.registeredEventNames)}</TableCell>
+                        }
+
                         if (col.dataType === 'checkbox') {
                           return (
                             <TableCell key={col.id} className="text-center">
                               <Checkbox 
                                 checked={!!cellValue}
-                                onCheckedChange={(checked) => handleStudentUpdate(student.uid, col.id, !!checked)}
+                                onCheckedChange={(checked) => handleStudentUpdate(student.uid, col.id, !!checked, isCustom)}
                                 disabled={!canManageStudents}
-                                aria-label={`Verify school for ${student.fullName}`}
+                                aria-label={`Update ${col.name} for ${student.fullName}`}
                               />
                             </TableCell>
                           )
                         }
+                        
+                         if (col.dataType === 'dropdown') {
+                          return (
+                            <TableCell key={col.id}>
+                                <Select value={cellValue || ''} onValueChange={(val) => handleStudentUpdate(student.uid, col.id, val, isCustom)}>
+                                    <SelectTrigger className="text-xs h-8"><SelectValue placeholder="Select..."/></SelectTrigger>
+                                    <SelectContent>
+                                        {(col.options || []).map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </TableCell>
+                          )
+                        }
+
 
                         return (
                           <TableCell key={col.id}>

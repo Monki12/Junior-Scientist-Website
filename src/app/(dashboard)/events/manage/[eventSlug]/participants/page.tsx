@@ -327,7 +327,7 @@ export default function ManageParticipantsPage() {
                                     }
                                 }}>
                                   <SelectTrigger className="text-xs capitalize h-8"><SelectValue placeholder="Select..."/></SelectTrigger>
-                                  <SelectContent>{col.options?.map(s => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}</SelectContent>
+                                  <SelectContent>{(col.options || []).map(s => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}</SelectContent>
                                 </Select>
                               );
                             case 'file':
