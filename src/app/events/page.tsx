@@ -55,6 +55,7 @@ function SubEventCard({ event }: { event: SubEvent }) {
   );
 }
 
+// This is the primary, public-facing page for the /events route.
 export default function SubEventsListPage() {
   const [events, setEvents] = useState<SubEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,7 +67,7 @@ export default function SubEventsListPage() {
 
   useEffect(() => {
     // This logic handles redirecting staff members away from the public events page
-    // to their own dedicated management page, resolving the routing conflict.
+    // to their own dedicated management page, resolving any routing conflicts.
     if (!authLoading && userProfile) {
       const isStaff = ['admin', 'overall_head', 'event_representative', 'organizer'].includes(userProfile.role);
       if (isStaff) {
@@ -103,7 +104,6 @@ export default function SubEventsListPage() {
   
   const uniqueCategories = ['all', ...new Set(events.map(event => event.superpowerCategory).filter(Boolean) as string[])];
   
-  // Render a loading state if auth is checking or if the user is a staff member being redirected
   const isRedirecting = !authLoading && userProfile && ['admin', 'overall_head', 'event_representative', 'organizer'].includes(userProfile.role);
   if (authLoading || loading || isRedirecting) {
     return (
