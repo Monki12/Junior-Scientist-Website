@@ -99,7 +99,9 @@ export default function GlobalTasksPage() {
   const { toast } = useToast();
   const { userProfile, loading: authLoading } = useAuth();
 
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [managedTasks, setManagedTasks] = useState<Task[]>([]);
+  const [personalTasks, setPersonalTasks] = useState<Task[]>([]);
+  
   const [allEvents, setAllEvents] = useState<SubEvent[]>([]);
   const [allStaff, setAllStaff] = useState<UserProfileData[]>([]);
   const [loadingData, setLoadingData] = useState(true);
@@ -110,44 +112,72 @@ export default function GlobalTasksPage() {
 
   const [isDeleteConfirmDialogOpen, setIsDeleteConfirmDialogOpen] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
+  
+  const tasks = useMemo(() => {
+    const allTasks = new Map<string, Task>();
+    managedTasks.forEach(task => allTasks.set(task.id, task));
+    personalTasks.forEach(task => allTasks.set(task.id, task));
+    return Array.from(allTasks.values()).sort((a, b) => {
+        const dateA = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+        const dateB = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+        return dateA - dateB;
+    });
+  }, [managedTasks, personalTasks]);
+
 
   useEffect(() => {
     if (!userProfile) return;
 
-    let unsubscribe: Unsubscribe | null = null;
+    const unsubs: Unsubscribe[] = [];
     
     const setupListeners = async () => {
         setLoadingData(true);
         try {
           const eventsQuery = query(collection(db, 'subEvents'));
-          const eventsSnapshot = await getDocs(eventsQuery);
-          const eventsList = eventsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SubEvent));
-          setAllEvents(eventsList);
+          unsubs.push(onSnapshot(eventsQuery, (snapshot) => {
+            const eventsList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SubEvent));
+            setAllEvents(eventsList);
+          }));
           
           const staffRoles = ['organizer', 'event_representative', 'overall_head', 'admin'];
           const staffQuery = query(collection(db, 'users'), where('role', 'in', staffRoles));
-          const staffSnapshot = await getDocs(staffQuery);
-          const staffList = staffSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfileData));
-          setAllStaff(staffList);
+          unsubs.push(onSnapshot(staffQuery, (snapshot) => {
+            const staffList = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfileData));
+            setAllStaff(staffList);
+          }));
 
           let tasksQuery;
           if (userProfile.role === 'admin' || userProfile.role === 'overall_head') {
               tasksQuery = query(collection(db, 'tasks'));
-          } else if (userProfile.role === 'event_representative' && userProfile.assignedEventUids) {
-              tasksQuery = query(collection(db, 'tasks'), where('subEventId', 'in', userProfile.assignedEventUids));
-          } else {
+              unsubs.push(onSnapshot(tasksQuery, (snapshot) => {
+                const tasksList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
+                setManagedTasks(tasksList);
+                setPersonalTasks([]);
+                setLoadingData(false);
+              }));
+          } else if (userProfile.role === 'event_representative') {
+              const managedEventsIds = userProfile.assignedEventUids || ['__none__'];
+              const managedTasksQuery = query(collection(db, 'tasks'), where('subEventId', 'in', managedEventsIds));
+              unsubs.push(onSnapshot(managedTasksQuery, (snapshot) => {
+                const tasksList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
+                setManagedTasks(tasksList);
+              }));
+              
+              const personalTasksQuery = query(collection(db, 'tasks'), where('assignedToUserIds', 'array-contains', userProfile.uid));
+              unsubs.push(onSnapshot(personalTasksQuery, (snapshot) => {
+                const tasksList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
+                setPersonalTasks(tasksList);
+                setLoadingData(false);
+              }));
+          } else { // Organizer
               tasksQuery = query(collection(db, 'tasks'), where('assignedToUserIds', 'array-contains', userProfile.uid));
+              unsubs.push(onSnapshot(tasksQuery, (snapshot) => {
+                const tasksList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
+                setPersonalTasks(tasksList);
+                setManagedTasks([]);
+                setLoadingData(false);
+              }));
           }
-
-          unsubscribe = onSnapshot(tasksQuery, (snapshot) => {
-              const tasksList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
-              setTasks(tasksList);
-              setLoadingData(false);
-          }, (error) => {
-              console.error("Error fetching tasks:", error);
-              toast({ title: "Error", description: "Could not fetch tasks.", variant: "destructive" });
-              setLoadingData(false);
-          });
         } catch (error) {
           console.error("Error setting up listeners:", error);
           toast({ title: "Error", description: "Could not initialize page data.", variant: "destructive" });
@@ -157,9 +187,7 @@ export default function GlobalTasksPage() {
 
     setupListeners();
 
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
+    return () => unsubs.forEach(unsub => unsub());
   }, [userProfile, toast]);
 
   const handleTaskFormSubmit = async () => {
@@ -195,52 +223,71 @@ export default function GlobalTasksPage() {
     }
   };
 
-  const handleMarkTaskComplete = async (task: Task) => {
+  const handleStatusChange = async (task: Task, newStatus: TaskStatus) => {
       if (!userProfile) return;
 
       const taskRef = doc(db, "tasks", task.id);
-      const assigneeOldScores = new Map<string, number>();
       
-      try {
-        await runTransaction(db, async (transaction) => {
-          const taskDoc = await transaction.get(taskRef);
-          if (!taskDoc.exists() || taskDoc.data().status === 'Completed') {
-              throw new Error("Task is already completed or does not exist.");
-          }
-
-          transaction.update(taskRef, {
-              status: 'Completed',
-              completedByUserId: userProfile.uid,
-              completedAt: serverTimestamp()
-          });
-
-          const pointsToAdd = task.pointsOnCompletion || 10;
-          for (const assigneeId of task.assignedToUserIds) {
-              const assigneeRef = doc(db, "users", assigneeId);
-              const assigneeDoc = await transaction.get(assigneeRef);
-              if (assigneeDoc.exists()) {
-                  const oldScore = assigneeDoc.data().credibilityScore || 0;
-                  assigneeOldScores.set(assigneeId, oldScore);
-                  transaction.update(assigneeRef, { credibilityScore: increment(pointsToAdd) });
+      // Optimistic UI update
+      const originalTasks = tasks;
+      const updatedTasks = tasks.map(t => t.id === task.id ? {...t, status: newStatus} : t);
+      setManagedTasks(updatedTasks.filter(t => managedTasks.some(mt => mt.id === t.id)));
+      setPersonalTasks(updatedTasks.filter(t => personalTasks.some(pt => pt.id === t.id)));
+      
+      // If setting to completed, run the transaction for points
+      if (newStatus === 'Completed' && task.status !== 'Completed') {
+          const assigneeOldScores = new Map<string, number>();
+          try {
+            await runTransaction(db, async (transaction) => {
+              const taskDoc = await transaction.get(taskRef);
+              if (!taskDoc.exists() || taskDoc.data().status === 'Completed') {
+                  throw new Error("Task is already completed or does not exist.");
               }
+
+              transaction.update(taskRef, {
+                  status: 'Completed',
+                  completedByUserId: userProfile.uid,
+                  completedAt: serverTimestamp()
+              });
+
+              const pointsToAdd = task.pointsOnCompletion || 10;
+              for (const assigneeId of task.assignedToUserIds) {
+                  const assigneeRef = doc(db, "users", assigneeId);
+                  const assigneeDoc = await transaction.get(assigneeRef);
+                  if (assigneeDoc.exists()) {
+                      const oldScore = assigneeDoc.data().credibilityScore || 0;
+                      assigneeOldScores.set(assigneeId, oldScore);
+                      transaction.update(assigneeRef, { credibilityScore: increment(pointsToAdd) });
+                  }
+              }
+
+              if (task.assignedByUserId) {
+                  const assignerRef = doc(db, "users", task.assignedByUserId);
+                  transaction.update(assignerRef, { credibilityScore: increment(2) });
+              }
+            });
+            toast({ title: "Task Completed!", description: `Credibility scores have been updated.` });
+
+            for (const [assigneeId, oldScore] of assigneeOldScores.entries()) {
+                const newScore = oldScore + (task.pointsOnCompletion || 10);
+                await checkAndSendRankNotification(assigneeId, oldScore, newScore);
+            }
+          } catch(e: any) {
+             console.error("Transaction failed: ", e);
+             toast({ title: "Error", description: e.message || "Failed to update task and scores.", variant: "destructive" });
+             setManagedTasks(originalTasks.filter(t => managedTasks.some(mt => mt.id === t.id)));
+             setPersonalTasks(originalTasks.filter(t => personalTasks.some(pt => pt.id === t.id)));
           }
-
-          if (task.assignedByUserId) {
-              const assignerRef = doc(db, "users", task.assignedByUserId);
-              transaction.update(assignerRef, { credibilityScore: increment(2) });
+      } else { // For any other status change, just update the status
+          try {
+              await updateDoc(taskRef, { status: newStatus, updatedAt: serverTimestamp() });
+              // No toast for simple status changes to avoid notification fatigue
+          } catch (e: any) {
+              console.error("Status update failed: ", e);
+              toast({ title: "Error", description: "Could not update task status.", variant: "destructive" });
+              setManagedTasks(originalTasks.filter(t => managedTasks.some(mt => mt.id === t.id)));
+              setPersonalTasks(originalTasks.filter(t => personalTasks.some(pt => pt.id === t.id)));
           }
-        });
-        toast({ title: "Task Completed", description: `Credibility scores have been updated.` });
-
-        // After transaction, check for notifications for each assignee
-        for (const [assigneeId, oldScore] of assigneeOldScores.entries()) {
-            const newScore = oldScore + (task.pointsOnCompletion || 10);
-            await checkAndSendRankNotification(assigneeId, oldScore, newScore);
-        }
-
-      } catch (e: any) {
-        console.error("Transaction failed: ", e);
-        toast({ title: "Error", description: e.message || "Failed to update task and scores.", variant: "destructive" });
       }
   };
 
@@ -283,7 +330,6 @@ export default function GlobalTasksPage() {
     return allEvents.find(e => e.id === id)?.title || id;
   };
   
-  const canEditPoints = userProfile?.role === 'admin' || userProfile?.role === 'overall_head' || userProfile?.role === 'event_representative';
   const canSelfAssignOnly = userProfile?.role === 'organizer';
 
   return (
@@ -318,25 +364,42 @@ export default function GlobalTasksPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {tasks.map((task) => (
-                    <TableRow key={task.id}>
-                      <TableCell className="font-medium">{task.title}</TableCell>
-                      <TableCell>{task.assignedToUserIds?.map(uid => allStaff.find(s => s.uid === uid)?.fullName || 'N/A').join(', ')}</TableCell>
-                      <TableCell>{getEventTitleById(task.subEventId)}</TableCell>
-                      <TableCell>{task.dueDate && isValid(parseISO(task.dueDate)) ? format(parseISO(task.dueDate), 'MMM dd, yyyy') : 'N/A'}</TableCell>
-                      <TableCell><Badge variant={getPriorityBadgeVariant(task.priority)}>{task.priority}</Badge></TableCell>
-                      <TableCell><Badge className={getStatusBadgeVariant(task.status).colorClass}>{task.status}</Badge></TableCell>
-                      <TableCell className="space-x-1">
-                        <Button variant="ghost" size="icon" onClick={() => openEditTaskDialog(task)}><Edit2 className="h-4 w-4" /></Button>
-                        {(userProfile?.role === 'admin' || userProfile?.role === 'overall_head') && 
-                            <Button variant="ghost" size="icon" onClick={() => {setTaskToDelete(task); setIsDeleteConfirmDialogOpen(true);}}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                        }
-                        {task.status !== 'Completed' && (userProfile?.role === 'admin' || userProfile?.role === 'overall_head' || userProfile?.role === 'event_representative') && (
-                          <Button size="sm" onClick={() => handleMarkTaskComplete(task)}>Mark Complete</Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {tasks.map((task) => {
+                    const isManager = userProfile?.role === 'admin' || userProfile?.role === 'overall_head' || (userProfile?.role === 'event_representative' && userProfile.assignedEventUids?.includes(task.subEventId || ''));
+                    const isAssigner = userProfile?.uid === task.assignedByUserId;
+                    const canEditFully = isManager || isAssigner;
+                    const isAssignee = task.assignedToUserIds.includes(userProfile?.uid || '');
+                    const canChangeStatus = canEditFully || isAssignee;
+
+                    return (
+                        <TableRow key={task.id}>
+                        <TableCell className="font-medium">{task.title}</TableCell>
+                        <TableCell>{task.assignedToUserIds?.map(uid => allStaff.find(s => s.uid === uid)?.fullName || 'N/A').join(', ')}</TableCell>
+                        <TableCell>{getEventTitleById(task.subEventId)}</TableCell>
+                        <TableCell>{task.dueDate && isValid(parseISO(task.dueDate)) ? format(parseISO(task.dueDate), 'MMM dd, yyyy') : 'N/A'}</TableCell>
+                        <TableCell><Badge variant={getPriorityBadgeVariant(task.priority)}>{task.priority}</Badge></TableCell>
+                        <TableCell>
+                             <Select value={task.status} onValueChange={(newStatus: TaskStatus) => handleStatusChange(task, newStatus)} disabled={!canChangeStatus}>
+                                <SelectTrigger className={`h-8 text-xs capitalize w-[130px] ${getStatusBadgeVariant(task.status).colorClass}`}>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Not Started">Not Started</SelectItem>
+                                    <SelectItem value="In Progress">In Progress</SelectItem>
+                                    <SelectItem value="Pending Review">Pending Review</SelectItem>
+                                    <SelectItem value="Completed">Completed</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </TableCell>
+                        <TableCell className="space-x-1">
+                            <Button variant="ghost" size="icon" onClick={() => openEditTaskDialog(task)} disabled={!canEditFully}><Edit2 className="h-4 w-4" /></Button>
+                            {canEditFully && 
+                                <Button variant="ghost" size="icon" onClick={() => {setTaskToDelete(task); setIsDeleteConfirmDialogOpen(true);}}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                            }
+                        </TableCell>
+                        </TableRow>
+                    );
+                })}
                 </TableBody>
               </Table>
             </div>
@@ -400,7 +463,7 @@ export default function GlobalTasksPage() {
               </div>
               <div>
                 <Label htmlFor="points">Points on Completion</Label>
-                <Input id="points" type="number" value={currentTaskForm.pointsOnCompletion} onChange={e => setCurrentTaskForm({...currentTaskForm, pointsOnCompletion: Number(e.target.value)})} disabled={!canEditPoints} />
+                <Input id="points" type="number" value={currentTaskForm.pointsOnCompletion} onChange={e => setCurrentTaskForm({...currentTaskForm, pointsOnCompletion: Number(e.target.value)})} disabled={userProfile?.role === 'organizer'} />
               </div>
 
           </div>

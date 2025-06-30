@@ -2,16 +2,17 @@
 'use client';
 
 import { useAuth } from '@/hooks/use-auth';
-import { Loader2, Users, ShieldCheck, Trophy, Briefcase, ListChecks, Award, BarChart3, LineChart, Ticket, Compass } from 'lucide-react';
+import { Loader2, Users, ShieldCheck, Trophy, Briefcase, ListChecks, Award, BarChart3, LineChart, Ticket, Compass, CheckCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useEffect, useState }from 'react';
-import type { SubEvent, UserProfileData, EventRegistration } from '@/types';
+import type { SubEvent, UserProfileData, EventRegistration, Task } from '@/types';
 import { collection, onSnapshot, query, orderBy, limit, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 
 const OverallHeadDashboard = () => {
   const [stats, setStats] = useState({ events: 0, staff: 0, students: 0, avgParticipants: '0.0' });
@@ -187,17 +188,127 @@ const OverallHeadDashboard = () => {
   )
 };
 
-const EventRepDashboard = () => (
-    <Card>
-        <CardHeader>
-            <CardTitle>Event Representative Dashboard</CardTitle>
-            <CardDescription>This is your dashboard. An overview of your assigned events, tasks, and staff will be shown here.</CardDescription>
-        </CardHeader>
-        <CardContent>
-             <p>Content for Event Representative coming soon!</p>
-        </CardContent>
-    </Card>
-);
+const EventRepDashboard = ({ userProfile }: { userProfile: UserProfileData }) => {
+  const [stats, setStats] = useState({
+    managedEvents: 0,
+    totalParticipants: 0,
+    tasksCompleted: 0,
+    tasksTotal: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [managedEvents, setManagedEvents] = useState<SubEvent[]>([]);
+
+  const assignedEventUids = userProfile.assignedEventUids || [];
+
+  useEffect(() => {
+    if (assignedEventUids.length === 0) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+
+    const unsubs: (() => void)[] = [];
+
+    const eventsQuery = query(collection(db, 'subEvents'), where('__name__', 'in', assignedEventUids));
+    unsubs.push(onSnapshot(eventsQuery, (snapshot) => {
+        const eventsList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SubEvent));
+        setManagedEvents(eventsList);
+        setStats(prev => ({...prev, managedEvents: eventsList.length}));
+    }));
+
+    const registrationsQuery = query(collection(db, 'event_registrations'), where('subEventId', 'in', assignedEventUids));
+    unsubs.push(onSnapshot(registrationsQuery, (snapshot) => {
+        setStats(prev => ({...prev, totalParticipants: snapshot.size}));
+    }));
+    
+    const tasksQuery = query(collection(db, 'tasks'), where('subEventId', 'in', assignedEventUids));
+    unsubs.push(onSnapshot(tasksQuery, (snapshot) => {
+        const tasksList = snapshot.docs.map(doc => doc.data() as Task);
+        const completed = tasksList.filter(t => t.status === 'Completed').length;
+        setStats(prev => ({...prev, tasksCompleted: completed, tasksTotal: tasksList.length}));
+        setLoading(false); // Assume this is the last query to finish
+    }));
+
+    return () => unsubs.forEach(unsub => unsub());
+
+  }, [assignedEventUids]);
+
+  if (loading) {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <span className="ml-4">Loading Your Dashboard...</span>
+      </div>
+    );
+  }
+  
+  const taskCompletionPercentage = stats.tasksTotal > 0 ? (stats.tasksCompleted / stats.tasksTotal) * 100 : 0;
+  
+  return (
+    <div className="space-y-6">
+        <h1 className="text-2xl font-bold text-primary">Event Representative Dashboard</h1>
+         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Managed Events</CardTitle>
+                <Briefcase className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+                <div className="text-2xl font-bold text-primary">{stats.managedEvents}</div>
+                <p className="text-xs text-muted-foreground">Events under your supervision</p>
+            </CardContent>
+            </Card>
+            <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Participants</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+                <div className="text-2xl font-bold text-accent">{stats.totalParticipants}</div>
+                <p className="text-xs text-muted-foreground">Across your managed events</p>
+            </CardContent>
+            </Card>
+            <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Tasks Completed</CardTitle>
+                <CheckCircle className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+                <div className="text-2xl font-bold text-primary">{stats.tasksCompleted} / {stats.tasksTotal}</div>
+                <p className="text-xs text-muted-foreground">Completion for your events</p>
+                <Progress value={taskCompletionPercentage} className="mt-2 h-2"/>
+            </CardContent>
+            </Card>
+         </div>
+         <Card>
+            <CardHeader>
+                <CardTitle>Your Events Overview</CardTitle>
+                <CardDescription>Quick links to manage your assigned events.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {managedEvents.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {managedEvents.map(event => (
+                            <div key={event.id} className="p-3 border rounded-lg flex justify-between items-center bg-muted/50">
+                                <div>
+                                    <p className="font-semibold">{event.title}</p>
+                                    <Badge variant={event.status === 'Active' ? 'default' : 'secondary'} className="mt-1">{event.status}</Badge>
+                                </div>
+                                <Button asChild size="sm">
+                                    <Link href={`/events/manage/${event.slug}`}>Manage</Link>
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="text-muted-foreground text-center">You are not assigned to any events.</p>
+                )}
+            </CardContent>
+         </Card>
+    </div>
+  );
+};
+
 
 const OrganizerDashboard = () => (
     <Card>
@@ -374,7 +485,7 @@ export default function DashboardPage() {
       case 'overall_head':
         return <OverallHeadDashboard />;
       case 'event_representative':
-        return <EventRepDashboard />;
+        return <EventRepDashboard userProfile={userProfile} />;
       case 'organizer':
         return <OrganizerDashboard />;
       case 'student':
