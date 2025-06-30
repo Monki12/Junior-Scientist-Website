@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import type { UserProfileData } from '@/types';
-import { collection, query, orderBy, limit, getDocs, where } from 'firebase/firestore';
+import { collection, query, orderBy, limit, where, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -32,28 +32,26 @@ export default function LeaderboardPage() {
         return;
       }
 
-      const fetchLeaderboard = async () => {
-        setLoadingData(true);
-        try {
-          const usersRef = collection(db, 'users');
-          const q = query(
-            usersRef,
-            where('role', 'in', ['organizer', 'event_representative', 'overall_head', 'admin']),
-            orderBy('credibilityScore', 'desc'),
-            limit(50)
-          );
-          const querySnapshot = await getDocs(q);
-          const leaders = querySnapshot.docs.map(doc => doc.data() as UserProfileData);
-          setLeaderboard(leaders);
-        } catch (error) {
-          console.error("Error fetching leaderboard data:", error);
-          toast({ title: "Error", description: "Could not fetch leaderboard data.", variant: "destructive" });
-        } finally {
-          setLoadingData(false);
-        }
-      };
+      setLoadingData(true);
+      const usersRef = collection(db, 'users');
+      const q = query(
+        usersRef,
+        where('role', 'in', ['organizer', 'event_representative', 'overall_head', 'admin']),
+        orderBy('credibilityScore', 'desc'),
+        limit(50)
+      );
+
+      const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const leaders = querySnapshot.docs.map(doc => doc.data() as UserProfileData);
+        setLeaderboard(leaders);
+        setLoadingData(false);
+      }, (error) => {
+        console.error("Error fetching leaderboard data:", error);
+        toast({ title: "Error", description: "Could not fetch leaderboard data.", variant: "destructive" });
+        setLoadingData(false);
+      });
       
-      fetchLeaderboard();
+      return () => unsubscribe();
     }
   }, [userProfile, authLoading, canViewPage, router, toast]);
 

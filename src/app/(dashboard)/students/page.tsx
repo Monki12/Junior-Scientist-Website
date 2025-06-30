@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { Loader2, Users, Search, ShieldAlert, Filter, GraduationCap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -40,21 +40,19 @@ export default function StudentsPage() {
 
     if (canViewPage) {
         setLoadingStudents(true);
-        const fetchStudents = async () => {
-            try {
-                // TODO: For Event Reps, this could be filtered by registrations in their assignedEventUids.
-                const studentsQuery = query(collection(db, 'users'), where('role', 'in', ['student', 'test']));
-                const querySnapshot = await getDocs(studentsQuery);
-                const fetchedStudents = querySnapshot.docs.map(doc => ({...doc.data(), uid: doc.id} as UserProfileData));
-                setStudents(fetchedStudents);
-            } catch (error) {
-                console.error("Error fetching students:", error);
-                toast({ title: "Error", description: "Could not fetch student data.", variant: "destructive" });
-            } finally {
-                setLoadingStudents(false);
-            }
-        };
-        fetchStudents();
+        const studentsQuery = query(collection(db, 'users'), where('role', 'in', ['student', 'test']));
+        
+        const unsubscribe = onSnapshot(studentsQuery, (querySnapshot) => {
+            const fetchedStudents = querySnapshot.docs.map(doc => ({...doc.data(), uid: doc.id} as UserProfileData));
+            setStudents(fetchedStudents);
+            setLoadingStudents(false);
+        }, (error) => {
+            console.error("Error fetching students:", error);
+            toast({ title: "Error", description: "Could not fetch student data.", variant: "destructive" });
+            setLoadingStudents(false);
+        });
+
+        return () => unsubscribe();
     }
   }, [userProfile, authLoading, canViewPage, router, toast]);
 
@@ -155,5 +153,3 @@ export default function StudentsPage() {
     </div>
   );
 }
-
-    

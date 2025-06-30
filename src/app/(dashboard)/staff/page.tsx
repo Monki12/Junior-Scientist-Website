@@ -10,7 +10,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import CreateOrganizerForm from '@/components/admin/CreateOrganizerForm';
-import { collection, getDocs, query, doc, updateDoc, getDoc, where } from 'firebase/firestore';
+import { collection, getDocs, query, doc, updateDoc, getDoc, where, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { UserProfileData, SubEvent, UserRole } from '@/types';
 import { Label } from '@/components/ui/label';
@@ -31,37 +31,42 @@ export default function StaffPage() {
   const [allEvents, setAllEvents] = useState<SubEvent[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
-  const fetchAllData = async () => {
-    setIsLoadingData(true);
-    try {
-      const staffRoles = ['admin', 'overall_head', 'event_representative', 'organizer'];
-      const usersCollection = collection(db, 'users');
-      const staffQuery = query(usersCollection, where('role', 'in', staffRoles));
-      const usersSnapshot = await getDocs(staffQuery);
-      const usersList = usersSnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as UserProfileData));
-      setAllStaff(usersList);
-
-      const eventsCollection = collection(db, 'subEvents');
-      const eventsSnapshot = await getDocs(eventsCollection);
-      const eventsList = eventsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as SubEvent));
-      setAllEvents(eventsList);
-
-    } catch (error) {
-      console.error("Error fetching data:", error);
-      toast({ title: "Error", description: "Could not load staff or event data.", variant: "destructive"});
-    } finally {
-      setIsLoadingData(false);
-    }
-  };
-
   useEffect(() => {
     if (!loading && userProfile && (userProfile.role === 'admin' || userProfile.role === 'overall_head')) {
-      fetchAllData();
-    } else if (!loading) {
-        // Non-admins trying to access this page will be redirected by layout, but as a fallback:
-        router.push('/dashboard');
+      setIsLoadingData(true);
+
+      const staffRoles = ['admin', 'overall_head', 'event_representative', 'organizer'];
+      const usersCollectionRef = collection(db, 'users');
+      const staffQuery = query(usersCollectionRef, where('role', 'in', staffRoles));
+      
+      const unsubStaff = onSnapshot(staffQuery, (usersSnapshot) => {
+        const usersList = usersSnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as UserProfileData));
+        setAllStaff(usersList);
+        if (isLoadingData) setIsLoadingData(false);
+      }, (error) => {
+        console.error("Error fetching staff data:", error);
+        toast({ title: "Error", description: "Could not load staff data.", variant: "destructive"});
+        setIsLoadingData(false);
+      });
+
+      const eventsCollectionRef = collection(db, 'subEvents');
+      const unsubEvents = onSnapshot(eventsCollectionRef, (eventsSnapshot) => {
+        const eventsList = eventsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as SubEvent));
+        setAllEvents(eventsList);
+      }, (error) => {
+        console.error("Error fetching event data:", error);
+        toast({ title: "Error", description: "Could not load event data.", variant: "destructive"});
+      });
+
+      return () => {
+        unsubStaff();
+        unsubEvents();
+      };
+
+    } else if (!loading && userProfile) {
+      router.push('/dashboard');
     }
-  }, [userProfile, loading, router]);
+  }, [userProfile, loading, router, toast]);
   
   const handleOpenEditDialog = (user: UserProfileData) => {
     setEditingUser(user);
@@ -97,7 +102,6 @@ export default function StaffPage() {
         toast({ title: "User Updated", description: `${editingUser.fullName}'s profile has been updated.`});
         setIsEditUserDialogOpen(false);
         setEditingUser(null);
-        fetchAllData(); // Refresh list
     } catch(e) {
         console.error("Error updating user:", e);
         toast({title: "Error", description: "Failed to update user.", variant: "destructive"});
@@ -107,7 +111,7 @@ export default function StaffPage() {
   if (loading || isLoadingData) {
      return (
       <div className="flex min-h-full items-center justify-center">
-        <Users className="h-12 w-12 animate-spin text-primary" />
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
       </div>
     );
   }
@@ -149,7 +153,7 @@ export default function StaffPage() {
                 </DialogHeader>
                 <CreateOrganizerForm
                   currentAdminRole={userProfile.role as 'admin' | 'overall_head'}
-                  onSuccess={() => { setIsCreateOrganizerDialogOpen(false); fetchAllData(); }}
+                  onSuccess={() => { setIsCreateOrganizerDialogOpen(false); }}
                 />
               </DialogContent>
             </Dialog>

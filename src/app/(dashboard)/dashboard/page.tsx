@@ -22,15 +22,8 @@ const OverallHeadDashboard = () => {
     setLoading(true);
 
     const eventsQuery = query(collection(db, 'subEvents'));
-    const staffQuery = query(collection(db, 'users'), where('role', 'in', ['admin', 'overall_head', 'event_representative', 'organizer']));
-    const studentsQuery = query(collection(db, 'users'), where('role', 'in', ['student', 'test']));
-    
-    let allEvents: SubEvent[] = [];
-
     const unsubEvents = onSnapshot(eventsQuery, (snapshot) => {
         const eventsList = snapshot.docs.map(doc => ({...doc.data(), id: doc.id}) as SubEvent);
-        allEvents = eventsList;
-
         const totalParticipants = eventsList.reduce((acc, event) => acc + (event.registeredParticipantCount || 0), 0);
         const avgParticipants = eventsList.length > 0 ? (totalParticipants / eventsList.length).toFixed(1) : '0.0';
 
@@ -43,19 +36,20 @@ const OverallHeadDashboard = () => {
         })));
     }, error => console.error("Error fetching events stats: ", error));
 
-    const unsubStaff = onSnapshot(staffQuery, async (snapshot) => {
+    const staffQuery = query(collection(db, 'users'), where('role', 'in', ['admin', 'overall_head', 'event_representative', 'organizer']));
+    const unsubStaff = onSnapshot(staffQuery, (snapshot) => {
         setStats(prev => ({...prev, staff: snapshot.size}));
         
-        const leaderboardQuery = query(staffQuery, orderBy('credibilityScore', 'desc'), limit(3));
-        const leaderboardSnapshot = await onSnapshot(leaderboardQuery, (leaderboardSnap) => {
-            setTopStaff(leaderboardSnap.docs.map(doc => doc.data() as UserProfileData));
-        });
-        // Note: No explicit unsubscribe for leaderboard snapshot, as it's tied to staff listener lifecycle
+        const staffList = snapshot.docs.map(doc => doc.data() as UserProfileData);
+        const leaderboard = staffList.sort((a, b) => (b.credibilityScore || 0) - (a.credibilityScore || 0)).slice(0, 3);
+        setTopStaff(leaderboard);
+
     }, error => console.error("Error fetching staff stats: ", error));
 
+    const studentsQuery = query(collection(db, 'users'), where('role', 'in', ['student', 'test']));
     const unsubStudents = onSnapshot(studentsQuery, (snapshot) => {
         setStats(prev => ({...prev, students: snapshot.size}));
-        if(loading) setLoading(false); // Mark loading as false after first student data comes in
+        if(loading) setLoading(false);
     }, error => {
         console.error("Error fetching students stats: ", error);
         if(loading) setLoading(false);
@@ -280,5 +274,3 @@ export default function DashboardPage() {
 
   return <div className="h-full w-full">{renderDashboardByRole()}</div>;
 }
-
-    
