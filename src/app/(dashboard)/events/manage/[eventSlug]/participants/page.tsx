@@ -141,8 +141,13 @@ export default function ManageParticipantsPage() {
             const userDocSnap = await getDoc(userDocRef);
             if (userDocSnap.exists()) {
               const userData = userDocSnap.data() as UserProfileData;
+              
+              // Merge customData from user profile into the root of the display participant
+              const customData = userData.customData || {};
+
               return {
                 ...userData,
+                ...customData,
                 registrationId: regDoc.id,
                 registrationStatus: regData.registrationStatus,
                 presentee: regData.presentee || false,
@@ -183,25 +188,22 @@ export default function ManageParticipantsPage() {
     });
   }, [participants, activeFilters]);
 
-  const handleUpdateRegistrationField = async (registrationId: string, field: keyof EventRegistration | string, value: any, userId: string) => {
-    // If it's a standard registration field
-    if (DEFAULT_COLUMNS.find(c => c.id === field)) {
-        const regDocRef = doc(db, 'event_registrations', registrationId);
-        try {
-            await runTransaction(db, async (transaction) => {
-                const regDoc = await transaction.get(regDocRef);
-                if (!regDoc.exists()) throw new Error("Registration document does not exist!");
-                transaction.update(regDocRef, { [field]: value, lastUpdatedAt: serverTimestamp() });
-            });
-            setParticipants(prev => prev.map(p => p.registrationId === registrationId ? { ...p, [field]: value } : p));
-            toast({ title: "Success", description: `Participant ${String(field)} updated.` });
-        } catch (error: any) {
-            toast({ title: "Update Failed", description: error.message || `Could not update ${field}.`, variant: "destructive" });
-        }
-        return;
+  const handleUpdateRegistrationField = async (registrationId: string, field: keyof EventRegistration, value: any) => {
+    const regDocRef = doc(db, 'event_registrations', registrationId);
+    try {
+        await runTransaction(db, async (transaction) => {
+            const regDoc = await transaction.get(regDocRef);
+            if (!regDoc.exists()) throw new Error("Registration document does not exist!");
+            transaction.update(regDocRef, { [field]: value, lastUpdatedAt: serverTimestamp() });
+        });
+        setParticipants(prev => prev.map(p => p.registrationId === registrationId ? { ...p, [field]: value } : p));
+        toast({ title: "Success", description: `Participant ${String(field)} updated.` });
+    } catch (error: any) {
+        toast({ title: "Update Failed", description: error.message || `Could not update ${field}.`, variant: "destructive" });
     }
-
-    // If it's a custom field, update the user document
+  };
+  
+  const handleUpdateCustomField = async (userId: string, registrationId: string, field: string, value: any) => {
     const userDocRef = doc(db, 'users', userId);
     try {
         await runTransaction(db, async (transaction) => {
@@ -233,7 +235,7 @@ export default function ManageParticipantsPage() {
       const storageRef = ref(storage, `admit_cards/${event.id}/${selectedParticipantForAdmitCard.uid}_${admitCardFile.name}`);
       await uploadBytes(storageRef, admitCardFile);
       const downloadURL = await getDownloadURL(storageRef);
-      await handleUpdateRegistrationField(selectedParticipantForAdmitCard.registrationId, 'admitCardUrl', downloadURL, selectedParticipantForAdmitCard.uid);
+      await handleUpdateRegistrationField(selectedParticipantForAdmitCard.registrationId, 'admitCardUrl', downloadURL);
       toast({ title: "Admit Card Uploaded" });
       setIsAdmitCardUploadOpen(false);
     } catch (error: any) {
@@ -304,12 +306,26 @@ export default function ManageParticipantsPage() {
                       <TableCell key={`${p.registrationId}-${col.id}`}>
                         {(() => {
                           const value = p[col.id];
+                          const isDefaultColumn = DEFAULT_COLUMNS.some(c => c.id === col.id);
+
                           switch (col.dataType) {
                             case 'checkbox':
-                              return <Checkbox checked={!!value} onCheckedChange={(checked) => handleUpdateRegistrationField(p.registrationId, col.id, !!checked, p.uid)} />;
+                              return <Checkbox checked={!!value} onCheckedChange={(checked) => {
+                                  if (isDefaultColumn) {
+                                      handleUpdateRegistrationField(p.registrationId, col.id as keyof EventRegistration, !!checked);
+                                  } else {
+                                      handleUpdateCustomField(p.uid, p.registrationId, col.id, !!checked);
+                                  }
+                              }} />;
                             case 'dropdown':
                               return (
-                                <Select value={value || ''} onValueChange={(val: any) => handleUpdateRegistrationField(p.registrationId, col.id, val, p.uid)}>
+                                <Select value={value || ''} onValueChange={(val: any) => {
+                                    if (isDefaultColumn) {
+                                        handleUpdateRegistrationField(p.registrationId, col.id as keyof EventRegistration, val);
+                                    } else {
+                                        handleUpdateCustomField(p.uid, p.registrationId, col.id, val);
+                                    }
+                                }}>
                                   <SelectTrigger className="text-xs capitalize h-8"><SelectValue placeholder="Select..."/></SelectTrigger>
                                   <SelectContent>{col.options?.map(s => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}</SelectContent>
                                 </Select>
@@ -323,7 +339,7 @@ export default function ManageParticipantsPage() {
                                     </Button>
                                 );
                             default:
-                              return <span className="text-sm">{p[col.id] || 'N/A'}</span>;
+                              return <span className="text-sm">{value || 'N/A'}</span>;
                           }
                         })()}
                       </TableCell>

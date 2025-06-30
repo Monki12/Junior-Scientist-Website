@@ -20,6 +20,7 @@ import { collection, query, where, onSnapshot, doc, runTransaction, serverTimest
 import { Loader2, Users, Search, ShieldAlert, Filter, GraduationCap, PlusCircle, Columns, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { nanoid } from 'nanoid';
+import { Textarea } from '@/components/ui/textarea';
 
 // Enriched student type for local display
 interface DisplayStudent extends UserProfileData {
@@ -84,6 +85,7 @@ export default function StudentsPage() {
   const [isCustomizeDialogOpen, setIsCustomizeDialogOpen] = useState(false);
   const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
   const [newColumn, setNewColumn] = useState<Omit<CustomColumnDefinition, 'id'>>({ name: '', dataType: 'text' });
+  const [newColumnOptions, setNewColumnOptions] = useState('');
 
   const canManageStudents = userProfile?.role === 'admin' || userProfile?.role === 'overall_head' || userProfile?.role === 'event_representative';
   const canManageColumns = userProfile?.role === 'admin' || userProfile?.role === 'overall_head';
@@ -186,11 +188,22 @@ export default function StudentsPage() {
 
   const handleAddCustomColumn = () => {
     const newId = `custom_${newColumn.name.toLowerCase().replace(/\s/g, '_')}`;
-    const newDef: CustomColumnDefinition = { ...newColumn, id: newId };
+    let finalOptions: string[] | undefined = undefined;
+
+    if (newColumn.dataType === 'dropdown') {
+      finalOptions = newColumnOptions.split(',').map(opt => opt.trim()).filter(Boolean);
+      if (finalOptions.length === 0) {
+        toast({ title: "Invalid Options", description: "Please provide at least one comma-separated option for the dropdown.", variant: "destructive" });
+        return;
+      }
+    }
+    
+    const newDef: CustomColumnDefinition = { ...newColumn, id: newId, options: finalOptions };
     setCustomColumnDefinitions([...customColumnDefinitions, newDef]);
     setVisibleColumns([...visibleColumns, newId]);
     setIsAddColumnDialogOpen(false);
     setNewColumn({ name: '', dataType: 'text' });
+    setNewColumnOptions('');
     toast({title: "Column Added", description: `Column "${newDef.name}" is now available.`});
   };
   
@@ -300,15 +313,32 @@ export default function StudentsPage() {
               <Label htmlFor="newColName">Column Name</Label>
               <Input id="newColName" value={newColumn.name} onChange={e => setNewColumn({...newColumn, name: e.target.value})} placeholder="e.g., T-Shirt Size"/>
               <Label htmlFor="newColType">Data Type</Label>
-              <Select value={newColumn.dataType} onValueChange={(val: any) => setNewColumn({...newColumn, dataType: val})}>
-                  <SelectTrigger><SelectValue/></SelectTrigger>
+              <Select 
+                value={newColumn.dataType} 
+                onValueChange={(val: any) => {
+                  setNewColumn({...newColumn, dataType: val});
+                  if (val !== 'dropdown') setNewColumnOptions('');
+                }}
+              >
+                  <SelectTrigger><SelectValue placeholder="Select data type..." /></SelectTrigger>
                   <SelectContent>
                       <SelectItem value="text">Text</SelectItem>
                       <SelectItem value="number">Number</SelectItem>
                       <SelectItem value="checkbox">Checkbox (True/False)</SelectItem>
-                      {/* More types can be added here */}
+                      <SelectItem value="dropdown">Dropdown</SelectItem>
                   </SelectContent>
               </Select>
+               {newColumn.dataType === 'dropdown' && (
+                <div className="space-y-2">
+                    <Label htmlFor="newColOptions">Dropdown Options</Label>
+                    <Textarea
+                        id="newColOptions"
+                        placeholder="Enter options separated by a comma. e.g., Small, Medium, Large"
+                        value={newColumnOptions}
+                        onChange={e => setNewColumnOptions(e.target.value)}
+                    />
+                </div>
+              )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddColumnDialogOpen(false)}>Cancel</Button>
