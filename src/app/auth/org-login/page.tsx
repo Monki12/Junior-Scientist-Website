@@ -37,7 +37,6 @@ export default function OrgLoginPage() {
     }
     setIsLoading(true);
     try {
-      // logIn will attempt Firebase login and use mock profiles for role determination
       const result = await logIn(formData);
       if (result && typeof result === 'object' && ('code' in result || 'message' in result)) {
         const errorMessage = (result as any).message || 'Login failed. Please check your credentials or ensure your account is active.';

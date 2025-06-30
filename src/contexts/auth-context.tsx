@@ -4,7 +4,7 @@
 
 import { type User as FirebaseUser, onAuthStateChanged, signInWithEmailAndPassword, type AuthError } from 'firebase/auth';
 import { createContext, useState, useEffect, ReactNode } from 'react';
-import type { LoginFormData, UserProfileData, UserRole } from '@/types';
+import type { LoginFormData, UserProfileData } from '@/types';
 import { auth, db } from '@/lib/firebase'; 
 import { doc, getDoc, DocumentData } from 'firebase/firestore'; 
 
@@ -13,7 +13,6 @@ interface AuthContextType {
   userProfile: UserProfileData | null;
   loading: boolean;
   logIn: (formData: LoginFormData) => Promise<FirebaseUser | AuthError>;
-  setMockUserRole: (role: UserRole) => void;
   logOut: () => Promise<void>;
   setUserProfile: React.Dispatch<React.SetStateAction<UserProfileData | null>>;
 }
@@ -93,40 +92,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const setMockUserRole = (role: UserRole) => {
-    const mockEmail = `${role.replace(/_/g, '.')}.test@example.com`;
-    const mockUser = {
-      uid: `mock-uid-${role}`,
-      email: mockEmail,
-      displayName: `Mock ${role}`,
-    } as FirebaseUser;
-
-    const mockProfile: UserProfileData = {
-      uid: mockUser.uid,
-      email: mockUser.email,
-      role: role,
-      displayName: `Mock ${role.replace('_', ' ')}`,
-      fullName: `Mock ${role.replace('_', ' ')}`,
-      shortId: role === 'student' ? 'S12345' : null,
-      collegeRollNumber: role !== 'student' ? 'BTXXTESTXXX' : null,
-      department: role !== 'student' ? 'Testing Dept.' : undefined,
-      credibilityScore: 120,
-    };
-    
-    setAuthUser(mockUser);
-    setUserProfile(mockProfile);
-    setLoading(false);
-  };
-
   const logOut = async () => {
     setLoading(true);
-    if(authUser?.uid.startsWith('mock-')) {
-        setAuthUser(null);
-        setUserProfile(null);
-        setLoading(false);
-    } else {
-      await auth.signOut();
-    }
+    await auth.signOut();
   };
 
   const value = {
@@ -134,7 +102,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     userProfile,
     loading,
     logIn,
-    setMockUserRole,
     logOut,
     setUserProfile,
   };

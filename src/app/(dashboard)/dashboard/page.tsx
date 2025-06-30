@@ -75,7 +75,7 @@ const OverallHeadDashboard = () => {
         if (!initialLoads.staff) { initialLoads.staff = true; checkAllLoaded(); }
     }, error => console.error("Error fetching staff stats: ", error));
 
-    const studentsQuery = query(collection(db, 'users'), where('role', 'in', ['student', 'test']));
+    const studentsQuery = query(collection(db, 'users'), where('role', '==', 'student'));
     const unsubStudents = onSnapshot(studentsQuery, (snapshot) => {
         setStats(prev => ({...prev, students: snapshot.size}));
         if (!initialLoads.students) { initialLoads.students = true; checkAllLoaded(); }
@@ -604,7 +604,6 @@ export default function DashboardPage() {
       case 'organizer':
         return <OrganizerDashboard userProfile={userProfile} />;
       case 'student':
-      case 'test':
       default:
         return <StudentDashboard userProfile={userProfile} />;
     }

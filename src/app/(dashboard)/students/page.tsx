@@ -249,7 +249,7 @@ export default function StudentsPage() {
           });
 
           // Fetch other data
-          const studentsQuery = query(collection(db, 'users'), where('role', 'in', ['student', 'test']));
+          const studentsQuery = query(collection(db, 'users'), where('role', '==', 'student'));
           const eventsQuery = query(collection(db, 'subEvents'));
           const registrationsQuery = query(collection(db, 'event_registrations'));
 

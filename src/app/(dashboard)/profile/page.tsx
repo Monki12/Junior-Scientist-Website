@@ -65,7 +65,7 @@ export default function ProfilePage() {
     setIsUpdating(true);
     
     try {
-      if (userProfile.role === 'student' || userProfile.role === 'test') {
+      if (userProfile.role === 'student') {
         const numericStandard = parseInt(editableProfile.standard || '0', 10);
         if (isNaN(numericStandard) || numericStandard < 4 || numericStandard > 12) {
           toast({ title: 'Invalid Grade', description: 'Standard must be a number between 4 and 12.', variant: 'destructive' });
@@ -83,7 +83,7 @@ export default function ProfilePage() {
         updatedAt: serverTimestamp(),
       };
       
-      if (userProfile.role === 'student' || userProfile.role === 'test') {
+      if (userProfile.role === 'student') {
         updatesToSave.schoolName = editableProfile.schoolName;
         updatesToSave.standard = editableProfile.standard;
         updatesToSave.division = editableProfile.division || null;
@@ -121,7 +121,7 @@ export default function ProfilePage() {
   const currentDisplayName = userProfile.fullName || userProfile.displayName;
   const avatarFallback = (currentDisplayName?.[0])?.toUpperCase() || (displayEmail?.[0])?.toUpperCase() || 'U';
   const currentPhotoURL = userProfile?.photoURL || authUser.photoURL;
-  const isStudentRole = userProfile.role === 'student' || userProfile.role === 'test';
+  const isStudentRole = userProfile.role === 'student';
   const isOrganizerRole = !isStudentRole;
 
   const displayValue = (value: any, placeholder = 'N/A') => {
@@ -312,5 +312,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
-

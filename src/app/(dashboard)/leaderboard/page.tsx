@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import type { UserProfileData } from '@/types';
-import { collection, query, onSnapshot, where } from 'firebase/firestore';
+import { collection, query, onSnapshot, where, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -22,7 +22,7 @@ export default function LeaderboardPage() {
   const [leaderboard, setLeaderboard] = useState<UserProfileData[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
-  const canViewPage = userProfile && userProfile.role !== 'student' && userProfile.role !== 'test';
+  const canViewPage = userProfile && userProfile.role !== 'student';
 
   useEffect(() => {
     if (!authLoading) {
@@ -34,19 +34,20 @@ export default function LeaderboardPage() {
 
       setLoadingData(true);
       const usersRef = collection(db, 'users');
+      const staffRoles = ['organizer', 'event_representative', 'overall_head', 'admin'];
       const q = query(
         usersRef,
-        where('role', 'in', ['organizer', 'event_representative', 'overall_head', 'admin'])
+        where('role', 'in', staffRoles),
+        orderBy('credibilityScore', 'desc')
       );
 
       const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const staffList = querySnapshot.docs.map(doc => doc.data() as UserProfileData);
-        const leaders = staffList.sort((a, b) => (b.credibilityScore || 0) - (a.credibilityScore || 0));
-        setLeaderboard(leaders);
+        const staffList = querySnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as UserProfileData));
+        setLeaderboard(staffList);
         setLoadingData(false);
       }, (error) => {
         console.error("Error fetching leaderboard data:", error);
-        toast({ title: "Error", description: "Could not fetch leaderboard data.", variant: "destructive" });
+        toast({ title: "Error", description: "Could not fetch leaderboard data. You may need to create a Firestore index.", variant: "destructive" });
         setLoadingData(false);
       });
       
@@ -87,9 +88,9 @@ export default function LeaderboardPage() {
   const nextSeven = leaderboard.slice(3, 10);
   const restOfBoard = leaderboard.slice(10);
 
-  const userRank = leaderboard.findIndex(u => u.uid === userProfile?.uid) + 1;
   const currentUserOnLeaderboard = leaderboard.find(u => u.uid === userProfile?.uid);
-
+  const userRank = currentUserOnLeaderboard ? leaderboard.findIndex(u => u.uid === userProfile?.uid) + 1 : 0;
+  
   return (
     <div className="flex flex-col items-center p-4 md:p-6 space-y-8 bg-background/50 rounded-lg">
       <div className="text-center">

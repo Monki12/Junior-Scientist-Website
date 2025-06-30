@@ -130,7 +130,7 @@ export default function SubEventDetailPage() {
       toast({ title: "Error", description: "User, event data missing, or action in progress.", variant: "destructive"});
       return;
     }
-    if (userProfile.role !== 'student' && userProfile.role !== 'test') {
+    if (userProfile.role !== 'student') {
       toast({ title: "Registration Denied", description: "Only students can register for events.", variant: "destructive" });
       return;
     }
@@ -173,7 +173,7 @@ export default function SubEventDetailPage() {
       toast({ title: "Error", description: "User, event data missing, or action in progress.", variant: "destructive"});
       return;
     }
-    if (userProfile.role !== 'student' && userProfile.role !== 'test') {
+    if (userProfile.role !== 'student') {
       toast({ title: "Action Denied", description: "Only students can create teams.", variant: "destructive" });
       return;
     }
@@ -268,7 +268,7 @@ export default function SubEventDetailPage() {
 
   const handleJoinSpecificTeam = async (teamToJoin: EventTeam) => {
     if (!currentUserId || !event || loadingAction || !userProfile) return;
-     if (userProfile.role !== 'student' && userProfile.role !== 'test') {
+     if (userProfile.role !== 'student') {
       toast({ title: "Action Denied", description: "Only students can join teams.", variant: "destructive" });
       return;
     }
@@ -446,7 +446,7 @@ export default function SubEventDetailPage() {
                  <Button variant="link" asChild className="mt-2 text-primary"><Link href="/dashboard">View in Dashboard</Link></Button>
               </div>
             )}
-             {(!userProfile || (userProfile && userProfile.role !== 'student' && userProfile.role !== 'test')) && currentUserId && (
+             {(!userProfile || (userProfile && userProfile.role !== 'student')) && currentUserId && (
                 <p className="text-muted-foreground text-center py-4 text-sm">Only students can register. Your current role: {userProfile?.role || 'Unknown'}.</p>
             )}
             <CardDescription className="text-sm text-muted-foreground pt-2">
