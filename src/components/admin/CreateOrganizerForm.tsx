@@ -97,7 +97,7 @@ export default function CreateOrganizerForm({ currentAdminRole, onSuccess }: Cre
         subEventsManaged: [],
         tasks: [],
         points: 0,
-        credibilityScore: 100,
+        credibilityScore: 0,
       };
 
       await setDoc(doc(db, 'users', newUserUid), userProfileData);
