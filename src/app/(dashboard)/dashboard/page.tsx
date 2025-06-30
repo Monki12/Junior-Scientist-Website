@@ -3,7 +3,7 @@
 
 import { useAuth } from '@/hooks/use-auth';
 import { Loader2, Users, ShieldCheck, Trophy, Briefcase, ListChecks, Award, BarChart3, LineChart, Ticket, Compass, CheckCircle, Search, AlertCircle } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -313,18 +313,113 @@ const EventRepDashboard = ({ userProfile }: { userProfile: UserProfileData }) =>
   );
 };
 
+const OrganizerDashboard = ({ userProfile }: { userProfile: UserProfileData }) => {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
 
-const OrganizerDashboard = () => (
-    <Card>
+  useEffect(() => {
+    if (!userProfile?.uid) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+
+    const q = query(collection(db, 'tasks'), where('assignedToUserIds', 'array-contains', userProfile.uid));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const tasksList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
+      setTasks(tasksList.sort((a, b) => (a.dueDate && b.dueDate) ? new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime() : 0));
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching organizer tasks:", error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [userProfile.uid]);
+
+  if (loading) {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <span className="ml-4">Loading Your Dashboard...</span>
+      </div>
+    );
+  }
+
+  const stats = {
+    credibilityScore: userProfile.credibilityScore || 0,
+    tasksTotal: tasks.length,
+    tasksCompleted: tasks.filter(t => t.status === 'Completed').length,
+  };
+  
+  const taskCompletionPercentage = stats.tasksTotal > 0 ? (stats.tasksCompleted / stats.tasksTotal) * 100 : 0;
+  const upcomingTasks = tasks.filter(t => t.status !== 'Completed').slice(0, 5);
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold text-primary">Organizer Dashboard</h1>
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Credibility Score</CardTitle>
+            <Trophy className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-accent">{stats.credibilityScore}</div>
+            <p className="text-xs text-muted-foreground">Points from completed tasks</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Tasks Completed</CardTitle>
+            <CheckCircle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-primary">{stats.tasksCompleted} / {stats.tasksTotal}</div>
+            <p className="text-xs text-muted-foreground">Overall completion rate</p>
+            <Progress value={taskCompletionPercentage} className="mt-2 h-2"/>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
         <CardHeader>
-            <CardTitle>Organizer Dashboard</CardTitle>
-            <CardDescription>This is your dashboard. An overview of your assigned tasks and credibility score will be shown here.</CardDescription>
+          <CardTitle>Your Upcoming Tasks</CardTitle>
+          <CardDescription>Here are your next 5 pending tasks. Go to the Tasks page to see all.</CardDescription>
         </CardHeader>
         <CardContent>
-             <p>Content for Organizer coming soon!</p>
+          {upcomingTasks.length > 0 ? (
+            <ul className="space-y-3">
+              {upcomingTasks.map(task => (
+                <li key={task.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                  <div>
+                    <p className="font-semibold">{task.title}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Due: {task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : 'No due date'}
+                    </p>
+                  </div>
+                  <Badge variant={task.priority === 'High' ? 'destructive' : 'secondary'}>{task.priority}</Badge>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="text-center py-10 text-muted-foreground">
+              <ListChecks className="h-12 w-12 mx-auto mb-3 text-primary/30" />
+              <h3 className="text-lg font-semibold text-foreground mb-1">No Pending Tasks</h3>
+              <p className="text-sm">You're all caught up!</p>
+            </div>
+          )}
         </CardContent>
-    </Card>
-);
+        <CardFooter>
+          <Button asChild variant="outline" className="w-full">
+            <Link href="/tasks">View All Tasks</Link>
+          </Button>
+        </CardFooter>
+      </Card>
+    </div>
+  );
+};
 
 const StudentDashboard = ({ userProfile }: { userProfile: UserProfileData }) => {
   const [registrations, setRegistrations] = useState<(EventRegistration & { eventDetails?: SubEvent })[]>([]);
@@ -507,7 +602,7 @@ export default function DashboardPage() {
       case 'event_representative':
         return <EventRepDashboard userProfile={userProfile} />;
       case 'organizer':
-        return <OrganizerDashboard />;
+        return <OrganizerDashboard userProfile={userProfile} />;
       case 'student':
       case 'test':
       default:
