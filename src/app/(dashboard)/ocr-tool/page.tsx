@@ -1,14 +1,17 @@
+
 'use client';
 
-import { useState, ChangeEvent, FormEvent } from 'react';
+import { useState, ChangeEvent, FormEvent, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/use-auth';
 import { processRegistrationForm } from '@/actions/ocr';
 import type { StudentData } from '@/types';
-import { Loader2, UploadCloud, FileText, User, School, BookOpen, Phone, Mail, AlertTriangle } from 'lucide-react';
+import { Loader2, UploadCloud, FileText, User, School, BookOpen, Phone, Mail, AlertTriangle, ShieldAlert } from 'lucide-react';
 import Image from 'next/image';
 
 const fileToDataUri = (file: File): Promise<string> => {
@@ -20,7 +23,11 @@ const fileToDataUri = (file: File): Promise<string> => {
   });
 };
 
+const ALLOWED_OCR_ROLES = ['organizer', 'event_representative', 'overall_head', 'admin', 'test'];
+
 export default function OcrToolPage() {
+  const { userProfile } = useAuth();
+  
   const [file, setFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -103,9 +110,21 @@ export default function OcrToolPage() {
       setIsLoading(false);
     }
   };
+  
+  if (userProfile && !ALLOWED_OCR_ROLES.includes(userProfile.role)) {
+    return (
+       <div className="flex flex-col min-h-full items-center justify-center text-center p-4">
+        <ShieldAlert className="h-16 w-16 text-destructive mb-4" />
+        <h1 className="text-2xl font-bold text-destructive mb-2">Access Denied</h1>
+        <p className="text-muted-foreground mb-4">
+          You do not have the necessary permissions to use the OCR tool.
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto animate-fade-in-up">
+    <div className="space-y-8 max-w-4xl mx-auto">
       <header className="text-center">
         <h1 className="text-3xl md:text-4xl font-bold text-primary">Registration Form Scanner (OCR)</h1>
         <p className="text-muted-foreground mt-2">
@@ -121,7 +140,7 @@ export default function OcrToolPage() {
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-6">
             <div>
-              <Label htmlFor="formFile" className="block text-sm font-medium text-gray-700 mb-2">
+              <Label htmlFor="formFile" className="block text-sm font-medium text-foreground mb-2">
                 Registration Form File
               </Label>
               <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-md hover:border-primary transition-colors">
@@ -129,11 +148,11 @@ export default function OcrToolPage() {
                   {filePreview && file?.type.startsWith('image/') ? (
                      <Image src={filePreview} alt="File preview" width={200} height={200} className="mx-auto h-32 w-auto object-contain rounded-md" />
                   ) : filePreview && file?.type === 'application/pdf' ? (
-                    <FileText className="mx-auto h-12 w-12 text-gray-400" />
+                    <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
                   ) : (
-                    <UploadCloud className="mx-auto h-12 w-12 text-gray-400" />
+                    <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
                   )}
-                  <div className="flex text-sm text-gray-600">
+                  <div className="flex text-sm text-muted-foreground">
                     <Label
                       htmlFor="formFile"
                       className="relative cursor-pointer rounded-md font-medium text-primary hover:text-primary/80 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary"
@@ -143,7 +162,7 @@ export default function OcrToolPage() {
                     </Label>
                     <p className="pl-1">or drag and drop</p>
                   </div>
-                  <p className="text-xs text-gray-500">{file ? file.name : 'PNG, JPG, PDF up to 5MB'}</p>
+                  <p className="text-xs text-muted-foreground">{file ? file.name : 'PNG, JPG, PDF up to 5MB'}</p>
                 </div>
               </div>
             </div>

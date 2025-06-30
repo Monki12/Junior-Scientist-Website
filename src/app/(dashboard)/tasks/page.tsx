@@ -55,7 +55,7 @@ const getStatusBadgeVariant = (status: TaskStatus): { variant: "default" | "seco
 };
 
 
-export default function EventTasksPage() {
+export default function GlobalTasksPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { userProfile, loading: authLoading } = useAuth();
@@ -73,13 +73,6 @@ export default function EventTasksPage() {
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
 
   useEffect(() => {
-    if (!authLoading && !userProfile) {
-      router.push('/login?redirect=/organizer/event-tasks');
-      return;
-    }
-  }, [userProfile, authLoading, router]);
-
-  useEffect(() => {
     if (!userProfile) return;
 
     let unsubscribe: Unsubscribe | null = null;
@@ -87,20 +80,17 @@ export default function EventTasksPage() {
     const setupListeners = async () => {
         setLoadingData(true);
         
-        // Fetch Events for dropdown
         const eventsQuery = query(collection(db, 'subEvents'));
         const eventsSnapshot = await getDocs(eventsQuery);
         const eventsList = eventsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SubEvent));
         setAllEvents(eventsList);
         
-        // Fetch Staff for assignment dropdown
         const staffRoles = ['organizer', 'event_representative', 'overall_head', 'admin'];
         const staffQuery = query(collection(db, 'users'), where('role', 'in', staffRoles));
         const staffSnapshot = await getDocs(staffQuery);
         const staffList = staffSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfileData));
         setAllStaff(staffList);
 
-        // Setup Task listener
         let tasksQuery;
         if (userProfile.role === 'admin' || userProfile.role === 'overall_head') {
             tasksQuery = query(collection(db, 'tasks'));
@@ -165,7 +155,6 @@ export default function EventTasksPage() {
       if (!userProfile) return;
 
       const taskRef = doc(db, "tasks", task.id);
-      const assignerRef = task.assignedByUserId ? doc(db, "users", task.assignedByUserId) : null;
       
       try {
         await runTransaction(db, async (transaction) => {
@@ -180,20 +169,19 @@ export default function EventTasksPage() {
               completedAt: serverTimestamp()
           });
 
-          // Update scores for assignees
           for (const assigneeId of task.assignedToUserIds) {
               const assigneeRef = doc(db, "users", assigneeId);
               transaction.update(assigneeRef, {
-                  credibilityScore: serverTimestamp.increment(task.pointsOnCompletion || 10)
+                  credibilityScore: (await transaction.get(assigneeRef)).data()?.credibilityScore + (task.pointsOnCompletion || 10)
               });
           }
 
-          // Update score for assigner
-          if (assignerRef) {
+          if (task.assignedByUserId) {
+              const assignerRef = doc(db, "users", task.assignedByUserId);
               const assignerDoc = await transaction.get(assignerRef);
               if (assignerDoc.exists()) {
                   transaction.update(assignerRef, {
-                      credibilityScore: serverTimestamp.increment(2) // Award 2 points for delegation
+                      credibilityScore: assignerDoc.data()?.credibilityScore + 2
                   });
               }
           }
@@ -239,23 +227,23 @@ export default function EventTasksPage() {
     setIsTaskFormDialogOpen(true);
   };
 
-  const getEventTitleBySlug = (slug?: string) => {
-    if (!slug || slug === 'general') return 'General';
-    return allEvents.find(e => e.id === slug)?.title || slug;
+  const getEventTitleById = (id?: string) => {
+    if (!id || id === 'general') return 'General';
+    return allEvents.find(e => e.id === id)?.title || id;
   };
   
   const canEditPoints = userProfile?.role === 'admin' || userProfile?.role === 'overall_head' || userProfile?.role === 'event_representative';
   const canSelfAssignOnly = userProfile?.role === 'organizer';
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
+    <div className="space-y-6">
       <Card className="shadow-lg">
         <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <CardTitle className="text-2xl font-bold text-primary flex items-center">
               <ListChecks className="mr-3 h-7 w-7" /> Task Management
             </CardTitle>
-            <CardDescription>Manage, assign, and track tasks for your event(s).</CardDescription>
+            <CardDescription>Manage, assign, and track tasks for all events.</CardDescription>
           </div>
            <Button className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-soft" onClick={openCreateTaskDialog}>
                 <PlusCircle className="mr-2 h-5 w-5" /> Add New Task
@@ -283,7 +271,7 @@ export default function EventTasksPage() {
                     <TableRow key={task.id}>
                       <TableCell className="font-medium">{task.title}</TableCell>
                       <TableCell>{task.assignedToUserIds?.map(uid => allStaff.find(s => s.uid === uid)?.fullName || 'N/A').join(', ')}</TableCell>
-                      <TableCell>{getEventTitleBySlug(task.subEventId)}</TableCell>
+                      <TableCell>{getEventTitleById(task.subEventId)}</TableCell>
                       <TableCell>{task.dueDate ? format(parseISO(task.dueDate), 'MMM dd, yyyy') : 'N/A'}</TableCell>
                       <TableCell><Badge variant={getPriorityBadgeVariant(task.priority)}>{task.priority}</Badge></TableCell>
                       <TableCell><Badge className={getStatusBadgeVariant(task.status).colorClass}>{task.status}</Badge></TableCell>

@@ -30,12 +30,6 @@ export default function NotificationsPage() {
   const router = useRouter();
   const [notifications, setNotifications] = useState<NotificationItem[]>(initialMockNotifications);
 
-  useEffect(() => {
-    if (!loading && !authUser) {
-      router.push('/login?redirect=/notifications');
-    }
-  }, [authUser, loading, router]);
-
   const toggleReadStatus = (notificationId: string) => {
     setNotifications(prevNotifications =>
       prevNotifications.map(notif =>
@@ -44,13 +38,6 @@ export default function NotificationsPage() {
     );
   };
 
-  if (loading || !authUser) {
-    return (
-      <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-      </div>
-    );
-  }
   
   const getIconForType = (type: string) => {
     switch(type) {
@@ -62,9 +49,9 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-8 animate-fade-in-up">
-      <header className="text-center">
-        <h1 className="text-3xl md:text-4xl font-bold text-primary">Notifications</h1>
+    <div className="max-w-3xl mx-auto space-y-6">
+      <header>
+        <h1 className="text-3xl font-bold text-primary">Notifications</h1>
         <p className="text-muted-foreground mt-1">Stay updated with the latest alerts and announcements.</p>
       </header>
 

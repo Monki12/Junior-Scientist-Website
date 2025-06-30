@@ -4,7 +4,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useAuth } from '@/hooks/use-auth';
 import type { UserProfileData } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -13,15 +12,14 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, UserCircle, Mail, Shield, LogOut, ArrowLeft, CalendarDays, Info, Users, GraduationCap, School, Edit3, Check, X, Building, Tag, Award } from 'lucide-react';
+import { Loader2, Mail, Shield, Edit3, Check, X, Building, Award } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 export default function ProfilePage() {
-  const { authUser, userProfile, loading, logOut, setUserProfile } = useAuth();
-  const router = useRouter();
+  const { authUser, userProfile, loading, setUserProfile } = useAuth();
   const { toast } = useToast();
   
   const [isEditing, setIsEditing] = useState(false);
@@ -30,9 +28,6 @@ export default function ProfilePage() {
   
 
   useEffect(() => {
-    if (!loading && !authUser) {
-      router.push('/login?redirect=/profile');
-    }
     if (userProfile) {
       setEditableProfile({
         displayName: userProfile.displayName || '',
@@ -46,7 +41,7 @@ export default function ProfilePage() {
         department: userProfile.department || '',
       });
     }
-  }, [authUser, userProfile, loading, router]);
+  }, [userProfile]);
   
   const handleInputChange = (field: keyof UserProfileData, value: string) => {
     setEditableProfile(prev => ({ ...prev, [field]: value }));
@@ -112,24 +107,10 @@ export default function ProfilePage() {
       setIsUpdating(false);
     }
   };
-
-  const handleLogout = async () => {
-    try {
-      await logOut();
-      router.push('/');
-      toast({ title: "Logged Out", description: "You have been successfully logged out." });
-    } catch (error) {
-       toast({
-        title: 'Logout Failed',
-        description: "An error occurred during logout. Please try again.",
-        variant: 'destructive',
-      });
-    }
-  };
   
   if (loading || !authUser || !userProfile) {
     return (
-      <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center">
+      <div className="flex h-full items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
       </div>
     );
@@ -143,18 +124,11 @@ export default function ProfilePage() {
   const isOrganizerRole = !isStudentRole;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 animate-fade-in-up">
-      <div className="flex justify-between items-center mb-6">
-        <header className="text-left">
-          <h1 className="text-3xl md:text-4xl font-bold text-primary">My Profile</h1>
-          <p className="text-muted-foreground mt-1">Manage your account details and preferences.</p>
-        </header>
-        <Button variant="outline" asChild>
-            <Link href="/dashboard">
-                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
-            </Link>
-        </Button>
-      </div>
+    <div className="max-w-4xl mx-auto space-y-6">
+      <header className="text-left">
+        <h1 className="text-3xl font-bold text-primary">My Profile</h1>
+        <p className="text-muted-foreground mt-1">Manage your account details and preferences.</p>
+      </header>
 
       <Card className="shadow-xl">
         <CardHeader className="flex flex-col items-center text-center border-b pb-6 bg-muted/20">
@@ -289,12 +263,6 @@ export default function ProfilePage() {
           </div>
         </CardContent>
       </Card>
-      
-      <div className="text-center pt-4">
-        <Button variant="destructive" onClick={handleLogout} className="w-full sm:w-auto">
-          <LogOut className="mr-2 h-4 w-4" /> Log Out
-        </Button>
-      </div>
     </div>
   );
 }

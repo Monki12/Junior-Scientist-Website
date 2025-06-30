@@ -4,21 +4,22 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Users, ShieldAlert, ArrowLeft, PlusCircle, Loader2, Edit } from 'lucide-react';
+import { Users, ShieldAlert, PlusCircle, Loader2, Edit } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import CreateOrganizerForm from '@/components/admin/CreateOrganizerForm';
-import { collection, getDocs, query, doc, updateDoc, runTransaction, getDoc, where } from 'firebase/firestore';
+import { collection, getDocs, query, doc, updateDoc, getDoc, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { UserProfileData, SubEvent, UserRole } from '@/types';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
+import { Badge } from '@/components/ui/badge';
 
-export default function AdminUsersPage() {
+export default function StaffPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { userProfile, loading } = useAuth();
@@ -26,17 +27,19 @@ export default function AdminUsersPage() {
   const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserProfileData | null>(null);
   
-  const [allUsers, setAllUsers] = useState<UserProfileData[]>([]);
+  const [allStaff, setAllStaff] = useState<UserProfileData[]>([]);
   const [allEvents, setAllEvents] = useState<SubEvent[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
   const fetchAllData = async () => {
     setIsLoadingData(true);
     try {
+      const staffRoles = ['admin', 'overall_head', 'event_representative', 'organizer'];
       const usersCollection = collection(db, 'users');
-      const usersSnapshot = await getDocs(usersCollection);
+      const staffQuery = query(usersCollection, where('role', 'in', staffRoles));
+      const usersSnapshot = await getDocs(staffQuery);
       const usersList = usersSnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as UserProfileData));
-      setAllUsers(usersList);
+      setAllStaff(usersList);
 
       const eventsCollection = collection(db, 'subEvents');
       const eventsSnapshot = await getDocs(eventsCollection);
@@ -45,6 +48,7 @@ export default function AdminUsersPage() {
 
     } catch (error) {
       console.error("Error fetching data:", error);
+      toast({ title: "Error", description: "Could not load staff or event data.", variant: "destructive"});
     } finally {
       setIsLoadingData(false);
     }
@@ -54,6 +58,7 @@ export default function AdminUsersPage() {
     if (!loading && userProfile && (userProfile.role === 'admin' || userProfile.role === 'overall_head')) {
       fetchAllData();
     } else if (!loading) {
+        // Non-admins trying to access this page will be redirected by layout, but as a fallback:
         router.push('/dashboard');
     }
   }, [userProfile, loading, router]);
@@ -67,15 +72,14 @@ export default function AdminUsersPage() {
     if (!editingUser) return;
     try {
         const userRef = doc(db, 'users', editingUser.uid);
-        // Only update fields that are managed here
-        const updates = {
+        const updates: Partial<UserProfileData> = {
             role: editingUser.role,
             assignedEventUids: editingUser.assignedEventUids || [],
             studentDataEventAccess: editingUser.studentDataEventAccess || {},
+            credibilityScore: Number(editingUser.credibilityScore) || 0,
         };
         await updateDoc(userRef, updates);
 
-        // If assigning a rep, also update the subEvent document
         if (editingUser.role === 'event_representative' && editingUser.assignedEventUids) {
             for (const eventId of editingUser.assignedEventUids) {
                 const eventRef = doc(db, 'subEvents', eventId);
@@ -100,34 +104,34 @@ export default function AdminUsersPage() {
     }
   };
   
-  if (loading || !userProfile || isLoadingData) {
+  if (loading || isLoadingData) {
      return (
-      <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center">
+      <div className="flex min-h-full items-center justify-center">
         <Users className="h-12 w-12 animate-spin text-primary" />
       </div>
     );
   }
   
-  if (userProfile.role !== 'admin' && userProfile.role !== 'overall_head') {
+  if (userProfile?.role !== 'admin' && userProfile?.role !== 'overall_head') {
     return (
-      <div className="flex flex-col min-h-[calc(100vh-10rem)] items-center justify-center text-center p-4">
+      <div className="flex flex-col min-h-full items-center justify-center text-center p-4">
         <ShieldAlert className="h-16 w-16 text-destructive mb-4" />
         <h1 className="text-2xl font-bold text-destructive mb-2">Access Denied</h1>
-        <p className="text-muted-foreground">You do not have permission to manage users.</p>
+        <p className="text-muted-foreground">You do not have permission to manage staff.</p>
         <Button onClick={() => router.push('/dashboard')} className="mt-4">Go to Dashboard</Button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
-      <Card className="shadow-xl">
+    <div className="space-y-6">
+      <Card className="shadow-lg">
         <CardHeader>
           <div className="flex justify-between items-center">
             <div>
-              <CardTitle className="text-3xl font-headline text-primary flex items-center"><Users className="mr-3 h-8 w-8"/>User Management</CardTitle>
+              <CardTitle className="text-3xl font-headline text-primary flex items-center"><Users className="mr-3 h-8 w-8"/>Staff Management</CardTitle>
               <CardDescription>
-                Create new organizational accounts and manage all platform users.
+                Create new staff accounts and manage all platform administrators, representatives, and organizers.
               </CardDescription>
             </div>
              <Dialog open={isCreateOrganizerDialogOpen} onOpenChange={setIsCreateOrganizerDialogOpen}>
@@ -154,16 +158,16 @@ export default function AdminUsersPage() {
         <CardContent>
           <div className="border rounded-md">
             <Table>
-              <TableHeader><TableRow><TableHead>Full Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Identifier</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Full Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Credibility</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
               <TableBody>
-                {allUsers.map((user) => (
+                {allStaff.map((user) => (
                   <TableRow key={user.uid}>
                     <TableCell className="font-medium">{user.fullName || user.displayName}</TableCell>
                     <TableCell>{user.email}</TableCell>
-                    <TableCell className="capitalize">{user.role?.replace(/_/g, ' ')}</TableCell>
-                    <TableCell>{user.role === 'student' ? `ID: ${user.shortId || 'N/A'}` : `Roll: ${user.collegeRollNumber || 'N/A'}`}</TableCell>
+                    <TableCell><Badge variant="outline" className="capitalize">{user.role?.replace(/_/g, ' ')}</Badge></TableCell>
+                    <TableCell className="font-semibold text-accent">{user.credibilityScore}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="outline" size="sm" onClick={() => handleOpenEditDialog(user)}>
+                      <Button variant="ghost" size="sm" onClick={() => handleOpenEditDialog(user)}>
                         <Edit className="mr-2 h-4 w-4"/>Manage
                       </Button>
                     </TableCell>
@@ -237,6 +241,15 @@ export default function AdminUsersPage() {
                              </div>
                         </div>
                     )}
+                    <div>
+                        <Label htmlFor="credibilityScore">Credibility Score</Label>
+                        <Input 
+                            id="credibilityScore" 
+                            type="number" 
+                            value={editingUser.credibilityScore} 
+                            onChange={(e) => setEditingUser(u => u ? {...u, credibilityScore: Number(e.target.value)} : null)} 
+                        />
+                    </div>
                     <Button onClick={handleUserUpdate}>Save Changes</Button>
                 </div>
             )}

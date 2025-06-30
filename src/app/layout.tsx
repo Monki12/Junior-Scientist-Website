@@ -33,8 +33,10 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            <MainNav />
-            <main className="flex-grow container mx-auto px-4 py-6"> {/* Changed py-8 to py-6 */}
+            {/* The new (dashboard)/layout.tsx will handle its own navigation for authenticated users */}
+            {/* This MainNav is now primarily for public-facing pages */}
+            <MainNav /> 
+            <main className="flex-grow">
               {children}
             </main>
             <SiteFooter />
