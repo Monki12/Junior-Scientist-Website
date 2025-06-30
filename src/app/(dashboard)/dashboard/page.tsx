@@ -8,51 +8,74 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useEffect, useState }from 'react';
-import type { SubEvent, Task, UserProfileData } from '@/types';
-import { collection, getDocs, query, orderBy, limit, where } from 'firebase/firestore';
+import type { SubEvent, UserProfileData } from '@/types';
+import { collection, onSnapshot, query, orderBy, limit, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 const OverallHeadDashboard = () => {
   const [stats, setStats] = useState({ events: 0, staff: 0, students: 0, avgParticipants: '0.0' });
   const [topStaff, setTopStaff] = useState<UserProfileData[]>([]);
   const [eventParticipantData, setEventParticipantData] = useState<{name: string, participants: number}[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchData = async () => {
-        try {
-            const eventsSnapshot = await getDocs(collection(db, 'subEvents'));
-            const staffQuery = query(collection(db, 'users'), where('role', 'in', ['admin', 'overall_head', 'event_representative', 'organizer']));
-            const staffSnapshot = await getDocs(staffQuery);
-            const studentsSnapshot = await getDocs(collection(db, 'users'), where('role', '==', 'student'));
+    setLoading(true);
 
-            const eventsList = eventsSnapshot.docs.map(doc => doc.data() as SubEvent);
-            const totalParticipants = eventsList.reduce((acc, event) => acc + (event.registeredParticipantCount || 0), 0);
-            const avgParticipants = eventsList.length > 0 ? (totalParticipants / eventsList.length).toFixed(1) : '0.0';
+    const eventsQuery = query(collection(db, 'subEvents'));
+    const staffQuery = query(collection(db, 'users'), where('role', 'in', ['admin', 'overall_head', 'event_representative', 'organizer']));
+    const studentsQuery = query(collection(db, 'users'), where('role', 'in', ['student', 'test']));
+    
+    let allEvents: SubEvent[] = [];
 
-            setStats({
-                events: eventsSnapshot.size,
-                staff: staffSnapshot.size,
-                students: studentsSnapshot.size,
-                avgParticipants: avgParticipants
-            });
+    const unsubEvents = onSnapshot(eventsQuery, (snapshot) => {
+        const eventsList = snapshot.docs.map(doc => ({...doc.data(), id: doc.id}) as SubEvent);
+        allEvents = eventsList;
 
-            const topEvents = eventsList.sort((a, b) => (b.registeredParticipantCount || 0) - (a.registeredParticipantCount || 0)).slice(0, 10);
-            setEventParticipantData(topEvents.map(event => ({
-                name: event.title.length > 15 ? event.title.substring(0, 15) + '...' : event.title,
-                participants: event.registeredParticipantCount || 0,
-            })));
+        const totalParticipants = eventsList.reduce((acc, event) => acc + (event.registeredParticipantCount || 0), 0);
+        const avgParticipants = eventsList.length > 0 ? (totalParticipants / eventsList.length).toFixed(1) : '0.0';
 
+        setStats(prev => ({...prev, events: snapshot.size, avgParticipants}));
+        
+        const topEvents = [...eventsList].sort((a, b) => (b.registeredParticipantCount || 0) - (a.registeredParticipantCount || 0)).slice(0, 10);
+        setEventParticipantData(topEvents.map(event => ({
+            name: event.title.length > 15 ? event.title.substring(0, 15) + '...' : event.title,
+            participants: event.registeredParticipantCount || 0,
+        })));
+    }, error => console.error("Error fetching events stats: ", error));
 
-            const leaderboardQuery = query(staffQuery, orderBy('credibilityScore', 'desc'), limit(3));
-            const leaderboardSnapshot = await getDocs(leaderboardQuery);
-            setTopStaff(leaderboardSnapshot.docs.map(doc => doc.data() as UserProfileData));
+    const unsubStaff = onSnapshot(staffQuery, async (snapshot) => {
+        setStats(prev => ({...prev, staff: snapshot.size}));
+        
+        const leaderboardQuery = query(staffQuery, orderBy('credibilityScore', 'desc'), limit(3));
+        const leaderboardSnapshot = await onSnapshot(leaderboardQuery, (leaderboardSnap) => {
+            setTopStaff(leaderboardSnap.docs.map(doc => doc.data() as UserProfileData));
+        });
+        // Note: No explicit unsubscribe for leaderboard snapshot, as it's tied to staff listener lifecycle
+    }, error => console.error("Error fetching staff stats: ", error));
 
-        } catch (error) {
-            console.error("Error fetching dashboard stats: ", error);
-        }
+    const unsubStudents = onSnapshot(studentsQuery, (snapshot) => {
+        setStats(prev => ({...prev, students: snapshot.size}));
+        if(loading) setLoading(false); // Mark loading as false after first student data comes in
+    }, error => {
+        console.error("Error fetching students stats: ", error);
+        if(loading) setLoading(false);
+    });
+
+    return () => {
+        unsubEvents();
+        unsubStaff();
+        unsubStudents();
     };
-    fetchData();
   }, []);
+  
+  if (loading) {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <span className="ml-4">Loading Dashboard Data...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -124,7 +147,7 @@ const OverallHeadDashboard = () => {
                 <CardDescription>Top performing staff members based on credibility score.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-                {topStaff.map((staff, index) => (
+                {topStaff.length > 0 ? topStaff.map((staff, index) => (
                     <div key={staff.uid} className="flex items-center">
                         <div className="text-xl font-bold mr-4">#{index + 1}</div>
                         <div>
@@ -133,7 +156,7 @@ const OverallHeadDashboard = () => {
                         </div>
                         <div className="ml-auto text-lg font-bold text-accent">{staff.credibilityScore}</div>
                     </div>
-                ))}
+                )) : <p className="text-sm text-muted-foreground">No staff data available.</p>}
                 <Button asChild variant="outline" className="w-full mt-2">
                     <Link href="/leaderboard">View Full Leaderboard</Link>
                 </Button>
@@ -257,3 +280,5 @@ export default function DashboardPage() {
 
   return <div className="h-full w-full">{renderDashboardByRole()}</div>;
 }
+
+    

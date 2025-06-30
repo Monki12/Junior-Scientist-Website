@@ -14,8 +14,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore';
-import { ArrowLeft, Loader2, Users, Search, ShieldAlert, Filter } from 'lucide-react';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { Loader2, Users, Search, ShieldAlert, Filter, GraduationCap } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export default function StudentsPage() {
   const router = useRouter();
@@ -41,11 +42,10 @@ export default function StudentsPage() {
         setLoadingStudents(true);
         const fetchStudents = async () => {
             try {
-                // For now, this fetches all students.
-                // TODO: For Event Reps, filter by registrations in their assignedEventUids.
+                // TODO: For Event Reps, this could be filtered by registrations in their assignedEventUids.
                 const studentsQuery = query(collection(db, 'users'), where('role', 'in', ['student', 'test']));
                 const querySnapshot = await getDocs(studentsQuery);
-                const fetchedStudents = querySnapshot.docs.map(doc => doc.data() as UserProfileData);
+                const fetchedStudents = querySnapshot.docs.map(doc => ({...doc.data(), uid: doc.id} as UserProfileData));
                 setStudents(fetchedStudents);
             } catch (error) {
                 console.error("Error fetching students:", error);
@@ -60,7 +60,7 @@ export default function StudentsPage() {
 
   const uniqueSchoolNames = useMemo(() => {
     const schools = new Set(students.map(p => p.schoolName).filter(Boolean) as string[]);
-    return ['all', ...Array.from(schools)];
+    return ['all', ...Array.from(schools).sort()];
   }, [students]);
 
   const filteredStudents = useMemo(() => {
@@ -76,7 +76,7 @@ export default function StudentsPage() {
       return matchesSearch && matchesSchool;
     });
   }, [students, searchTerm, schoolFilter]);
-
+  
   if (authLoading || (!canViewPage && !authLoading)) {
     return (
       <div className="flex h-full w-full items-center justify-center">
@@ -84,16 +84,27 @@ export default function StudentsPage() {
       </div>
     );
   }
+  
+  if (!canViewPage) {
+      return (
+        <div className="flex flex-col h-full w-full items-center justify-center text-center p-4">
+            <ShieldAlert className="h-16 w-16 text-destructive mb-4" />
+            <h1 className="text-2xl font-bold text-destructive">Access Denied</h1>
+            <p className="text-muted-foreground">You do not have permission to manage student data.</p>
+            <Button onClick={() => router.push('/dashboard')} className="mt-4">Go to Dashboard</Button>
+        </div>
+      )
+  }
 
   return (
     <div className="space-y-6">
        <Card className="shadow-lg">
         <CardHeader>
           <CardTitle className="text-3xl font-headline text-primary flex items-center">
-            <Users className="mr-3 h-8 w-8"/>Student Management
+            <GraduationCap className="mr-3 h-8 w-8"/>Student Management
           </CardTitle>
           <CardDescription>
-            View, filter, and manage all student accounts and registrations across all events.
+            View, filter, and manage all student accounts across all events.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -115,7 +126,7 @@ export default function StudentsPage() {
 
           <div className="border rounded-md">
             <Table>
-              <TableHeader><TableRow><TableHead>Full Name</TableHead><TableHead>Email</TableHead><TableHead>School</TableHead><TableHead>Standard</TableHead><TableHead>Verified</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Full Name</TableHead><TableHead>Email</TableHead><TableHead>School</TableHead><TableHead>Standard</TableHead><TableHead>School Verified</TableHead></TableRow></TableHeader>
               <TableBody>
                 {loadingStudents ? (
                     <TableRow><TableCell colSpan={5} className="text-center py-10"><Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" /></TableCell></TableRow>
@@ -144,3 +155,5 @@ export default function StudentsPage() {
     </div>
   );
 }
+
+    
