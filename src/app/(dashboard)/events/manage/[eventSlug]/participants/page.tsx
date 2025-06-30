@@ -21,6 +21,7 @@ import { collection, query, where, getDocs, doc, runTransaction, serverTimestamp
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { ArrowLeft, Loader2, Users, Search, Filter, PlusCircle, UploadCloud, FileCog, Columns, X } from 'lucide-react';
 import { nanoid } from 'nanoid';
+import { Textarea } from '@/components/ui/textarea';
 
 interface DisplayParticipant extends UserProfileData {
   registrationId: string;
@@ -65,7 +66,8 @@ export default function ManageParticipantsPage() {
   const [isAddColumnDialogOpen, setIsAddColumnDialogOpen] = useState(false);
   const [isCustomizeDialogOpen, setIsCustomizeDialogOpen] = useState(false);
   const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
-  const [newColumn, setNewColumn] = useState<Omit<CustomColumnDefinition, 'id'>>({ name: '', dataType: 'text' });
+  const [newColumn, setNewColumn] = useState<Omit<CustomColumnDefinition, 'id'>>({ name: '', dataType: 'text', options: [] });
+  const [newColumnOptions, setNewColumnOptions] = useState('');
   
   const [isAdmitCardUploadOpen, setIsAdmitCardUploadOpen] = useState(false);
   const [selectedParticipantForAdmitCard, setSelectedParticipantForAdmitCard] = useState<DisplayParticipant | null>(null);
@@ -181,29 +183,46 @@ export default function ManageParticipantsPage() {
     });
   }, [participants, activeFilters]);
 
-  const handleUpdateRegistrationField = async (registrationId: string, field: keyof EventRegistration | string, value: any) => {
-    if (!DEFAULT_COLUMNS.find(c => c.id === field)) {
-      console.warn("Updating custom fields is not fully implemented in Firestore yet.");
-      setParticipants(prev => prev.map(p => p.registrationId === registrationId ? { ...p, [field]: value } : p));
-      toast({ title: "Success (Local)", description: `Participant ${String(field)} updated locally.` });
-      return;
-    }
-    
-    const regDocRef = doc(db, 'event_registrations', registrationId);
-    try {
-      await runTransaction(db, async (transaction) => {
-        const regDoc = await transaction.get(regDocRef);
-        if (!regDoc.exists()) {
-          throw new Error("Registration document does not exist!");
+  const handleUpdateRegistrationField = async (registrationId: string, field: keyof EventRegistration | string, value: any, userId: string) => {
+    // If it's a standard registration field
+    if (DEFAULT_COLUMNS.find(c => c.id === field)) {
+        const regDocRef = doc(db, 'event_registrations', registrationId);
+        try {
+            await runTransaction(db, async (transaction) => {
+                const regDoc = await transaction.get(regDocRef);
+                if (!regDoc.exists()) throw new Error("Registration document does not exist!");
+                transaction.update(regDocRef, { [field]: value, lastUpdatedAt: serverTimestamp() });
+            });
+            setParticipants(prev => prev.map(p => p.registrationId === registrationId ? { ...p, [field]: value } : p));
+            toast({ title: "Success", description: `Participant ${String(field)} updated.` });
+        } catch (error: any) {
+            toast({ title: "Update Failed", description: error.message || `Could not update ${field}.`, variant: "destructive" });
         }
-        transaction.update(regDocRef, { [field]: value, lastUpdatedAt: serverTimestamp() });
-      });
+        return;
+    }
 
-      // Update local state for immediate UI feedback
-      setParticipants(prev => prev.map(p => p.registrationId === registrationId ? { ...p, [field]: value } : p));
-      toast({ title: "Success", description: `Participant ${String(field)} updated.` });
+    // If it's a custom field, update the user document
+    const userDocRef = doc(db, 'users', userId);
+    try {
+        await runTransaction(db, async (transaction) => {
+            const userDoc = await transaction.get(userDocRef);
+            if (!userDoc.exists()) throw new Error("User document does not exist!");
+
+            const currentCustomData = userDoc.data()?.customData || {};
+            const updatedCustomData = { ...currentCustomData, [field]: value };
+            
+            transaction.update(userDocRef, { customData: updatedCustomData, updatedAt: serverTimestamp() });
+        });
+        setParticipants(prev => prev.map(p => {
+            if (p.registrationId === registrationId) {
+                const customData = { ...(p.customData || {}), [field]: value };
+                return { ...p, customData, [field]: value };
+            }
+            return p;
+        }));
+        toast({ title: "Success", description: `Participant ${String(field)} updated.` });
     } catch (error: any) {
-      toast({ title: "Update Failed", description: error.message || `Could not update ${field}.`, variant: "destructive" });
+        toast({ title: "Update Failed", description: error.message || `Could not update ${field}.`, variant: "destructive" });
     }
   };
   
@@ -214,7 +233,7 @@ export default function ManageParticipantsPage() {
       const storageRef = ref(storage, `admit_cards/${event.id}/${selectedParticipantForAdmitCard.uid}_${admitCardFile.name}`);
       await uploadBytes(storageRef, admitCardFile);
       const downloadURL = await getDownloadURL(storageRef);
-      await handleUpdateRegistrationField(selectedParticipantForAdmitCard.registrationId, 'admitCardUrl', downloadURL);
+      await handleUpdateRegistrationField(selectedParticipantForAdmitCard.registrationId, 'admitCardUrl', downloadURL, selectedParticipantForAdmitCard.uid);
       toast({ title: "Admit Card Uploaded" });
       setIsAdmitCardUploadOpen(false);
     } catch (error: any) {
@@ -226,11 +245,22 @@ export default function ManageParticipantsPage() {
 
   const handleAddCustomColumn = () => {
     const newId = `custom_${newColumn.name.toLowerCase().replace(/\s/g, '_')}`;
-    const newDef: CustomColumnDefinition = { ...newColumn, id: newId };
+    let finalOptions: string[] | undefined = undefined;
+
+    if (newColumn.dataType === 'dropdown') {
+      finalOptions = newColumnOptions.split(',').map(opt => opt.trim()).filter(Boolean);
+      if (finalOptions.length === 0) {
+        toast({ title: "Invalid Options", description: "Please provide at least one comma-separated option for the dropdown.", variant: "destructive" });
+        return;
+      }
+    }
+
+    const newDef: CustomColumnDefinition = { ...newColumn, id: newId, options: finalOptions };
     setCustomColumnDefinitions([...customColumnDefinitions, newDef]);
     setVisibleColumns([...visibleColumns, newId]);
     setIsAddColumnDialogOpen(false);
-    setNewColumn({ name: '', dataType: 'text' });
+    setNewColumn({ name: '', dataType: 'text', options: [] });
+    setNewColumnOptions('');
     toast({title: "Column Added", description: `Column "${newDef.name}" is now available.`});
   };
 
@@ -271,16 +301,16 @@ export default function ManageParticipantsPage() {
                 ) : filteredParticipants.map(p => (
                   <TableRow key={p.registrationId}>
                     {availableColumns.filter(c => visibleColumns.includes(c.id)).map(col => (
-                      <TableCell key={col.id}>
+                      <TableCell key={`${p.registrationId}-${col.id}`}>
                         {(() => {
                           const value = p[col.id];
                           switch (col.dataType) {
                             case 'checkbox':
-                              return <Checkbox checked={value} onCheckedChange={(checked) => handleUpdateRegistrationField(p.registrationId, col.id, !!checked)} />;
+                              return <Checkbox checked={!!value} onCheckedChange={(checked) => handleUpdateRegistrationField(p.registrationId, col.id, !!checked, p.uid)} />;
                             case 'dropdown':
                               return (
-                                <Select value={value} onValueChange={(val: any) => handleUpdateRegistrationField(p.registrationId, col.id, val)}>
-                                  <SelectTrigger className="text-xs capitalize h-8"><SelectValue /></SelectTrigger>
+                                <Select value={value || ''} onValueChange={(val: any) => handleUpdateRegistrationField(p.registrationId, col.id, val, p.uid)}>
+                                  <SelectTrigger className="text-xs capitalize h-8"><SelectValue placeholder="Select..."/></SelectTrigger>
                                   <SelectContent>{col.options?.map(s => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}</SelectContent>
                                 </Select>
                               );
@@ -313,16 +343,34 @@ export default function ManageParticipantsPage() {
           <DialogHeader><DialogTitle>Add New Custom Column</DialogTitle></DialogHeader>
           <div className="grid gap-4 py-4">
               <Label htmlFor="newColName">Column Name</Label>
-              <Input id="newColName" value={newColumn.name} onChange={e => setNewColumn({...newColumn, name: e.target.value})} />
+              <Input id="newColName" value={newColumn.name} onChange={e => setNewColumn({...newColumn, name: e.target.value})} placeholder="e.g., T-Shirt Size" />
               <Label htmlFor="newColType">Data Type</Label>
-              <Select value={newColumn.dataType} onValueChange={(val: any) => setNewColumn({...newColumn, dataType: val})}>
-                  <SelectTrigger><SelectValue/></SelectTrigger>
+              <Select 
+                value={newColumn.dataType} 
+                onValueChange={(val: any) => {
+                  setNewColumn({...newColumn, dataType: val});
+                  if (val !== 'dropdown') setNewColumnOptions('');
+                }}
+              >
+                  <SelectTrigger><SelectValue placeholder="Select data type..." /></SelectTrigger>
                   <SelectContent>
                       <SelectItem value="text">Text</SelectItem>
                       <SelectItem value="number">Number</SelectItem>
                       <SelectItem value="checkbox">Checkbox (True/False)</SelectItem>
+                      <SelectItem value="dropdown">Dropdown</SelectItem>
                   </SelectContent>
               </Select>
+              {newColumn.dataType === 'dropdown' && (
+                <div className="space-y-2">
+                    <Label htmlFor="newColOptions">Dropdown Options</Label>
+                    <Textarea
+                        id="newColOptions"
+                        placeholder="Enter options separated by a comma. e.g., Small, Medium, Large"
+                        value={newColumnOptions}
+                        onChange={e => setNewColumnOptions(e.target.value)}
+                    />
+                </div>
+              )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddColumnDialogOpen(false)}>Cancel</Button>
