@@ -1,3 +1,4 @@
+
 // This file is intentionally left without a default export.
 // It previously caused a build error because it conflicted with src/app/events/page.tsx.
 // By removing the default export, this file no longer creates a page at this route,
