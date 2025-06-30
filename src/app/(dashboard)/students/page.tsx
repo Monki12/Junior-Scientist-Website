@@ -16,8 +16,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, doc, runTransaction, serverTimestamp } from 'firebase/firestore';
-import { Loader2, Users, Search, ShieldAlert, Filter, GraduationCap, PlusCircle, Columns, X } from 'lucide-react';
+import { collection, query, where, onSnapshot, doc, runTransaction, serverTimestamp, getDocs, addDoc } from 'firebase/firestore';
+import { Loader2, Users, Search, ShieldAlert, Filter, GraduationCap, PlusCircle, Columns, X, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { nanoid } from 'nanoid';
 import { Textarea } from '@/components/ui/textarea';
@@ -60,6 +60,142 @@ const displayValue = (value: any, placeholder: string = '(N/A)') => {
 };
 
 
+function AddColumnModal({ isOpen, onClose, userProfile, onColumnAdded }: { isOpen: boolean, onClose: () => void, userProfile: UserProfileData, onColumnAdded: (colDef: CustomColumnDefinition) => void }) {
+    const { toast } = useToast();
+    const [newColumn, setNewColumn] = useState<Omit<CustomColumnDefinition, 'id'>>({ name: '', dataType: 'text', options: [] });
+    const [newColumnOptions, setNewColumnOptions] = useState('');
+    const [visibility, setVisibility] = useState<'meOnly' | 'allAdmins'>('meOnly');
+    const [editableByOthers, setEditableByOthers] = useState(false);
+    
+    if (!isOpen) return null;
+
+    const handleAddCustomColumn = async () => {
+        if (!newColumn.name) {
+            toast({ title: "Column name is required.", variant: "destructive"});
+            return;
+        }
+        const newId = `custom_${newColumn.name.toLowerCase().replace(/\s/g, '_')}_${nanoid(4)}`;
+        let finalOptions: string[] | undefined = undefined;
+
+        if (newColumn.dataType === 'dropdown') {
+            finalOptions = newColumnOptions.split(',').map(opt => opt.trim()).filter(Boolean);
+            if (finalOptions.length === 0) {
+                toast({ title: "Invalid Options", description: "Please provide at least one comma-separated option for the dropdown.", variant: "destructive" });
+                return;
+            }
+        }
+        
+        const newDef: CustomColumnDefinition = { 
+            ...newColumn, 
+            id: newId, 
+            options: finalOptions,
+            isSharedGlobally: visibility === 'allAdmins',
+            editableByOthers: visibility === 'allAdmins' ? editableByOthers : false,
+            createdBy: userProfile.uid,
+            createdAt: serverTimestamp(),
+        };
+
+        const collectionPath = visibility === 'allAdmins' 
+            ? 'systemPreferences/columnDefinitions/studentData'
+            : `users/${userProfile.uid}/preferences/columnDefinitions/studentData`;
+            
+        try {
+            await addDoc(collection(db, collectionPath), newDef);
+            onColumnAdded(newDef);
+            toast({title: "Column Added", description: `Column "${newDef.name}" is now available.`});
+            onClose();
+            setNewColumn({ name: '', dataType: 'text', options: [] });
+            setNewColumnOptions('');
+            setVisibility('meOnly');
+            setEditableByOthers(false);
+        } catch(e) {
+            console.error(e);
+            toast({title: "Error", description: "Could not save column definition.", variant: "destructive"});
+        }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onClose}>
+            <DialogContent>
+                <DialogHeader><DialogTitle>Add New Custom Column</DialogTitle></DialogHeader>
+                <div className="grid gap-4 py-4">
+                    <Label htmlFor="newColName">Column Name</Label>
+                    <Input id="newColName" value={newColumn.name} onChange={e => setNewColumn({...newColumn, name: e.target.value})} placeholder="e.g., T-Shirt Size"/>
+                    
+                    <Label htmlFor="newColType">Data Type</Label>
+                    <Select value={newColumn.dataType} onValueChange={(val: any) => setNewColumn({...newColumn, dataType: val})}>
+                        <SelectTrigger><SelectValue placeholder="Select data type..." /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="text">Text</SelectItem>
+                            <SelectItem value="number">Number</SelectItem>
+                            <SelectItem value="checkbox">Checkbox (True/False)</SelectItem>
+                            <SelectItem value="dropdown">Dropdown</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    
+                    {newColumn.dataType === 'dropdown' && (
+                        <div className="space-y-2">
+                            <Label htmlFor="newColOptions">Dropdown Options</Label>
+                            <Textarea id="newColOptions" placeholder="Enter options separated by a comma, e.g., Small, Medium, Large" value={newColumnOptions} onChange={e => setNewColumnOptions(e.target.value)} />
+                        </div>
+                    )}
+
+                    <div className="space-y-2">
+                        <Label>View by:</Label>
+                        <div className="flex flex-col gap-2">
+                            <label className="flex items-center gap-2">
+                                <input type="radio" name="visibility" value="meOnly" checked={visibility === 'meOnly'} onChange={() => { setVisibility('meOnly'); setEditableByOthers(false); }} />
+                                Only me
+                            </label>
+                            { (userProfile.role === 'admin' || userProfile.role === 'overall_head') &&
+                                <label className="flex items-center gap-2">
+                                    <input type="radio" name="visibility" value="allAdmins" checked={visibility === 'allAdmins'} onChange={() => setVisibility('allAdmins')} />
+                                    All Overall Heads and Admins
+                                </label>
+                            }
+                        </div>
+                    </div>
+
+                    {visibility === 'allAdmins' && (
+                         <div className="flex items-center gap-2">
+                            <Checkbox id="editableByOthers" checked={editableByOthers} onCheckedChange={(checked) => setEditableByOthers(!!checked)} />
+                            <Label htmlFor="editableByOthers">Allow others to edit data in this column</Label>
+                        </div>
+                    )}
+
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={onClose}>Cancel</Button>
+                    <Button onClick={handleAddCustomColumn} disabled={!newColumn.name}>Add Column</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function CustomizeColumnsModal({ isOpen, onClose, availableColumns, visibleColumns, setVisibleColumns }: { isOpen: boolean, onClose: () => void, availableColumns: CustomColumnDefinition[], visibleColumns: string[], setVisibleColumns: (cols: string[]) => void }) {
+    if (!isOpen) return null;
+    return (
+        <Dialog open={isOpen} onOpenChange={onClose}>
+            <DialogContent>
+                <DialogHeader><DialogTitle>Customize Visible Columns</DialogTitle></DialogHeader>
+                <div className="grid gap-2 py-4 max-h-80 overflow-y-auto">
+                    {availableColumns.map(col => (
+                        <div key={col.id} className="flex items-center gap-2 p-2 rounded-md hover:bg-muted">
+                            <Checkbox id={`vis-${col.id}`} checked={visibleColumns.includes(col.id)} onCheckedChange={checked => {
+                                setVisibleColumns(prev => checked ? [...prev, col.id] : prev.filter(id => id !== col.id));
+                            }}/>
+                            <Label htmlFor={`vis-${col.id}`}>{col.name}</Label>
+                        </div>
+                    ))}
+                </div>
+                <DialogFooter><DialogClose asChild><Button>Done</Button></DialogClose></DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+
 export default function StudentsPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -79,16 +215,13 @@ export default function StudentsPage() {
   const [isAddColumnDialogOpen, setIsAddColumnDialogOpen] = useState(false);
   const [isCustomizeDialogOpen, setIsCustomizeDialogOpen] = useState(false);
   const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
-  
-  const [newColumn, setNewColumn] = useState<Omit<CustomColumnDefinition, 'id'>>({ name: '', dataType: 'text' });
-  const [newColumnOptions, setNewColumnOptions] = useState('');
 
   const availableColumns = useMemo(() => {
     return [...DEFAULT_COLUMNS, ...customColumnDefinitions];
   }, [customColumnDefinitions]);
 
   const canManageStudents = userProfile?.role === 'admin' || userProfile?.role === 'overall_head' || userProfile?.role === 'event_representative';
-  const canManageColumns = userProfile?.role === 'admin' || userProfile?.role === 'overall_head';
+  const canManageColumns = userProfile?.role === 'admin' || userProfile?.role === 'overall_head' || userProfile?.role === 'event_representative';
 
   useEffect(() => {
     if (!authLoading && !canManageStudents) {
@@ -97,50 +230,60 @@ export default function StudentsPage() {
         return;
     }
 
-    if (canManageStudents) {
+    if (canManageStudents && userProfile) {
         setLoadingData(true);
-        const studentsQuery = query(collection(db, 'users'), where('role', 'in', ['student', 'test']));
-        const eventsQuery = query(collection(db, 'subEvents'));
-        const registrationsQuery = query(collection(db, 'event_registrations'));
 
-        const unsubStudents = onSnapshot(studentsQuery, (snapshot) => {
-            const fetchedStudents = snapshot.docs.map(doc => {
-              const data = doc.data();
-              return {
-                ...data,
-                uid: doc.id,
-                customData: data.customData || {},
-              } as DisplayStudent
-            });
-            setStudents(fetchedStudents);
-            if (loadingData) setLoadingData(false);
-        }, (error) => {
-            console.error("Error fetching students:", error);
-            toast({ title: "Error", description: "Could not fetch student data.", variant: "destructive" });
-        });
+        const setupListeners = async () => {
+          // Listen to global columns
+          const globalColsRef = collection(db, `systemPreferences/columnDefinitions/studentData`);
+          onSnapshot(globalColsRef, (snapshot) => {
+              const globalCols = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as CustomColumnDefinition);
+              setCustomColumnDefinitions(prev => [...prev.filter(p => !p.isSharedGlobally), ...globalCols]);
+          });
+          
+          // Listen to user-specific columns
+          const userColsRef = collection(db, `users/${userProfile.uid}/preferences/columnDefinitions/studentData`);
+          onSnapshot(userColsRef, (snapshot) => {
+              const userCols = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as CustomColumnDefinition);
+              setCustomColumnDefinitions(prev => [...prev.filter(p => p.createdBy !== userProfile.uid), ...userCols]);
+          });
 
-        const unsubEvents = onSnapshot(eventsQuery, (snapshot) => {
-            const newMap = new Map<string, string>();
-            snapshot.docs.forEach(doc => newMap.set(doc.id, (doc.data() as SubEvent).title));
-            setEventsMap(newMap);
-        });
+          // Fetch other data
+          const studentsQuery = query(collection(db, 'users'), where('role', 'in', ['student', 'test']));
+          const eventsQuery = query(collection(db, 'subEvents'));
+          const registrationsQuery = query(collection(db, 'event_registrations'));
 
-        const unsubRegistrations = onSnapshot(registrationsQuery, (snapshot) => {
-            const newMap = new Map<string, string[]>();
-            snapshot.docs.forEach(doc => {
-                const regData = doc.data() as EventRegistration;
-                const userRegs = newMap.get(regData.userId) || [];
-                userRegs.push(regData.subEventId);
-                newMap.set(regData.userId, userRegs);
-            });
-            setRegistrationsMap(newMap);
-        });
+          onSnapshot(studentsQuery, (snapshot) => {
+              const fetchedStudents = snapshot.docs.map(doc => {
+                const data = doc.data();
+                return { ...data, uid: doc.id, customData: data.customData || {}, } as DisplayStudent
+              });
+              setStudents(fetchedStudents);
+              if (loadingData) setLoadingData(false);
+          });
+          
+          onSnapshot(eventsQuery, (snapshot) => {
+              const newMap = new Map<string, string>();
+              snapshot.docs.forEach(doc => newMap.set(doc.id, (doc.data() as SubEvent).title));
+              setEventsMap(newMap);
+          });
 
-        return () => {
-            unsubStudents();
-            unsubEvents();
-            unsubRegistrations();
+          onSnapshot(registrationsQuery, (snapshot) => {
+              const newMap = new Map<string, string[]>();
+              snapshot.docs.forEach(doc => {
+                  const regData = doc.data() as EventRegistration;
+                  const userRegs = newMap.get(regData.userId) || [];
+                  userRegs.push(regData.subEventId);
+                  newMap.set(regData.userId, userRegs);
+              });
+              setRegistrationsMap(newMap);
+          });
         };
+        
+        setupListeners().catch(err => {
+          console.error("Error setting up listeners:", err);
+          toast({ title: "Error", description: "Could not initialize page data.", variant: "destructive"});
+        });
     }
   }, [userProfile, authLoading, canManageStudents, router, toast]);
 
@@ -186,16 +329,6 @@ export default function StudentsPage() {
         
         transaction.update(studentRef, updateData);
       });
-      // Update local state for immediate feedback
-      setStudents(prev => prev.map(s => {
-        if (s.uid === studentId) {
-            if(isCustom) {
-                return {...s, customData: {...s.customData, [field]: value}};
-            }
-            return {...s, [field]: value};
-        }
-        return s;
-      }));
       toast({ title: "Update Successful", description: `Student record has been updated.` });
     } catch (error: any) {
       console.error("Error updating student:", error);
@@ -203,43 +336,21 @@ export default function StudentsPage() {
     }
   };
 
-  const handleAddCustomColumn = () => {
-    if (!newColumn.name) {
-        toast({ title: "Column name is required.", variant: "destructive"});
-        return;
-    }
-    const newId = `custom_${newColumn.name.toLowerCase().replace(/\s/g, '_')}_${nanoid(4)}`;
-    let finalOptions: string[] | undefined = undefined;
+  const handleColumnAdded = (newDef: CustomColumnDefinition) => {
+      setCustomColumnDefinitions(prev => [...prev, newDef]);
+      setVisibleColumns(prev => [...prev, newDef.id]);
 
-    if (newColumn.dataType === 'dropdown') {
-      finalOptions = newColumnOptions.split(',').map(opt => opt.trim()).filter(Boolean);
-      if (finalOptions.length === 0) {
-        toast({ title: "Invalid Options", description: "Please provide at least one comma-separated option for the dropdown.", variant: "destructive" });
-        return;
-      }
-    }
-    
-    const newDef: CustomColumnDefinition = { ...newColumn, id: newId, options: finalOptions };
-    setCustomColumnDefinitions([...customColumnDefinitions, newDef]);
-    setVisibleColumns([...visibleColumns, newId]);
-    setIsAddColumnDialogOpen(false);
-    
-    // Mass update local state to reflect the new column with a default value
-    let defaultValue: any = null;
-    if (newDef.dataType === 'checkbox') defaultValue = false;
-    if (newDef.dataType === 'text' || newDef.dataType === 'dropdown') defaultValue = '';
+      let defaultValue: any = null;
+      if (newDef.dataType === 'checkbox') defaultValue = false;
+      if (newDef.dataType === 'text' || newDef.dataType === 'dropdown') defaultValue = '';
 
-    setStudents(prev => prev.map(s => ({
-        ...s,
-        customData: {
-            ...s.customData,
-            [newId]: defaultValue
-        }
-    })));
-
-    setNewColumn({ name: '', dataType: 'text' });
-    setNewColumnOptions('');
-    toast({title: "Column Added", description: `Column "${newDef.name}" is now available. Note: This is a local-only prototype. In a real app, this would trigger a mass database update.`});
+      setStudents(prevStudents => prevStudents.map(s => ({
+          ...s,
+          customData: {
+              ...s.customData,
+              [newDef.id]: defaultValue
+          }
+      })));
   };
   
   if (authLoading || (!canManageStudents && !authLoading) || loadingData) {
@@ -272,7 +383,7 @@ export default function StudentsPage() {
             </div>
              <div className="flex items-center gap-2 self-start md:self-center">
                 <Button variant="outline" onClick={() => setIsFilterDialogOpen(true)}><Filter className="mr-2 h-4 w-4" />Filter ({activeFilters.length})</Button>
-                <Button variant="outline" onClick={() => setIsCustomizeDialogOpen(true)}><Columns className="mr-2 h-4 w-4" />Customize Columns</Button>
+                <Button variant="outline" onClick={() => setIsCustomizeDialogOpen(true)}><Settings className="mr-2 h-4 w-4" />Customize Columns</Button>
                 {canManageColumns && <Button onClick={() => setIsAddColumnDialogOpen(true)}><PlusCircle className="mr-2 h-4 w-4" />Add Column</Button>}
             </div>
           </div>
@@ -338,85 +449,13 @@ export default function StudentsPage() {
         </CardContent>
       </Card>
 
-    {/* --- DIALOGS --- */}
+    {userProfile && <AddColumnModal isOpen={isAddColumnDialogOpen} onClose={() => setIsAddColumnDialogOpen(false)} userProfile={userProfile} onColumnAdded={handleColumnAdded} />}
+    <CustomizeColumnsModal isOpen={isCustomizeDialogOpen} onClose={() => setIsCustomizeDialogOpen(false)} availableColumns={availableColumns} visibleColumns={visibleColumns} setVisibleColumns={setVisibleColumns} />
 
-    <Dialog open={isAddColumnDialogOpen} onOpenChange={setIsAddColumnDialogOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Add New Custom Column</DialogTitle></DialogHeader>
-          <div className="grid gap-4 py-4">
-              <Label htmlFor="newColName">Column Name</Label>
-              <Input id="newColName" value={newColumn.name} onChange={e => setNewColumn({...newColumn, name: e.target.value})} placeholder="e.g., T-Shirt Size"/>
-              <Label htmlFor="newColType">Data Type</Label>
-              <Select value={newColumn.dataType} onValueChange={(val: any) => setNewColumn({...newColumn, dataType: val})}>
-                  <SelectTrigger><SelectValue placeholder="Select data type..." /></SelectTrigger>
-                  <SelectContent>
-                      <SelectItem value="text">Text</SelectItem>
-                      <SelectItem value="number">Number</SelectItem>
-                      <SelectItem value="checkbox">Checkbox (True/False)</SelectItem>
-                      <SelectItem value="dropdown">Dropdown</SelectItem>
-                  </SelectContent>
-              </Select>
-               {newColumn.dataType === 'dropdown' && (
-                <div className="space-y-2">
-                    <Label htmlFor="newColOptions">Dropdown Options</Label>
-                    <Textarea id="newColOptions" placeholder="Enter options separated by a comma, e.g., Small, Medium, Large" value={newColumnOptions} onChange={e => setNewColumnOptions(e.target.value)} />
-                </div>
-              )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddColumnDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleAddCustomColumn} disabled={!newColumn.name}>Add Column</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      <Dialog open={isCustomizeDialogOpen} onOpenChange={setIsCustomizeDialogOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Customize Visible Columns</DialogTitle></DialogHeader>
-          <div className="grid gap-2 py-4 max-h-80 overflow-y-auto">
-            {availableColumns.map(col => (
-              <div key={col.id} className="flex items-center gap-2 p-2 rounded-md hover:bg-muted">
-                <Checkbox id={`vis-${col.id}`} checked={visibleColumns.includes(col.id)} onCheckedChange={checked => setVisibleColumns(prev => checked ? [...prev, col.id] : prev.filter(id => id !== col.id))}/>
-                <Label htmlFor={`vis-${col.id}`}>{col.name}</Label>
-              </div>
-            ))}
-          </div>
-          <DialogFooter><DialogClose asChild><Button>Done</Button></DialogClose></DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      <Dialog open={isFilterDialogOpen} onOpenChange={setIsFilterDialogOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Filter Students</DialogTitle></DialogHeader>
-            <div className="space-y-4 py-4">
-                <div className="flex items-center justify-between">
-                    <Label>Active Filters</Label>
-                    {activeFilters.length > 0 && <Button variant="link" size="sm" onClick={() => setActiveFilters([])}>Clear All</Button>}
-                </div>
-                <div className="space-y-2">
-                    {activeFilters.map((filter) => (
-                        <div key={filter.id} className="flex items-center gap-2 p-2 border rounded-md">
-                           <span className="text-sm font-medium">{filter.columnName}</span>
-                           <span className="text-sm text-muted-foreground">{filter.operator}</span>
-                           <span className="text-sm font-semibold text-primary">{`"${filter.value}"`}</span>
-                           <Button variant="ghost" size="icon" className="ml-auto h-6 w-6" onClick={() => setActiveFilters(prev => prev.filter(f => f.id !== filter.id))}>
-                               <X className="h-4 w-4"/>
-                           </Button>
-                        </div>
-                    ))}
-                    {activeFilters.length === 0 && <p className="text-sm text-muted-foreground text-center py-2">No filters applied.</p>}
-                </div>
-                <Button onClick={() => {
-                    const mockFilter: ActiveDynamicFilter = {id: nanoid(), columnId: 'fullName', columnName: 'Full Name', operator: 'contains', value: 'Test', isCustom: false};
-                    setActiveFilters(prev => [...prev, mockFilter]);
-                    toast({title: "Filter Added", description: "This is a mock filter. Full filter builder UI coming soon."});
-                }}>Add Mock Filter</Button>
-            </div>
-          <DialogFooter><DialogClose asChild><Button>Apply</Button></DialogClose></DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
+
+    
 
     
