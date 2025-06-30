@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Search, ListFilter, Loader2, CalendarDays, Tag } from 'lucide-react';
-import { collection, getDocs, query } from 'firebase/firestore';
+import { collection, onSnapshot, query } from 'firebase/firestore'; // Changed to onSnapshot
 import { db } from '@/lib/firebase';
 
 function SubEventCard({ event }: { event: SubEvent }) {
@@ -60,21 +60,20 @@ export default function SubEventsListPage() {
   const [categoryFilter, setCategoryFilter] = useState('all');
 
   useEffect(() => {
-    const fetchEvents = async () => {
-      setLoading(true);
-      try {
-        const eventsCollection = collection(db, 'subEvents');
-        const eventSnapshot = await getDocs(eventsCollection);
-        const eventsList = eventSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SubEvent));
-        setEvents(eventsList);
-      } catch (error) {
-        console.error("Error fetching events: ", error);
-        // Optionally, show a toast notification
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchEvents();
+    setLoading(true);
+    const eventsQuery = query(collection(db, 'subEvents'));
+    
+    const unsubscribe = onSnapshot(eventsQuery, (snapshot) => {
+      const eventsList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SubEvent));
+      setEvents(eventsList);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching events in real-time: ", error);
+      setLoading(false);
+    });
+
+    // Cleanup the listener on component unmount
+    return () => unsubscribe();
   }, []);
 
   const filteredEvents = events
@@ -88,45 +87,35 @@ export default function SubEventsListPage() {
   
   const uniqueCategories = ['all', ...new Set(events.map(event => event.superpowerCategory).filter(Boolean) as string[])];
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-[calc(100vh-10rem)]">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-4 text-lg text-muted-foreground">Loading events...</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="animate-fade-in-up">
+    <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 animate-fade-in-up">
       <header className="mb-12 text-center">
         <h1 className="text-4xl md:text-5xl font-bold text-primary mb-4">Junior Scientist Sub-Events</h1>
-        <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+        <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
           Explore the exciting array of sub-events designed to challenge and inspire young scientists. Find your passion and register today!
         </p>
       </header>
-
-      <div className="mb-8 flex flex-col sm:flex-row gap-4 items-center">
+      
+      <div className="mb-8 flex flex-col sm:flex-row gap-4 items-center p-4 rounded-lg bg-card border">
         <div className="relative w-full sm:flex-grow">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input 
             type="search"
             placeholder="Search sub-events..."
-            className="pl-10 w-full bg-card/50 border-border/70"
+            className="pl-10 w-full bg-background"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
         <div className="relative w-full sm:w-auto">
-          <ListFilter className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none z-10" />
            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-full sm:w-[220px] pl-10 bg-card/50 border-border/70">
-              <SelectValue placeholder="Filter by superpower" />
+            <SelectTrigger className="w-full sm:w-[220px] bg-background">
+              <SelectValue placeholder="Filter by category" />
             </SelectTrigger>
             <SelectContent>
               {uniqueCategories.map(category => (
                 <SelectItem key={category} value={category}>
-                  {category === 'all' ? 'All Superpowers' : category}
+                  {category === 'all' ? 'All Categories' : category}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -134,14 +123,18 @@ export default function SubEventsListPage() {
         </div>
       </div>
 
-      {filteredEvents.length > 0 ? (
+      {loading ? (
+        <div className="flex justify-center items-center min-h-[30vh]">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        </div>
+      ) : filteredEvents.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredEvents.map((event) => (
             <SubEventCard key={event.id} event={event} />
           ))}
         </div>
       ) : (
-        <div className="text-center py-12">
+        <div className="text-center py-16">
           <Search className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-2xl font-semibold text-foreground mb-2">No Sub-Events Found</h3>
           <p className="text-muted-foreground">
