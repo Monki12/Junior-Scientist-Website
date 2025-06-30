@@ -160,7 +160,7 @@ export type JoinTeamFormData = {
 export interface CustomColumnDefinition {
   id: string; // e.g., 'custom_field_1'
   name: string; // e.g., 'T-Shirt Size'
-  dataType: 'text' | 'number' | 'checkbox' | 'date' | 'dropdown' | 'file' | 'reference';
+  dataType: 'text' | 'number' | 'checkbox' | 'date' | 'dropdown' | 'file';
   options?: string[]; // For 'dropdown' type
   defaultValue?: any;
   description?: string;
