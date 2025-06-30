@@ -228,44 +228,55 @@ export default function GlobalTasksPage() {
 
       const taskRef = doc(db, "tasks", task.id);
       
-      // Optimistic UI update
       const originalTasks = tasks;
       const updatedTasks = tasks.map(t => t.id === task.id ? {...t, status: newStatus} : t);
       setManagedTasks(updatedTasks.filter(t => managedTasks.some(mt => mt.id === t.id)));
       setPersonalTasks(updatedTasks.filter(t => personalTasks.some(pt => pt.id === t.id)));
       
-      // If setting to completed, run the transaction for points
       if (newStatus === 'Completed' && task.status !== 'Completed') {
           const assigneeOldScores = new Map<string, number>();
           try {
             await runTransaction(db, async (transaction) => {
+              // --- 1. READ PHASE ---
               const taskDoc = await transaction.get(taskRef);
+              
+              const assigneeRefs = task.assignedToUserIds.map(id => doc(db, "users", id));
+              const assigneeDocs = await Promise.all(assigneeRefs.map(ref => transaction.get(ref)));
+              
+              let assignerRef = null;
+              let assignerDoc = null;
+              if (task.assignedByUserId) {
+                assignerRef = doc(db, "users", task.assignedByUserId);
+                assignerDoc = await transaction.get(assignerRef);
+              }
+
+              // --- 2. VALIDATION PHASE ---
               if (!taskDoc.exists() || taskDoc.data().status === 'Completed') {
                   throw new Error("Task is already completed or does not exist.");
               }
+              
+              const pointsToAdd = task.pointsOnCompletion || 10;
 
+              // --- 3. WRITE PHASE ---
               transaction.update(taskRef, {
                   status: 'Completed',
                   completedByUserId: userProfile.uid,
                   completedAt: serverTimestamp()
               });
+              
+              assigneeDocs.forEach((doc, index) => {
+                if (doc.exists()) {
+                  const oldScore = doc.data().credibilityScore || 0;
+                  assigneeOldScores.set(doc.id, oldScore);
+                  transaction.update(assigneeRefs[index], { credibilityScore: increment(pointsToAdd) });
+                }
+              });
 
-              const pointsToAdd = task.pointsOnCompletion || 10;
-              for (const assigneeId of task.assignedToUserIds) {
-                  const assigneeRef = doc(db, "users", assigneeId);
-                  const assigneeDoc = await transaction.get(assigneeRef);
-                  if (assigneeDoc.exists()) {
-                      const oldScore = assigneeDoc.data().credibilityScore || 0;
-                      assigneeOldScores.set(assigneeId, oldScore);
-                      transaction.update(assigneeRef, { credibilityScore: increment(pointsToAdd) });
-                  }
-              }
-
-              if (task.assignedByUserId) {
-                  const assignerRef = doc(db, "users", task.assignedByUserId);
+              if (assignerDoc && assignerRef && assignerDoc.exists()) {
                   transaction.update(assignerRef, { credibilityScore: increment(2) });
               }
             });
+            
             toast({ title: "Task Completed!", description: `Credibility scores have been updated.` });
 
             for (const [assigneeId, oldScore] of assigneeOldScores.entries()) {
@@ -278,10 +289,9 @@ export default function GlobalTasksPage() {
              setManagedTasks(originalTasks.filter(t => managedTasks.some(mt => mt.id === t.id)));
              setPersonalTasks(originalTasks.filter(t => personalTasks.some(pt => pt.id === t.id)));
           }
-      } else { // For any other status change, just update the status
+      } else {
           try {
               await updateDoc(taskRef, { status: newStatus, updatedAt: serverTimestamp() });
-              // No toast for simple status changes to avoid notification fatigue
           } catch (e: any) {
               console.error("Status update failed: ", e);
               toast({ title: "Error", description: "Could not update task status.", variant: "destructive" });
