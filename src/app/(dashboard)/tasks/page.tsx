@@ -54,6 +54,45 @@ const getStatusBadgeVariant = (status: TaskStatus): { variant: "default" | "seco
   }
 };
 
+async function checkAndSendRankNotification(assigneeId: string, oldScore: number, newScore: number) {
+    try {
+        const staffQuery = query(collection(db, 'users'), where('role', 'in', ['organizer', 'event_representative', 'overall_head', 'admin']));
+        const staffSnapshot = await getDocs(staffQuery);
+        const staffList = staffSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfileData));
+
+        const getRank = (score: number, list: UserProfileData[]) => {
+            const sortedList = [...list].map(user => user.uid === assigneeId ? { ...user, credibilityScore: score } : user)
+                                       .sort((a, b) => (b.credibilityScore || 0) - (a.credibilityScore || 0));
+            return sortedList.findIndex(u => u.uid === assigneeId) + 1;
+        };
+
+        const oldRank = getRank(oldScore, staffList);
+        const newRank = getRank(newScore, staffList);
+
+        let notificationTitle: string | null = null;
+        if (newRank > 0 && newRank <= 3 && (oldRank === 0 || oldRank > 3)) {
+            notificationTitle = `You're in the Top 3!`;
+        } else if (newRank > 0 && newRank <= 10 && (oldRank === 0 || oldRank > 10)) {
+            notificationTitle = `You've reached the Top 10!`;
+        }
+
+        if (notificationTitle) {
+            const notificationData = {
+                userId: assigneeId,
+                type: 'achievement',
+                title: notificationTitle,
+                message: `Congratulations! You've reached rank #${newRank} on the leaderboard. Keep up the great work!`,
+                link: '/leaderboard',
+                createdAt: serverTimestamp(),
+                read: false,
+            };
+            await addDoc(collection(db, 'notifications'), notificationData);
+        }
+    } catch (error) {
+        console.error("Error checking or sending rank notification:", error);
+    }
+}
+
 
 export default function GlobalTasksPage() {
   const router = useRouter();
@@ -160,6 +199,7 @@ export default function GlobalTasksPage() {
       if (!userProfile) return;
 
       const taskRef = doc(db, "tasks", task.id);
+      const assigneeOldScores = new Map<string, number>();
       
       try {
         await runTransaction(db, async (transaction) => {
@@ -177,7 +217,12 @@ export default function GlobalTasksPage() {
           const pointsToAdd = task.pointsOnCompletion || 10;
           for (const assigneeId of task.assignedToUserIds) {
               const assigneeRef = doc(db, "users", assigneeId);
-              transaction.update(assigneeRef, { credibilityScore: increment(pointsToAdd) });
+              const assigneeDoc = await transaction.get(assigneeRef);
+              if (assigneeDoc.exists()) {
+                  const oldScore = assigneeDoc.data().credibilityScore || 0;
+                  assigneeOldScores.set(assigneeId, oldScore);
+                  transaction.update(assigneeRef, { credibilityScore: increment(pointsToAdd) });
+              }
           }
 
           if (task.assignedByUserId) {
@@ -186,6 +231,13 @@ export default function GlobalTasksPage() {
           }
         });
         toast({ title: "Task Completed", description: `Credibility scores have been updated.` });
+
+        // After transaction, check for notifications for each assignee
+        for (const [assigneeId, oldScore] of assigneeOldScores.entries()) {
+            const newScore = oldScore + (task.pointsOnCompletion || 10);
+            await checkAndSendRankNotification(assigneeId, oldScore, newScore);
+        }
+
       } catch (e: any) {
         console.error("Transaction failed: ", e);
         toast({ title: "Error", description: e.message || "Failed to update task and scores.", variant: "destructive" });
@@ -196,7 +248,7 @@ export default function GlobalTasksPage() {
     setEditingTaskId(task.id);
     setCurrentTaskForm({
       ...task,
-      dueDate: task.dueDate ? parseISO(task.dueDate) : undefined,
+      dueDate: task.dueDate && isValid(parseISO(task.dueDate)) ? parseISO(task.dueDate) : undefined,
     });
     setIsTaskFormDialogOpen(true);
   };
@@ -271,7 +323,7 @@ export default function GlobalTasksPage() {
                       <TableCell className="font-medium">{task.title}</TableCell>
                       <TableCell>{task.assignedToUserIds?.map(uid => allStaff.find(s => s.uid === uid)?.fullName || 'N/A').join(', ')}</TableCell>
                       <TableCell>{getEventTitleById(task.subEventId)}</TableCell>
-                      <TableCell>{task.dueDate ? format(parseISO(task.dueDate), 'MMM dd, yyyy') : 'N/A'}</TableCell>
+                      <TableCell>{task.dueDate && isValid(parseISO(task.dueDate)) ? format(parseISO(task.dueDate), 'MMM dd, yyyy') : 'N/A'}</TableCell>
                       <TableCell><Badge variant={getPriorityBadgeVariant(task.priority)}>{task.priority}</Badge></TableCell>
                       <TableCell><Badge className={getStatusBadgeVariant(task.status).colorClass}>{task.status}</Badge></TableCell>
                       <TableCell className="space-x-1">

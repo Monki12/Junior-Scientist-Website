@@ -2,42 +2,91 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { BellRing, Loader2, Info, CheckCircle, AlertTriangle } from 'lucide-react';
+import { BellRing, Loader2, Info, CheckCircle, AlertTriangle, Trophy, ExternalLink } from 'lucide-react';
+import { db } from '@/lib/firebase';
+import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { format } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 interface NotificationItem {
   id: string;
-  type: string;
+  type: 'achievement' | 'announcement' | 'task' | 'info' | 'success' | 'warning';
   title: string;
   message: string;
-  date: string;
+  date: string; // ISO string from createdAt
   read: boolean;
+  link?: string;
+  createdAt?: any;
 }
 
 export default function NotificationsPage() {
-  const { authUser, loading } = useAuth();
-  const router = useRouter();
+  const { userProfile, loading } = useAuth();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
 
-  const toggleReadStatus = (notificationId: string) => {
-    setNotifications(prevNotifications =>
-      prevNotifications.map(notif =>
-        notif.id === notificationId ? { ...notif, read: !notif.read } : notif
-      )
-    );
+  useEffect(() => {
+    if (loading) return;
+    if (!userProfile) {
+        setIsLoading(false);
+        return;
+    }
+
+    setIsLoading(true);
+    const notificationsRef = collection(db, 'notifications');
+    const q = query(notificationsRef, where('userId', '==', userProfile.uid), orderBy('createdAt', 'desc'));
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const fetchedNotifications = querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                date: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString(),
+            } as NotificationItem;
+        });
+        setNotifications(fetchedNotifications);
+        setIsLoading(false);
+    }, (error) => {
+        console.error("Error fetching notifications:", error);
+        toast({ title: "Error", description: "Could not fetch notifications.", variant: "destructive"});
+        setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [userProfile, loading, toast]);
+
+  const toggleReadStatus = async (notificationId: string, currentStatus: boolean) => {
+    const notificationRef = doc(db, 'notifications', notificationId);
+    try {
+        await updateDoc(notificationRef, { read: !currentStatus });
+        // The onSnapshot listener will automatically update the UI.
+    } catch (error) {
+        toast({ title: "Error", description: "Could not update notification status.", variant: "destructive"});
+    }
   };
-
   
   const getIconForType = (type: string) => {
     switch(type) {
+      case 'achievement': return <Trophy className="h-5 w-5 text-yellow-500" />;
       case 'info': return <Info className="h-5 w-5 text-blue-500" />;
       case 'success': return <CheckCircle className="h-5 w-5 text-green-500" />;
       case 'warning': return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
       default: return <BellRing className="h-5 w-5 text-muted-foreground" />;
     }
+  }
+
+  if (loading || isLoading) {
+    return (
+        <div className="flex h-full w-full items-center justify-center">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        </div>
+    );
   }
 
   return (
@@ -50,20 +99,29 @@ export default function NotificationsPage() {
       {notifications.length > 0 ? (
         <div className="space-y-4">
           {notifications.map(notif => (
-            <Card key={notif.id} className={`shadow-lg hover:shadow-xl transition-shadow ${!notif.read ? 'bg-primary/5 border-primary/20' : 'bg-card'}`}>
+            <Card key={notif.id} className={cn('shadow-lg hover:shadow-xl transition-shadow', !notif.read ? 'bg-primary/5 border-primary/20' : 'bg-card')}>
               <CardContent className="p-4 flex items-start gap-4">
                 <div className="pt-1">
                   {getIconForType(notif.type)}
                 </div>
                 <div className="flex-grow">
                   <div className="flex justify-between items-start">
-                    <h3 className={`font-semibold ${!notif.read ? 'text-primary' : 'text-foreground'}`}>{notif.title}</h3>
+                    <h3 className={cn('font-semibold', !notif.read ? 'text-primary' : 'text-foreground')}>{notif.title}</h3>
                     {!notif.read && <span className="inline-block h-2 w-2 rounded-full bg-accent animate-pulse"></span>}
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">{notif.message}</p>
-                  <p className="text-xs text-muted-foreground/70 mt-2">{new Date(notif.date).toLocaleDateString()}</p>
+                  <div className="flex justify-between items-center mt-2">
+                    <p className="text-xs text-muted-foreground/70">
+                      {format(new Date(notif.date), "PPP 'at' p")}
+                    </p>
+                    {notif.link && (
+                        <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs">
+                            <Link href={notif.link}>View <ExternalLink className="ml-1 h-3 w-3"/></Link>
+                        </Button>
+                    )}
+                  </div>
                 </div>
-                <Button variant="ghost" size="sm" className="text-xs text-muted-foreground hover:text-primary" onClick={() => toggleReadStatus(notif.id)}>
+                <Button variant="ghost" size="sm" className="text-xs text-muted-foreground hover:text-primary" onClick={() => toggleReadStatus(notif.id, notif.read)}>
                   Mark as {notif.read ? 'unread' : 'read'}
                 </Button>
               </CardContent>
@@ -79,10 +137,6 @@ export default function NotificationsPage() {
           </CardContent>
         </Card>
       )}
-      
-       <div className="text-center mt-8">
-        <Button variant="outline" disabled>Load More Notifications</Button>
-      </div>
     </div>
   );
 }

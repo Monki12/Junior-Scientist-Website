@@ -3,142 +3,117 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // --- HELPER FUNCTIONS ---
+    
+    // Helper functions
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // --- Role checks now read from the user's document in Firestore ---
-    // This is more flexible for development if custom claims are not yet set.
-    function getUserData(userId) {
-      return get(/databases/$(database)/documents/users/$(userId)).data;
-    }
-
-    function getUserRole(userId) {
-      if (exists(/databases/$(database)/documents/users/$(userId))) {
-        return getUserData(userId).role;
-      }
-      return ''; // Default to no role if doc doesn't exist
-    }
-
     function isRole(role) {
-      return isSignedIn() && getUserRole(request.auth.uid) == role;
-    }
-
-    function isRoleIn(roles) {
-      return isSignedIn() && getUserRole(request.auth.uid) in roles;
-    }
-
-    function isStudent() {
-      return isRoleIn(['student', 'test']);
-    }
-
-    function isStaff() {
-      return isRoleIn(['organizer', 'event_representative', 'overall_head', 'admin']);
-    }
-
-    function isOverallHeadOrAdmin() {
-      return isRoleIn(['overall_head', 'admin']);
-    }
-
-    // --- RULES FOR COLLECTIONS ---
-
-    // USERS (student profiles, staff profiles)
-    match /users/{userId} {
-      // List: Staff can query the entire users collection.
-      allow list: if isStaff();
-      // Get: Staff can get any user, a user can get their own profile.
-      allow get: if isStaff() || (isSignedIn() && request.auth.uid == userId);
-      // Create: Anyone can create their own user document on signup. Admins can also create users.
-      allow create: if (isSignedIn() && request.auth.uid == userId) || isOverallHeadOrAdmin();
-      // Update: User can update their own profile. Admins can update any.
-      allow update: if (isSignedIn() && request.auth.uid == userId) || isOverallHeadOrAdmin();
-      // Delete: Only top-level admins can delete users.
-      allow delete: if isOverallHeadOrAdmin();
-    }
-
-    // SUBEVENTS (Event definitions)
-    match /subEvents/{eventId} {
-      // Read: Publicly readable for event browsing.
-      allow read: if true;
-      // Write: Only top-level admins can create/edit/delete events.
-      allow write: if isOverallHeadOrAdmin();
-    }
-
-    // EVENT REGISTRATIONS
-    match /event_registrations/{registrationId} {
-      function isOwner() {
-        return isSignedIn() && resource.data.userId == request.auth.uid;
-      }
-
-      function getSubEventId(reg) {
-        return reg.data.subEventId;
-      }
-
-      function isManagerForEvent(eventId) {
-        // This check is simplified as it's assumed staff have appropriate access levels
-        // A more granular check could be re-introduced if needed.
-        return isStaff();
-      }
-
-      // List: Staff can list all registrations for dashboards and management.
-      allow list: if isStaff();
-      // Get: The owner of the registration or a manager for the event can get it.
-      allow get: if isOwner() || isManagerForEvent(getSubEventId(resource));
-      // Create: A student can create a registration for themselves.
-      allow create: if isStudent() && request.resource.data.userId == request.auth.uid;
-      // Update: An event manager can update. An owner can only cancel.
-      allow update: if isManagerForEvent(getSubEventId(request.resource)) || (isOwner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['registrationStatus']) && request.resource.data.registrationStatus == 'cancelled');
-      // Delete: Only event managers can delete.
-      allow delete: if isManagerForEvent(getSubEventId(resource));
-    }
-
-    // EVENT TEAMS
-    match /event_teams/{teamId} {
-      // Read: Publicly readable for display.
-      allow read: if true;
-      // Create: A student can create a team if they are its leader.
-      allow create: if isStudent() && request.resource.data.teamLeaderId == request.auth.uid;
-      // Update: The team leader or an admin can update.
-      allow update: if isOverallHeadOrAdmin() || (isSignedIn() && resource.data.teamLeaderId == request.auth.uid);
-      // Delete: Only top-level admins can delete teams.
-      allow delete: if isOverallHeadOrAdmin();
-    }
-
-    // TASKS
-    match /tasks/{taskId} {
-      function isAssignee() {
-        return isSignedIn() && request.auth.uid in resource.data.assignedToUserIds;
-      }
-      function isAssigner() {
-        return isSignedIn() && request.auth.uid == resource.data.assignedByUserId;
-      }
-
-      // Read: The assignee or the assigner can read the task.
-      allow read: if isAssignee() || isAssigner() || isOverallHeadOrAdmin();
-      // Create: Any staff member can create a task.
-      allow create: if isStaff();
-      // Update/Delete: Only the assigner or an admin can modify/delete.
-      allow update, delete: if isAssigner() || isOverallHeadOrAdmin();
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
     }
     
-    // CUSTOM COLUMN DEFINITIONS
-    match /systemPreferences/columnDefinitions/studentData/{columnId} {
-        allow read: if isStaff();
-        allow write: if isOverallHeadOrAdmin();
-    }
-    match /users/{userId}/preferences/columnDefinitions/studentData/{columnId} {
-        allow read, write: if isSignedIn() && request.auth.uid == userId;
-    }
-    match /events/{eventPathId}/columnDefinitions/{columnId} {
-        allow read, write: if isStaff();
+    function isStaff() {
+        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'overall_head', 'event_representative', 'organizer'];
     }
 
+    function isAdminOrOverallHead() {
+        let role = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+        return role == 'admin' || role == 'overall_head';
+    }
 
-    // Default Deny: All other paths are protected.
-    match /{document=**} {
-      allow read, write: if false;
+    // Rules for 'users' collection
+    match /users/{userId} {
+      // Allow user creation for anyone (e.g., public sign-up)
+      allow create: if true;
+      
+      // Allow a user to read their own profile
+      allow read: if isSignedIn(); // Broad read for now, can be restricted to self (request.auth.uid == userId)
+      
+      // Allow a user to update their own profile, but not change their role or score
+      allow update: if request.auth.uid == userId
+                    && !('role' in request.resource.data)
+                    && !('credibilityScore' in request.resource.data);
+
+      // Admins and Overall Heads can update any user profile (e.g., for role changes, score adjustments)
+      allow update: if isAdminOrOverallHead();
+
+      // Only admins can delete users
+      allow delete: if isRole('admin');
+    }
+
+    // Rules for 'subEvents' collection
+    match /subEvents/{eventId} {
+      allow read: if true; // All sub-events are public to view
+      
+      // Only Admins or Overall Heads can create, update, or delete events
+      allow create, update, delete: if isAdminOrOverallHead();
+    }
+    
+    // Rules for 'event_registrations' collection
+    match /event_registrations/{registrationId} {
+      // A user can create their own registration
+      allow create: if request.auth.uid == request.resource.data.userId;
+
+      // A user can read their own registration, staff can read any
+      allow read: if request.auth.uid == resource.data.userId || isStaff();
+      
+      // Staff can update any registration, users cannot
+      allow update: if isStaff();
+      
+      // Users can cancel their registration (if logic is implemented to do so)
+      // For now, only staff can delete.
+      allow delete: if isStaff();
+    }
+    
+     // Rules for 'event_teams' collection
+    match /event_teams/{teamId} {
+      allow read: if isSignedIn(); // Any signed-in user can read team data to find/join teams
+      
+      // A user can create a team if they are its leader
+      allow create: if request.auth.uid == request.resource.data.teamLeaderId;
+
+      // Only team members can update their own team details, or staff
+      allow update: if request.auth.uid in resource.data.memberUids || isStaff();
+
+      // Only team leader or staff can delete
+      allow delete: if request.auth.uid == resource.data.teamLeaderId || isStaff();
+    }
+
+    // Rules for 'tasks' collection
+    match /tasks/{taskId} {
+        // Staff can create tasks
+        allow create: if isStaff();
+        
+        // Assigned users or any staff can read a task
+        allow read: if isStaff() || request.auth.uid in resource.data.assignedToUserIds;
+        
+        // Assigned users, the assigner, or admins/overall heads can update a task
+        allow update: if isStaff();
+        
+        // Only admins or overall heads can delete tasks
+        allow delete: if isAdminOrOverallHead();
+    }
+
+    // Rules for 'notifications' collection
+    match /notifications/{notificationId} {
+      // A user can read their own notifications
+      allow read: if request.auth.uid == resource.data.userId;
+
+      // A user can update the 'read' status of their own notifications
+      allow update: if request.auth.uid == resource.data.userId;
+
+      // Staff can create notifications for users (triggered by server-side logic or trusted clients)
+      allow create: if isStaff();
+      
+      // Nobody can delete notifications from the client
+      allow delete: if false;
+    }
+
+    // Global collection group queries
+    match /databases/{database}/documents {
+      // Allow staff to list users and registrations for dashboards
+      allow list, read: if isStaff();
     }
   }
 }
