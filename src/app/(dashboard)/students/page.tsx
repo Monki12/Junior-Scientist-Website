@@ -329,11 +329,38 @@ export default function StudentsPage() {
         
         transaction.update(studentRef, updateData);
       });
-      toast({ title: "Update Successful", description: `Student record has been updated.` });
+      // Success: No toast needed for optimistic updates. The UI already reflects the change.
+      return true; // Indicate success for potential chaining
     } catch (error: any) {
       console.error("Error updating student:", error);
       toast({ title: "Update Failed", description: error.message, variant: "destructive" });
+      return false; // Indicate failure
     }
+  };
+
+  const handleOptimisticUpdate = (studentId: string, field: string, value: any, isCustom: boolean) => {
+    const originalStudents = students.map(s => ({...s, customData: {...s.customData}})); // Deep copy for rollback
+    
+    // Optimistically update local state
+    setStudents(prevStudents => 
+      prevStudents.map(s => {
+        if (s.uid === studentId) {
+          if (isCustom) {
+            return { ...s, customData: { ...s.customData, [field]: value } };
+          }
+          return { ...s, [field]: value };
+        }
+        return s;
+      })
+    );
+
+    // Call async update and revert on failure
+    handleStudentUpdate(studentId, field, value, isCustom).then(success => {
+      if (!success) {
+        setStudents(originalStudents); // Revert on failure
+        toast({ title: "Reverted Change", description: "The update failed and was reverted.", variant: "destructive" });
+      }
+    });
   };
 
   const handleColumnAdded = (newDef: CustomColumnDefinition) => {
@@ -413,7 +440,7 @@ export default function StudentsPage() {
                             <TableCell key={col.id} className="text-center">
                               <Checkbox 
                                 checked={!!cellValue}
-                                onCheckedChange={(checked) => handleStudentUpdate(student.uid, col.id, !!checked, isCustom)}
+                                onCheckedChange={(checked) => handleOptimisticUpdate(student.uid, col.id, !!checked, isCustom)}
                                 disabled={!canManageStudents}
                               />
                             </TableCell>
@@ -423,7 +450,7 @@ export default function StudentsPage() {
                          if (col.dataType === 'dropdown') {
                           return (
                             <TableCell key={col.id}>
-                                <Select value={cellValue || ''} onValueChange={(val) => handleStudentUpdate(student.uid, col.id, val, isCustom)}>
+                                <Select value={cellValue || ''} onValueChange={(val) => handleOptimisticUpdate(student.uid, col.id, val, isCustom)}>
                                     <SelectTrigger className="text-xs h-8"><SelectValue placeholder="Select..."/></SelectTrigger>
                                     <SelectContent>
                                         {(col.options || []).map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
@@ -456,6 +483,3 @@ export default function StudentsPage() {
   );
 }
 
-    
-
-    

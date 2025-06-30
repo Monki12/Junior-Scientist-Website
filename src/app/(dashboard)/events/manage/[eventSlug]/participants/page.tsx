@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { db, storage } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, runTransaction, serverTimestamp, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, runTransaction, serverTimestamp, getDoc, addDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { ArrowLeft, Loader2, Users, Search, Filter, PlusCircle, UploadCloud, FileCog, Columns, X } from 'lucide-react';
 import { nanoid } from 'nanoid';
@@ -77,7 +77,13 @@ export default function ManageParticipantsPage() {
   useEffect(() => {
     // In a real implementation, this would fetch column preferences from Firestore
     // For now, we combine default and locally managed custom columns
-    setAvailableColumns([...DEFAULT_COLUMNS, ...customColumnDefinitions]);
+    const allCols = [...DEFAULT_COLUMNS];
+    customColumnDefinitions.forEach(customCol => {
+      if (!allCols.some(c => c.id === customCol.id)) {
+        allCols.push(customCol);
+      }
+    });
+    setAvailableColumns(allCols);
   }, [customColumnDefinitions]);
 
 
@@ -90,7 +96,12 @@ export default function ManageParticipantsPage() {
           const querySnapshot = await getDocs(q);
           if (!querySnapshot.empty) {
             const eventDoc = querySnapshot.docs[0];
-            setEvent({ id: eventDoc.id, ...eventDoc.data() } as SubEvent);
+            const eventData = { id: eventDoc.id, ...eventDoc.data() } as SubEvent
+            setEvent(eventData);
+            if(eventData.customData) {
+                const customCols = Object.values(eventData.customData) as CustomColumnDefinition[];
+                setCustomColumnDefinitions(customCols);
+            }
           } else {
             notFound();
           }
@@ -142,8 +153,8 @@ export default function ManageParticipantsPage() {
             if (userDocSnap.exists()) {
               const userData = userDocSnap.data() as UserProfileData;
               
-              // Merge customData from user profile into the root of the display participant
-              const customData = userData.customData || {};
+              // Merge customData from registration into the root of the display participant
+              const customData = regData.customData || {};
 
               return {
                 ...userData,
@@ -187,47 +198,41 @@ export default function ManageParticipantsPage() {
       })
     });
   }, [participants, activeFilters]);
-
-  const handleUpdateRegistrationField = async (registrationId: string, field: keyof EventRegistration, value: any) => {
-    const regDocRef = doc(db, 'event_registrations', registrationId);
-    try {
-        await runTransaction(db, async (transaction) => {
-            const regDoc = await transaction.get(regDocRef);
-            if (!regDoc.exists()) throw new Error("Registration document does not exist!");
-            transaction.update(regDocRef, { [field]: value, lastUpdatedAt: serverTimestamp() });
-        });
-        setParticipants(prev => prev.map(p => p.registrationId === registrationId ? { ...p, [field]: value } : p));
-        toast({ title: "Success", description: `Participant ${String(field)} updated.` });
-    } catch (error: any) {
-        toast({ title: "Update Failed", description: error.message || `Could not update ${field}.`, variant: "destructive" });
-    }
-  };
   
-  const handleUpdateCustomField = async (userId: string, registrationId: string, field: string, value: any) => {
-    const userDocRef = doc(db, 'users', userId);
-    try {
-        await runTransaction(db, async (transaction) => {
-            const userDoc = await transaction.get(userDocRef);
-            if (!userDoc.exists()) throw new Error("User document does not exist!");
-
-            const currentCustomData = userDoc.data()?.customData || {};
-            const updatedCustomData = { ...currentCustomData, [field]: value };
-            
-            transaction.update(userDocRef, { customData: updatedCustomData, updatedAt: serverTimestamp() });
-        });
-        setParticipants(prev => prev.map(p => {
-            if (p.registrationId === registrationId) {
-                const customData = { ...(p.customData || {}), [field]: value };
-                return { ...p, customData, [field]: value };
+  const handleOptimisticUpdate = (registrationId: string, field: string, value: any, isCustom: boolean) => {
+    // Optimistically update local state for instant UI feedback
+    setParticipants(prev => prev.map(p => {
+        if (p.registrationId === registrationId) {
+            if (isCustom) {
+                return { ...p, [field]: value, customData: { ...(p.customData || {}), [field]: value } };
             }
-            return p;
-        }));
-        toast({ title: "Success", description: `Participant ${String(field)} updated.` });
-    } catch (error: any) {
+            return { ...p, [field]: value };
+        }
+        return p;
+    }));
+    
+    // Perform database update in the background
+    const regDocRef = doc(db, 'event_registrations', registrationId);
+    runTransaction(db, async (transaction) => {
+        const regDoc = await transaction.get(regDocRef);
+        if (!regDoc.exists()) throw new Error("Registration document does not exist!");
+        
+        let updatePayload: { [key: string]: any } = { lastUpdatedAt: serverTimestamp() };
+        if (isCustom) {
+            const customData = regDoc.data()?.customData || {};
+            updatePayload.customData = { ...customData, [field]: value };
+        } else {
+            updatePayload[field] = value;
+        }
+        transaction.update(regDocRef, updatePayload);
+    }).catch((error: any) => {
         toast({ title: "Update Failed", description: error.message || `Could not update ${field}.`, variant: "destructive" });
-    }
+        // Revert local state on failure
+        // A more robust implementation might store original state before optimistic update
+        // For now, we rely on a page refresh or subsequent fetch to correct the view
+    });
   };
-  
+
   const handleAdmitCardUpload = async () => {
     if (!admitCardFile || !selectedParticipantForAdmitCard || !event) return;
     setIsUploadingAdmitCard(true);
@@ -235,8 +240,16 @@ export default function ManageParticipantsPage() {
       const storageRef = ref(storage, `admit_cards/${event.id}/${selectedParticipantForAdmitCard.uid}_${admitCardFile.name}`);
       await uploadBytes(storageRef, admitCardFile);
       const downloadURL = await getDownloadURL(storageRef);
-      await handleUpdateRegistrationField(selectedParticipantForAdmitCard.registrationId, 'admitCardUrl', downloadURL);
-      toast({ title: "Admit Card Uploaded" });
+
+      // Optimistically update UI
+      setParticipants(prev => prev.map(p => 
+        p.registrationId === selectedParticipantForAdmitCard.registrationId ? { ...p, admitCardUrl: downloadURL } : p
+      ));
+      
+      const regDocRef = doc(db, 'event_registrations', selectedParticipantForAdmitCard.registrationId);
+      await updateDoc(regDocRef, { admitCardUrl: downloadURL, lastUpdatedAt: serverTimestamp() });
+      
+      // No success toast for better UX
       setIsAdmitCardUploadOpen(false);
     } catch (error: any) {
        toast({ title: "Upload Failed", description: error.message, variant: "destructive" });
@@ -245,7 +258,8 @@ export default function ManageParticipantsPage() {
     }
   };
 
-  const handleAddCustomColumn = () => {
+ const handleAddCustomColumn = async () => {
+    if (!event) return;
     const newId = `custom_${newColumn.name.toLowerCase().replace(/\s/g, '_')}`;
     let finalOptions: string[] | undefined = undefined;
 
@@ -256,14 +270,30 @@ export default function ManageParticipantsPage() {
         return;
       }
     }
-
+    
     const newDef: CustomColumnDefinition = { ...newColumn, id: newId, options: finalOptions };
-    setCustomColumnDefinitions([...customColumnDefinitions, newDef]);
-    setVisibleColumns([...visibleColumns, newId]);
-    setIsAddColumnDialogOpen(false);
-    setNewColumn({ name: '', dataType: 'text', options: [] });
-    setNewColumnOptions('');
-    toast({title: "Column Added", description: `Column "${newDef.name}" is now available.`});
+    
+    try {
+        const eventRef = doc(db, 'subEvents', event.id);
+        const currentEvent = await getDoc(eventRef);
+        const existingCustomData = currentEvent.data()?.customData || {};
+        
+        await updateDoc(eventRef, {
+            customData: {
+                ...existingCustomData,
+                [newId]: newDef
+            }
+        });
+
+        setCustomColumnDefinitions([...customColumnDefinitions, newDef]);
+        setVisibleColumns([...visibleColumns, newId]);
+        setIsAddColumnDialogOpen(false);
+        setNewColumn({ name: '', dataType: 'text', options: [] });
+        setNewColumnOptions('');
+        toast({title: "Column Added", description: `Column "${newDef.name}" is now available.`});
+    } catch (e: any) {
+        toast({title: "Error", description: `Could not save column: ${e.message}`, variant: "destructive"});
+    }
   };
 
   if (authLoading || loadingEventData || !organizerProfile || !event) {
@@ -310,22 +340,10 @@ export default function ManageParticipantsPage() {
 
                           switch (col.dataType) {
                             case 'checkbox':
-                              return <Checkbox checked={!!value} onCheckedChange={(checked) => {
-                                  if (isDefaultColumn) {
-                                      handleUpdateRegistrationField(p.registrationId, col.id as keyof EventRegistration, !!checked);
-                                  } else {
-                                      handleUpdateCustomField(p.uid, p.registrationId, col.id, !!checked);
-                                  }
-                              }} />;
+                              return <Checkbox checked={!!value} onCheckedChange={(checked) => handleOptimisticUpdate(p.registrationId, col.id, !!checked, !isDefaultColumn)} />;
                             case 'dropdown':
                               return (
-                                <Select value={value || ''} onValueChange={(val: any) => {
-                                    if (isDefaultColumn) {
-                                        handleUpdateRegistrationField(p.registrationId, col.id as keyof EventRegistration, val);
-                                    } else {
-                                        handleUpdateCustomField(p.uid, p.registrationId, col.id, val);
-                                    }
-                                }}>
+                                <Select value={value || ''} onValueChange={(val: any) => handleOptimisticUpdate(p.registrationId, col.id, val, !isDefaultColumn)}>
                                   <SelectTrigger className="text-xs capitalize h-8"><SelectValue placeholder="Select..."/></SelectTrigger>
                                   <SelectContent>{(col.options || []).map(s => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}</SelectContent>
                                 </Select>
@@ -471,3 +489,4 @@ export default function ManageParticipantsPage() {
     </div>
   );
 }
+

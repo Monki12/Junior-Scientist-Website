@@ -131,7 +131,8 @@ export type EventRegistration = {
     fullName: string;
     email: string;
     schoolName: string;
-  }
+  },
+  customData?: Record<string, any>; // For event-specific custom fields
 };
 
 // For Firestore event_teams collection
@@ -162,10 +163,14 @@ export type JoinTeamFormData = {
 export interface CustomColumnDefinition {
   id: string; // e.g., 'custom_field_1'
   name: string; // e.g., 'T-Shirt Size'
-  dataType: 'text' | 'number' | 'checkbox' | 'date' | 'dropdown' | 'file';
+  dataType: 'text' | 'number' | 'checkbox' | 'date' | 'dropdown';
   options?: string[]; // For 'dropdown' type
   defaultValue?: any;
   description?: string;
+  isSharedGlobally?: boolean;
+  editableByOthers?: boolean;
+  createdBy?: string;
+  createdAt?: any;
 }
 
 export interface UserColumnPreference {
