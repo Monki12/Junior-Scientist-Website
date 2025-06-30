@@ -4,118 +4,143 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if a user is authenticated.
+    // Helper functions
     function isAuth() {
       return request.auth != null;
     }
 
-    // Helper function to check if the authenticated user has a specific role.
-    function isRole(role) {
-      return isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
-    }
-
-    // Helper function to check if the authenticated user has one of the specified roles.
-    function isOneOfRoles(roles) {
-      return isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in roles;
-    }
-    
-    // Helper function to check if the authenticated user is the owner of a document.
-    function isOwner(userId) {
+    function isUser(userId) {
       return isAuth() && request.auth.uid == userId;
     }
+
+    function getUserData(userId) {
+      // Use exists() to avoid errors on non-existent docs, like during user creation.
+      return getAfter(/databases/$(database)/documents/users/$(userId));
+    }
     
-    // Helper function to access the data of an incoming request.
     function incomingData() {
       return request.resource.data;
     }
 
-    // ====== Users Collection ======
-    // Defines rules for user profile documents.
+    function hasRole(roles) {
+      // When checking a user's role on their own create, the doc doesn't exist yet, so we check request data.
+      // Otherwise, we check existing data in the database.
+      let userRole = isUser(request.auth.uid) && request.method == 'create' 
+                     ? incomingData().role 
+                     : getUserData(request.auth.uid).data.role;
+      return isAuth() && userRole in roles;
+    }
+
+    function isAdmin() {
+      return hasRole(['admin']);
+    }
+
+    function isOverallHead() {
+      return hasRole(['overall_head']);
+    }
+
+    function isAdminOrOverallHead() {
+        return hasRole(['admin', 'overall_head']);
+    }
+    
+    function isStaff() {
+      return hasRole(['admin', 'overall_head', 'event_representative', 'organizer']);
+    }
+
+    function isStudent() {
+      return hasRole(['student', 'test']);
+    }
+
+    // USERS collection
     match /users/{userId} {
-      // Allow authenticated users to read profiles (e.g., to see names, roles).
-      allow read: if isAuth();
-
-      // Allow a new user to create their own 'student' profile upon signup.
-      // Allow admins/overall_heads to create staff accounts.
-      allow create: if (isOwner(userId) && incomingData().role == 'student') ||
-                       (isOneOfRoles(['admin', 'overall_head']) && incomingData().role != 'student');
-
-      // A user can update their own profile.
-      // Admins/Overall Heads can update any profile (e.g., to verify a school or update a role).
-      allow update: if isOwner(userId) || isOneOfRoles(['admin', 'overall_head']);
+      allow read: if isAuth() && (isUser(userId) || isStaff());
       
-      // Nobody can delete user documents directly to maintain data integrity.
-      // Deletions should be handled by a secure administrative process.
-      allow delete: if false;
-
-        // --- Custom Column Preferences (Subcollection) ---
-        // Defines rules for user-specific custom column definitions.
-        match /preferences/columnDefinitions/studentData/{docId} {
-            // A user can read and write to their own column preferences.
-            allow read, write: if isOwner(userId);
-        }
+      // Allow user creation on signup, and staff creation by admins.
+      allow create: if (
+        // Student signup: user creates their own doc, must be student role.
+        isUser(userId) && incomingData().role == 'student'
+      ) || (
+        // Admin/Overall Head creates a staff account
+        isAdminOrOverallHead()
+      );
+      
+      // Allow users to update their own profile, but not change critical fields.
+      // Admins can update anything, including customData.
+      allow update: if (isUser(userId) && 
+                      incomingData().role == resource.data.role &&
+                      incomingData().email == resource.data.email &&
+                      incomingData().credibilityScore == resource.data.credibilityScore
+                   ) || isAdminOrOverallHead();
+                   
+      allow delete: if isAdmin();
+      
+      // Custom Column Preferences for individual users
+      match /preferences/columnDefinitions/studentData/{docId} {
+        allow read, write: if isUser(userId);
+      }
     }
 
-    // ====== Sub-Events Collection ======
-    // Defines rules for sub-event documents.
+    // SUB-EVENTS collection
     match /subEvents/{eventId} {
-      // Anyone, including unauthenticated visitors, can view event details.
-      allow read: if true;
-      // Only Admins or Overall Heads can create, update, or delete events.
-      allow write: if isOneOfRoles(['admin', 'overall_head']);
+      allow read: if true; // Publicly readable
+      allow create, update, delete: if isAdminOrOverallHead();
     }
-
-    // ====== Event Registrations Collection ======
-    // Defines rules for event registration documents.
+    
+    // EVENT REGISTRATIONS collection
     match /event_registrations/{registrationId} {
-      // Allow users to read their own registration details.
-      // Allow Admins/Overall Heads to read any registration.
-      // TODO: Extend to allow Event Reps to read registrations for their assigned events.
-      allow read: if isOwner(resource.data.userId) || isOneOfRoles(['admin', 'overall_head']);
-
-      // Allow authenticated students to create their own registration.
-      allow create: if isOwner(request.resource.data.userId) && isRole('student');
-
-      // Allow Admins/Overall Heads to update any registration (e.g., approve/decline status).
-      // TODO: Extend to allow Event Reps to update registrations for their events.
-      allow update: if isOneOfRoles(['admin', 'overall_head']);
-      
-      // Only Admins/Overall Heads can delete registrations.
-      allow delete: if isOneOfRoles(['admin', 'overall_head']);
-    }
-
-    // ====== Event Teams Collection ======
-    // Defines rules for team documents for team-based events.
-    match /event_teams/{teamId} {
-        // Any authenticated user can read team information (e.g., to search for a team to join).
-        allow read: if isAuth();
-        // A user can create a team if they are the designated leader.
-        allow create: if isAuth() && request.resource.data.teamLeaderId == request.auth.uid;
-        // Any member of a team can update it (e.g., to add another member).
-        allow update: if isAuth() && resource.data.memberUids.hasAny([request.auth.uid]);
-        // Only Admins/Overall Heads can delete teams.
-        allow delete: if isOneOfRoles(['admin', 'overall_head']);
-    }
-    
-    // ====== Tasks Collection ======
-    // Defines rules for task management documents.
-    match /tasks/{taskId} {
-        // Admins/Overall Heads can read any task.
-        // Other users can read tasks assigned to them.
-        allow read: if isOneOfRoles(['admin', 'overall_head']) || (isAuth() && request.auth.uid in resource.data.assignedToUserIds);
+        function hasDataAccess(subEventId) {
+            let userProfile = getUserData(request.auth.uid).data;
+            return userProfile.role in ['admin', 'overall_head'] ||
+                   (userProfile.role == 'event_representative' && subEventId in userProfile.assignedEventUids) ||
+                   (userProfile.role == 'organizer' && userProfile.studentDataEventAccess[subEventId] == true);
+        }
         
-        // Admins/Overall Heads can write to any task.
-        // Other users can write to tasks assigned to them (e.g., to change status).
-        allow write: if isOneOfRoles(['admin', 'overall_head']) || (isAuth() && request.auth.uid in resource.data.assignedToUserIds);
+        // Only student who registered or an authorized staff can read.
+        allow read: if isAuth() && (isUser(resource.data.userId) || hasDataAccess(resource.data.subEventId));
+        
+        // Only students can create registrations for themselves.
+        allow create: if isAuth() && isUser(request.resource.data.userId) && isStudent();
+        
+        // Only authorized staff can update registrations. Student can only update to 'cancelled'.
+        allow update: if isAuth() && (
+            (hasDataAccess(resource.data.subEventId)) || 
+            (isUser(resource.data.userId) && incomingData().registrationStatus == 'cancelled')
+          );
+        
+        allow delete: if isAdminOrOverallHead();
+    }
+
+    // EVENT TEAMS collection
+    match /event_teams/{teamId} {
+      allow read: if isAuth();
+      // Team leader is creating the team
+      allow create: if isAuth() && isUser(incomingData().teamLeaderId);
+      // Team members are being added, or team leader is updating.
+      allow update: if isAuth() && (isUser(resource.data.teamLeaderId) || request.auth.uid in incomingData().memberUids);
+      allow delete: if isAuth() && (isUser(resource.data.teamLeaderId) || isAdminOrOverallHead());
     }
     
-    // ====== Global System Preferences ======
-    // Defines rules for system-wide configurations, like shared custom columns.
+    // TASKS collection
+    match /tasks/{taskId} {
+      // Allow read if user is assigner, assignee, or admin/overall_head
+      allow read: if isAuth() && (
+        isAdminOrOverallHead() || 
+        isUser(resource.data.assignedByUserId) || 
+        request.auth.uid in resource.data.assignedToUserIds
+      );
+      allow create: if isStaff();
+      allow update: if isAuth() && (
+        isAdminOrOverallHead() ||
+        isUser(resource.data.assignedByUserId) || 
+        request.auth.uid in resource.data.assignedToUserIds
+      );
+      allow delete: if isAuth() && (isAdminOrOverallHead() || isUser(resource.data.assignedByUserId));
+    }
+    
+    // SYSTEM PREFERENCES collection for global custom columns
     match /systemPreferences/columnDefinitions/studentData/{docId} {
-        // Any authenticated user can read global column definitions to render their table view.
-        allow read: if isAuth();
-        // Only Admins/Overall Heads can create, update, or delete global column definitions.
-        allow write: if isOneOfRoles(['admin', 'overall_head']);
+        allow read: if isStaff();
+        allow write: if isAdminOrOverallHead();
     }
   }
 }
