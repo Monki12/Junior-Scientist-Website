@@ -19,12 +19,6 @@ const nextConfig = {
       },
     ],
   },
-  experimental: {
-    allowedDevOrigins: [
-      'https://9000-firebase-studio-1750187955130.cluster-fdkw7vjj7bgguspe3fbbc25tra.cloudworkstations.dev',
-      'https://6000-firebase-studio-1750187955130.cluster-fdkw7vjj7bgguspe3fbbc25tra.cloudworkstations.dev',
-    ],
-  },
   // If you also need to handle .glb or .png files with a custom webpack rule,
   // ensure it's added here. For example:
   // webpack: (config, { isServer }) => {
