@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import type { UserProfileData } from '@/types';
-import { collection, query, orderBy, limit, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, onSnapshot, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -34,15 +34,15 @@ export default function LeaderboardPage() {
 
       setLoadingData(true);
       const usersRef = collection(db, 'users');
+      // Fetch all staff and sort on the client to avoid needing a composite index in Firestore
       const q = query(
         usersRef,
-        where('role', 'in', ['organizer', 'event_representative', 'overall_head', 'admin']),
-        orderBy('credibilityScore', 'desc'),
-        limit(50)
+        where('role', 'in', ['organizer', 'event_representative', 'overall_head', 'admin'])
       );
 
       const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const leaders = querySnapshot.docs.map(doc => doc.data() as UserProfileData);
+        const staffList = querySnapshot.docs.map(doc => doc.data() as UserProfileData);
+        const leaders = staffList.sort((a, b) => (b.credibilityScore || 0) - (a.credibilityScore || 0));
         setLeaderboard(leaders);
         setLoadingData(false);
       }, (error) => {
@@ -60,6 +60,8 @@ export default function LeaderboardPage() {
   const restOfBoard = leaderboard.slice(10);
 
   const userRank = leaderboard.findIndex(u => u.uid === userProfile?.uid) + 1;
+  const currentUserOnLeaderboard = leaderboard.find(u => u.uid === userProfile?.uid);
+
 
   if (authLoading || loadingData) {
     return (
@@ -194,23 +196,23 @@ export default function LeaderboardPage() {
         </CardContent>
       </Card>
       
-      {userRank > 0 && userProfile && (
+      {userRank > 0 && currentUserOnLeaderboard && (
          <div className="sticky bottom-4 w-full flex justify-center z-20">
             <Card className="w-full max-w-4xl shadow-2xl bg-accent text-accent-foreground p-3 animate-fade-in-up">
                 <div className="flex justify-between items-center">
                     <div className="flex items-center gap-3">
                         <div className="text-lg font-bold">#{userRank}</div>
                         <Avatar className="h-10 w-10">
-                            <AvatarImage src={userProfile.photoURL || undefined} />
-                            <AvatarFallback>{(userProfile.fullName || 'U')[0]}</AvatarFallback>
+                            <AvatarImage src={currentUserOnLeaderboard.photoURL || undefined} />
+                            <AvatarFallback>{(currentUserOnLeaderboard.fullName || 'U')[0]}</AvatarFallback>
                         </Avatar>
                         <div>
-                            <p className="font-bold">{userProfile.fullName} (You)</p>
-                            <p className="text-xs opacity-80 capitalize">{userProfile.role?.replace(/_/g, ' ')}</p>
+                            <p className="font-bold">{currentUserOnLeaderboard.fullName} (You)</p>
+                            <p className="text-xs opacity-80 capitalize">{currentUserOnLeaderboard.role?.replace(/_/g, ' ')}</p>
                         </div>
                     </div>
                     <div className="text-lg font-bold flex items-center gap-1">
-                        <Award className="h-5 w-5" /> {userProfile.credibilityScore}
+                        <Award className="h-5 w-5" /> {currentUserOnLeaderboard.credibilityScore}
                     </div>
                 </div>
             </Card>
