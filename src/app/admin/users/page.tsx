@@ -4,50 +4,103 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Users, ShieldAlert, ArrowLeft, PlusCircle, Loader2 } from 'lucide-react';
+import { Users, ShieldAlert, ArrowLeft, PlusCircle, Loader2, Edit } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import CreateOrganizerForm from '@/components/admin/CreateOrganizerForm';
-import { collection, getDocs, query } from 'firebase/firestore';
+import { collection, getDocs, query, doc, updateDoc, runTransaction, getDoc, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { UserProfileData } from '@/types';
+import type { UserProfileData, SubEvent, UserRole } from '@/types';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useToast } from '@/hooks/use-toast';
 
 export default function AdminUsersPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const { userProfile, loading } = useAuth();
   const [isCreateOrganizerDialogOpen, setIsCreateOrganizerDialogOpen] = useState(false);
-  const [allUsers, setAllUsers] = useState<UserProfileData[]>([]);
-  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
-
-  useEffect(() => {
-    if (!loading && userProfile && (userProfile.role !== 'admin' && userProfile.role !== 'overall_head')) {
-      router.push('/dashboard'); 
-    }
-  }, [userProfile, loading, router]);
+  const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserProfileData | null>(null);
   
-  const fetchAllUsers = async () => {
-    setIsLoadingUsers(true);
+  const [allUsers, setAllUsers] = useState<UserProfileData[]>([]);
+  const [allEvents, setAllEvents] = useState<SubEvent[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+
+  const fetchAllData = async () => {
+    setIsLoadingData(true);
     try {
       const usersCollection = collection(db, 'users');
       const usersSnapshot = await getDocs(usersCollection);
-      const usersList = usersSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfileData));
+      const usersList = usersSnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as UserProfileData));
       setAllUsers(usersList);
+
+      const eventsCollection = collection(db, 'subEvents');
+      const eventsSnapshot = await getDocs(eventsCollection);
+      const eventsList = eventsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as SubEvent));
+      setAllEvents(eventsList);
+
     } catch (error) {
-      console.error("Error fetching users:", error);
+      console.error("Error fetching data:", error);
     } finally {
-      setIsLoadingUsers(false);
+      setIsLoadingData(false);
     }
   };
 
   useEffect(() => {
-    if (userProfile && (userProfile.role === 'admin' || userProfile.role === 'overall_head')) {
-      fetchAllUsers();
+    if (!loading && userProfile && (userProfile.role === 'admin' || userProfile.role === 'overall_head')) {
+      fetchAllData();
+    } else if (!loading) {
+        router.push('/dashboard');
     }
-  }, [userProfile]);
+  }, [userProfile, loading, router]);
+  
+  const handleOpenEditDialog = (user: UserProfileData) => {
+    setEditingUser(user);
+    setIsEditUserDialogOpen(true);
+  };
+  
+  const handleUserUpdate = async () => {
+    if (!editingUser) return;
+    try {
+        const userRef = doc(db, 'users', editingUser.uid);
+        // Only update fields that are managed here
+        const updates = {
+            role: editingUser.role,
+            assignedEventUids: editingUser.assignedEventUids || [],
+            studentDataEventAccess: editingUser.studentDataEventAccess || {},
+        };
+        await updateDoc(userRef, updates);
 
-  if (loading || !userProfile) {
+        // If assigning a rep, also update the subEvent document
+        if (editingUser.role === 'event_representative' && editingUser.assignedEventUids) {
+            for (const eventId of editingUser.assignedEventUids) {
+                const eventRef = doc(db, 'subEvents', eventId);
+                const eventSnap = await getDoc(eventRef);
+                if (eventSnap.exists()) {
+                    const eventData = eventSnap.data();
+                    const reps = eventData.eventReps || [];
+                    if (!reps.includes(editingUser.uid)) {
+                        await updateDoc(eventRef, { eventReps: [...reps, editingUser.uid] });
+                    }
+                }
+            }
+        }
+        
+        toast({ title: "User Updated", description: `${editingUser.fullName}'s profile has been updated.`});
+        setIsEditUserDialogOpen(false);
+        setEditingUser(null);
+        fetchAllData(); // Refresh list
+    } catch(e) {
+        console.error("Error updating user:", e);
+        toast({title: "Error", description: "Failed to update user.", variant: "destructive"});
+    }
+  };
+  
+  if (loading || !userProfile || isLoadingData) {
      return (
       <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center">
         <Users className="h-12 w-12 animate-spin text-primary" />
@@ -65,11 +118,6 @@ export default function AdminUsersPage() {
       </div>
     );
   }
-
-  const handleOrganizerCreationSuccess = () => {
-    setIsCreateOrganizerDialogOpen(false);
-    fetchAllUsers();
-  };
 
   return (
     <div className="space-y-6 animate-fade-in-up">
@@ -97,48 +145,103 @@ export default function AdminUsersPage() {
                 </DialogHeader>
                 <CreateOrganizerForm
                   currentAdminRole={userProfile.role as 'admin' | 'overall_head'}
-                  onSuccess={handleOrganizerCreationSuccess}
+                  onSuccess={() => { setIsCreateOrganizerDialogOpen(false); fetchAllData(); }}
                 />
               </DialogContent>
             </Dialog>
           </div>
         </CardHeader>
         <CardContent>
-          {isLoadingUsers ? (
-            <div className="flex items-center justify-center p-8">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="ml-2">Loading users...</p>
-            </div>
-          ) : (
-            <div className="border rounded-md">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Full Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Identifier</TableHead>
-                    <TableHead>Actions</TableHead>
+          <div className="border rounded-md">
+            <Table>
+              <TableHeader><TableRow><TableHead>Full Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Identifier</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {allUsers.map((user) => (
+                  <TableRow key={user.uid}>
+                    <TableCell className="font-medium">{user.fullName || user.displayName}</TableCell>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell className="capitalize">{user.role?.replace(/_/g, ' ')}</TableCell>
+                    <TableCell>{user.role === 'student' ? `ID: ${user.shortId || 'N/A'}` : `Roll: ${user.collegeRollNumber || 'N/A'}`}</TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="outline" size="sm" onClick={() => handleOpenEditDialog(user)}>
+                        <Edit className="mr-2 h-4 w-4"/>Manage
+                      </Button>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {allUsers.map((user) => (
-                    <TableRow key={user.uid}>
-                      <TableCell className="font-medium">{user.fullName || user.displayName}</TableCell>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell className="capitalize">{user.role?.replace('_', ' ')}</TableCell>
-                      <TableCell>{user.role === 'student' ? `ID: ${user.shortId}` : `Roll: ${user.collegeRollNumber}`}</TableCell>
-                      <TableCell>
-                        <Button variant="outline" size="sm">Edit</Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
+
+      <Dialog open={isEditUserDialogOpen} onOpenChange={setIsEditUserDialogOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Manage User: {editingUser?.fullName}</DialogTitle>
+            </DialogHeader>
+            {editingUser && (
+                <div className="space-y-4 py-4">
+                    <div>
+                        <Label htmlFor="role">Role</Label>
+                        <Select value={editingUser.role} onValueChange={(value: UserRole) => setEditingUser(u => u ? {...u, role: value} : null)}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="student">Student</SelectItem>
+                                <SelectItem value="organizer">Organizer</SelectItem>
+                                <SelectItem value="event_representative">Event Representative</SelectItem>
+                                <SelectItem value="overall_head">Overall Head</SelectItem>
+                                {userProfile.role === 'admin' && <SelectItem value="admin">Admin</SelectItem>}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    {editingUser.role === 'event_representative' && (
+                        <div>
+                            <Label>Assign Events to Representative</Label>
+                            <div className="space-y-1 p-2 border rounded-md max-h-40 overflow-y-auto">
+                                {allEvents.map(event => (
+                                    <div key={event.id} className="flex items-center gap-2">
+                                        <Checkbox 
+                                            id={`event-${event.id}`} 
+                                            checked={editingUser.assignedEventUids?.includes(event.id)}
+                                            onCheckedChange={(checked) => {
+                                                const uids = editingUser.assignedEventUids || [];
+                                                const newUids = checked ? [...uids, event.id] : uids.filter(id => id !== event.id);
+                                                setEditingUser(u => u ? {...u, assignedEventUids: newUids} : null);
+                                            }}
+                                        />
+                                        <Label htmlFor={`event-${event.id}`}>{event.title}</Label>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    {editingUser.role === 'organizer' && (
+                        <div>
+                            <Label>Grant Student Data Access</Label>
+                             <div className="space-y-1 p-2 border rounded-md max-h-40 overflow-y-auto">
+                                {allEvents.map(event => (
+                                    <div key={event.id} className="flex items-center gap-2">
+                                         <Checkbox 
+                                            id={`access-${event.id}`} 
+                                            checked={editingUser.studentDataEventAccess?.[event.id] === true}
+                                            onCheckedChange={(checked) => {
+                                                const accessMap = editingUser.studentDataEventAccess || {};
+                                                const newAccessMap = {...accessMap, [event.id]: !!checked};
+                                                setEditingUser(u => u ? {...u, studentDataEventAccess: newAccessMap} : null);
+                                            }}
+                                        />
+                                        <Label htmlFor={`access-${event.id}`}>{event.title}</Label>
+                                    </div>
+                                ))}
+                             </div>
+                        </div>
+                    )}
+                    <Button onClick={handleUserUpdate}>Save Changes</Button>
+                </div>
+            )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

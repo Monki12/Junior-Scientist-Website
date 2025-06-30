@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, UserCircle, Mail, Shield, LogOut, ArrowLeft, CalendarDays, Info, Users, GraduationCap, School, Edit3, Check, X, Building, Tag } from 'lucide-react';
+import { Loader2, UserCircle, Mail, Shield, LogOut, ArrowLeft, CalendarDays, Info, Users, GraduationCap, School, Edit3, Check, X, Building, Tag, Award } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
@@ -170,11 +170,17 @@ export default function ProfilePage() {
           </div>
            {userProfile.role && (
             <Badge variant="secondary" className="mt-2 capitalize text-sm py-1 px-3">
-                <Shield className="mr-2 h-4 w-4" /> Role: {userProfile.role.replace('_', ' ')}
+                <Shield className="mr-2 h-4 w-4" /> Role: {userProfile.role.replace(/_/g, ' ')}
             </Badge>
            )}
         </CardHeader>
         <CardContent className="space-y-6 pt-6">
+            {isOrganizerRole && (
+                <div className="space-y-1 text-center">
+                    <Label>Credibility Score</Label>
+                    <p className="text-4xl font-bold text-accent flex items-center justify-center gap-2"><Award className="h-8 w-8"/> {userProfile.credibilityScore || 0}</p>
+                </div>
+            )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
             <div className="space-y-1">
               <Label htmlFor="fullName">Full Name</Label>

@@ -1,11 +1,10 @@
 
 'use client';
 
-import { useEffect, useState, useMemo, useCallback, FormEvent } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { useAuth } from '@/hooks/use-auth';
-import type { Task, TaskPriority, TaskStatus, CustomTaskColumnDefinition, ActiveTaskFilter, UserProfileData, SubEvent } from '@/types';
+import type { Task, TaskPriority, TaskStatus, UserProfileData, SubEvent } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -17,50 +16,27 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO, isValid, isPast, startOfDay, differenceInDays, addDays } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
 import {
-  ListChecks, ShieldAlert, Loader2, Search, Filter, PlusCircle, Edit2, Trash2, CalendarIcon, ArrowUpDown, Tag, XIcon, ChevronDown, Rows, GanttChartSquare, LayoutDashboard
+  ListChecks, Loader2, PlusCircle, Edit2, Trash2, CalendarIcon, ChevronDown
 } from 'lucide-react';
-import { collection, query, where, getDocs, onSnapshot, addDoc, updateDoc, deleteDoc, doc, Unsubscribe } from 'firebase/firestore';
+import { collection, query, where, getDocs, onSnapshot, addDoc, updateDoc, deleteDoc, doc, Unsubscribe, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
-const mockAssignableUsersForEvent = [
-  'Alice (Organizer)',
-  'Bob (Event Rep for this Event)',
-  'Carol (Overall Head)',
-  'David (Organizer)',
-];
-
-const defaultTaskFormState = {
+const defaultTaskFormState: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'assignedToUserIds'> & { assignedToUserIds: string[] } = {
   title: '',
   description: '',
-  assignedTo: [] as string[],
-  dueDate: undefined as Date | undefined,
-  priority: 'Medium' as TaskPriority,
-  status: 'Not Started' as TaskStatus,
-  points: 0,
-  eventSlug: 'general',
-  customTaskData: {},
+  assignedToUserIds: [],
+  dueDate: undefined,
+  priority: 'Medium',
+  status: 'Not Started',
+  pointsOnCompletion: 10,
+  subEventId: 'general',
 };
-
-type SortableTaskFields = 'dueDate' | 'priority' | 'status' | 'title';
-type SortDirection = 'asc' | 'dsc';
-
-const standardTaskFilterColumns: Array<{id: keyof Task | string, name: string, isCustom?: boolean}> = [
-    { id: 'title', name: 'Title' },
-    { id: 'description', name: 'Description' },
-    { id: 'assignedTo', name: 'Assigned To' },
-    { id: 'dueDate', name: 'Due Date' },
-    { id: 'priority', name: 'Priority' },
-    { id: 'status', name: 'Status' },
-];
-
-type TaskViewMode = 'list' | 'timeline';
-
 
 const getPriorityBadgeVariant = (priority: TaskPriority) => {
   if (priority === 'High') return 'destructive';
@@ -79,78 +55,6 @@ const getStatusBadgeVariant = (status: TaskStatus): { variant: "default" | "seco
 };
 
 
-const BasicTimelineView = ({ tasks, events }: { tasks: Task[], events: SubEvent[] }) => {
-  if (tasks.length === 0) {
-    return <div className="text-center py-10 text-muted-foreground">No tasks to display in timeline view.</div>;
-  }
-
-  const allDates = tasks.flatMap(task => [
-    task.createdAt && isValid(parseISO(task.createdAt)) ? parseISO(task.createdAt) : new Date(),
-    task.dueDate && isValid(parseISO(task.dueDate)) ? parseISO(task.dueDate) : addDays(new Date(), 1)
-  ]).filter(date => isValid(date));
-
-  const overallStartDate = allDates.length > 0 ? new Date(Math.min(...allDates.map(d => d.getTime()))) : new Date();
-  const overallEndDate = allDates.length > 0 ? new Date(Math.max(...allDates.map(d => d.getTime()))) : addDays(new Date(), 7);
-  let totalTimelineDays = Math.max(1, differenceInDays(overallEndDate, overallStartDate) || 1);
-  if (totalTimelineDays === 0) totalTimelineDays = 1;
-
-
-  return (
-    <Card className="shadow-lg mt-6">
-      <CardHeader>
-        <CardTitle>Task Timeline (Basic View)</CardTitle>
-        <CardDescription>A simplified visual representation of task durations. Updates with filters.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3 overflow-x-auto p-4">
-        <div className="relative min-w-[800px]" style={{ height: `${tasks.length * 40 + 50}px` }}>
-          <div className="flex justify-between text-xs text-muted-foreground border-b pb-1 mb-2">
-            <span>{format(overallStartDate, 'MMM dd, yyyy')}</span>
-            <span>Timeline Span: ~{totalTimelineDays} day{totalTimelineDays === 1 ? '' : 's'}</span>
-            <span>{format(overallEndDate, 'MMM dd, yyyy')}</span>
-          </div>
-
-          {tasks.map((task, index) => {
-            const taskStartDate = task.createdAt && isValid(parseISO(task.createdAt)) ? parseISO(task.createdAt) : overallStartDate;
-            const taskDueDate = task.dueDate && isValid(parseISO(task.dueDate)) ? parseISO(task.dueDate) : overallEndDate;
-
-            let startOffsetPercent = 0;
-            if (totalTimelineDays > 0) {
-              startOffsetPercent = (differenceInDays(taskStartDate, overallStartDate) / totalTimelineDays) * 100;
-            }
-
-            let durationDays = Math.max(1, differenceInDays(taskDueDate, taskStartDate));
-            if(taskStartDate > taskDueDate) durationDays = 0;
-
-            let durationPercent = 0;
-            if (totalTimelineDays > 0) {
-                 durationPercent = (durationDays / totalTimelineDays) * 100;
-            }
-
-            const { colorClass } = getStatusBadgeVariant(task.status);
-
-            return (
-              <div
-                key={task.id}
-                className={`absolute h-8 rounded flex items-center px-2 text-xs shadow-sm ${colorClass}`}
-                style={{
-                  top: `${index * 40 + 30}px`,
-                  left: `${Math.max(0, Math.min(100, startOffsetPercent))}%`,
-                  width: `${Math.max(2, Math.min(100 - startOffsetPercent, durationPercent))}%`,
-                  minWidth: '50px',
-                }}
-                title={`${task.title} (Status: ${task.status})`}
-              >
-                <span className="truncate text-white mix-blend-difference">{task.title}</span>
-              </div>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
-
-
 export default function EventTasksPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -158,20 +62,8 @@ export default function EventTasksPage() {
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [allEvents, setAllEvents] = useState<SubEvent[]>([]);
+  const [allStaff, setAllStaff] = useState<UserProfileData[]>([]);
   const [loadingData, setLoadingData] = useState(true);
-  const [isClient, setIsClient] = useState(false);
-  const [currentView, setCurrentView] = useState<TaskViewMode>('list');
-
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<TaskStatus | 'All'>('All');
-  const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'All'>('All');
-  const [assignedToFilterText, setAssignedToFilterText] = useState('');
-
-
-  const [activeDynamicFilters, setActiveDynamicFilters] = useState<ActiveTaskFilter[]>([]);
-  const [isAddFilterPopoverOpen, setIsAddFilterPopoverOpen] = useState(false);
-  const [newFilterColumn, setNewFilterColumn] = useState<{ id: string, name: string, isCustom?: boolean } | null>(null);
-  const [newFilterValue, setNewFilterValue] = useState('');
 
   const [isTaskFormDialogOpen, setIsTaskFormDialogOpen] = useState(false);
   const [currentTaskForm, setCurrentTaskForm] = useState<any>(defaultTaskFormState);
@@ -180,10 +72,7 @@ export default function EventTasksPage() {
   const [isDeleteConfirmDialogOpen, setIsDeleteConfirmDialogOpen] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
 
-  const [sortConfig, setSortConfig] = useState<{ key: SortableTaskFields | null; direction: SortDirection }>({ key: 'dueDate', direction: 'asc' });
-
   useEffect(() => {
-    setIsClient(true);
     if (!authLoading && !userProfile) {
       router.push('/login?redirect=/organizer/event-tasks');
       return;
@@ -193,76 +82,63 @@ export default function EventTasksPage() {
   useEffect(() => {
     if (!userProfile) return;
 
-    setLoadingData(true);
     let unsubscribe: Unsubscribe | null = null;
-
-    const fetchEvents = async () => {
+    
+    const setupListeners = async () => {
+        setLoadingData(true);
+        
+        // Fetch Events for dropdown
         const eventsQuery = query(collection(db, 'subEvents'));
         const eventsSnapshot = await getDocs(eventsQuery);
         const eventsList = eventsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SubEvent));
         setAllEvents(eventsList);
-    };
+        
+        // Fetch Staff for assignment dropdown
+        const staffRoles = ['organizer', 'event_representative', 'overall_head', 'admin'];
+        const staffQuery = query(collection(db, 'users'), where('role', 'in', staffRoles));
+        const staffSnapshot = await getDocs(staffQuery);
+        const staffList = staffSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfileData));
+        setAllStaff(staffList);
 
-    const setupListener = async () => {
-      await fetchEvents();
-      
-      const canAccess = userProfile.role === 'event_representative' || userProfile.role === 'overall_head' || userProfile.role === 'admin' || userProfile.role === 'organizer' || userProfile.role === 'test';
-      if (!canAccess) {
-        toast({ title: "Access Denied", description: "You don't have permission to view this page.", variant: "destructive" });
-        router.push('/dashboard');
-        setLoadingData(false);
-        return;
-      }
-  
-      let tasksQuery;
-      if (userProfile.role === 'overall_head' || userProfile.role === 'admin') {
-        tasksQuery = query(collection(db, 'tasks'));
-      } else if (userProfile.displayName) {
-        tasksQuery = query(collection(db, 'tasks'), where('assignedTo', 'array-contains', userProfile.displayName));
-      } 
+        // Setup Task listener
+        let tasksQuery;
+        if (userProfile.role === 'admin' || userProfile.role === 'overall_head') {
+            tasksQuery = query(collection(db, 'tasks'));
+        } else if (userProfile.role === 'event_representative' && userProfile.assignedEventUids) {
+            tasksQuery = query(collection(db, 'tasks'), where('subEventId', 'in', userProfile.assignedEventUids));
+        } else {
+            tasksQuery = query(collection(db, 'tasks'), where('assignedToUserIds', 'array-contains', userProfile.uid));
+        }
 
-      if (tasksQuery) {
         unsubscribe = onSnapshot(tasksQuery, (snapshot) => {
-          const tasksList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
-          setTasks(tasksList);
-          setLoadingData(false);
+            const tasksList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
+            setTasks(tasksList);
+            setLoadingData(false);
         }, (error) => {
-          console.error("Error fetching tasks:", error);
-          toast({ title: "Error", description: "Could not fetch tasks.", variant: "destructive" });
-          setLoadingData(false);
+            console.error("Error fetching tasks:", error);
+            toast({ title: "Error", description: "Could not fetch tasks.", variant: "destructive" });
+            setLoadingData(false);
         });
-      } else {
-        setTasks([]);
-        setLoadingData(false);
-      }
-    };
-    
-    setupListener();
-    
+    }
+
+    setupListeners();
+
     return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
+      if (unsubscribe) unsubscribe();
     };
-  }, [userProfile, router, toast]);
+  }, [userProfile, toast]);
 
   const handleTaskFormSubmit = async () => {
-    if (!currentTaskForm.title || !currentTaskForm.dueDate) {
-      toast({ title: "Missing Information", description: "Task Title and Due Date are required.", variant: "destructive" });
+    if (!currentTaskForm.title || !currentTaskForm.dueDate || currentTaskForm.assignedToUserIds.length === 0) {
+      toast({ title: "Missing Information", description: "Title, Due Date, and at least one Assignee are required.", variant: "destructive" });
       return;
     }
   
-    const taskDataToSave = {
-      title: currentTaskForm.title,
-      description: currentTaskForm.description,
-      assignedTo: currentTaskForm.assignedTo,
+    const taskDataToSave: Partial<Task> = {
+      ...currentTaskForm,
+      assignedByUserId: userProfile?.uid,
       dueDate: currentTaskForm.dueDate.toISOString(),
-      priority: currentTaskForm.priority,
-      status: currentTaskForm.status,
-      points: currentTaskForm.points || 0,
-      eventSlug: currentTaskForm.eventSlug,
-      createdBy: userProfile?.displayName,
-      updatedAt: new Date().toISOString(),
+      updatedAt: serverTimestamp() as any,
     };
   
     try {
@@ -273,17 +149,60 @@ export default function EventTasksPage() {
       } else {
         await addDoc(collection(db, 'tasks'), {
           ...taskDataToSave,
-          createdAt: new Date().toISOString(),
+          createdAt: serverTimestamp(),
+          status: 'Not Started',
         });
         toast({ title: "Task Created", description: `Task "${currentTaskForm.title}" has been added.` });
       }
       setIsTaskFormDialogOpen(false);
-      setCurrentTaskForm(defaultTaskFormState);
-      setEditingTaskId(null);
     } catch (error) {
       console.error("Error saving task:", error);
       toast({ title: "Save Failed", description: "Could not save the task.", variant: "destructive" });
     }
+  };
+
+  const handleMarkTaskComplete = async (task: Task) => {
+      if (!userProfile) return;
+
+      const taskRef = doc(db, "tasks", task.id);
+      const assignerRef = task.assignedByUserId ? doc(db, "users", task.assignedByUserId) : null;
+      
+      try {
+        await runTransaction(db, async (transaction) => {
+          const taskDoc = await transaction.get(taskRef);
+          if (!taskDoc.exists() || taskDoc.data().status === 'Completed') {
+              throw new Error("Task is already completed or does not exist.");
+          }
+
+          transaction.update(taskRef, {
+              status: 'Completed',
+              completedByUserId: userProfile.uid,
+              completedAt: serverTimestamp()
+          });
+
+          // Update scores for assignees
+          for (const assigneeId of task.assignedToUserIds) {
+              const assigneeRef = doc(db, "users", assigneeId);
+              transaction.update(assigneeRef, {
+                  credibilityScore: serverTimestamp.increment(task.pointsOnCompletion || 10)
+              });
+          }
+
+          // Update score for assigner
+          if (assignerRef) {
+              const assignerDoc = await transaction.get(assignerRef);
+              if (assignerDoc.exists()) {
+                  transaction.update(assignerRef, {
+                      credibilityScore: serverTimestamp.increment(2) // Award 2 points for delegation
+                  });
+              }
+          }
+        });
+        toast({ title: "Task Completed", description: `Credibility scores have been updated.` });
+      } catch (e) {
+        console.error("Transaction failed: ", e);
+        toast({ title: "Error", description: "Failed to update task and scores.", variant: "destructive" });
+      }
   };
 
   const openEditTaskDialog = (task: Task) => {
@@ -310,54 +229,23 @@ export default function EventTasksPage() {
     }
   };
 
-  const toggleTaskStatus = async (taskId: string, currentStatus: TaskStatus) => {
-    const newStatus = currentStatus === 'Completed' ? 'In Progress' : 'Completed';
-    try {
-        await updateDoc(doc(db, 'tasks', taskId), { status: newStatus, updatedAt: new Date().toISOString() });
-    } catch (error) {
-        console.error("Error updating task status:", error);
-        toast({ title: "Update Failed", variant: "destructive" });
+  const openCreateTaskDialog = () => {
+    setEditingTaskId(null);
+    const defaults = { ...defaultTaskFormState };
+    if (userProfile?.role === 'organizer') {
+      defaults.assignedToUserIds = [userProfile.uid];
     }
+    setCurrentTaskForm(defaults);
+    setIsTaskFormDialogOpen(true);
   };
-
-
-  const priorityOrder: Record<TaskPriority, number> = { 'High': 1, 'Medium': 2, 'Low': 3 };
-  const statusOrder: Record<TaskStatus, number> = { 'Not Started': 1, 'In Progress': 2, 'Pending Review': 3, 'Completed': 4 };
-
-
-  const filteredAndSortedTasks = useMemo(() => {
-    let sortableTasks = [...tasks];
-
-    sortableTasks = sortableTasks.filter(task => {
-      const searchTermLower = searchTerm.toLowerCase();
-      const matchesSearch = searchTermLower === '' ||
-        task.title.toLowerCase().includes(searchTermLower) ||
-        (task.description && task.description.toLowerCase().includes(searchTermLower));
-      
-      const matchesStatus = statusFilter === 'All' || task.status === statusFilter;
-      const matchesPriority = priorityFilter === 'All' || task.priority === priorityFilter;
-
-      return matchesSearch && matchesStatus && matchesPriority;
-    });
-
-
-    // Sorting logic remains the same
-    return sortableTasks;
-  }, [tasks, searchTerm, statusFilter, priorityFilter, sortConfig]);
-
-
-  if (authLoading || loadingData || !userProfile || !isClient) {
-    return (
-      <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-      </div>
-    );
-  }
 
   const getEventTitleBySlug = (slug?: string) => {
-    if (!slug) return 'General';
-    return allEvents.find(e => e.slug === slug)?.title || slug;
+    if (!slug || slug === 'general') return 'General';
+    return allEvents.find(e => e.id === slug)?.title || slug;
   };
+  
+  const canEditPoints = userProfile?.role === 'admin' || userProfile?.role === 'overall_head' || userProfile?.role === 'event_representative';
+  const canSelfAssignOnly = userProfile?.role === 'organizer';
 
   return (
     <div className="space-y-6 animate-fade-in-up">
@@ -369,17 +257,20 @@ export default function EventTasksPage() {
             </CardTitle>
             <CardDescription>Manage, assign, and track tasks for your event(s).</CardDescription>
           </div>
-           <Button className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-soft" onClick={() => { setEditingTaskId(null); setCurrentTaskForm(defaultTaskFormState); setIsTaskFormDialogOpen(true); }}>
+           <Button className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-soft" onClick={openCreateTaskDialog}>
                 <PlusCircle className="mr-2 h-5 w-5" /> Add New Task
             </Button>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto rounded-md border">
+          {loadingData ? (
+             <div className="flex justify-center items-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+          ) : (
+            <div className="overflow-x-auto rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead></TableHead>
                     <TableHead>Title</TableHead>
+                    <TableHead>Assigned To</TableHead>
                     <TableHead>Event</TableHead>
                     <TableHead>Due Date</TableHead>
                     <TableHead>Priority</TableHead>
@@ -388,91 +279,97 @@ export default function EventTasksPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredAndSortedTasks.map((task) => (
+                  {tasks.map((task) => (
                     <TableRow key={task.id}>
-                      <TableCell>
-                        <Checkbox checked={task.status === 'Completed'} onCheckedChange={() => toggleTaskStatus(task.id, task.status)} />
-                      </TableCell>
-                      <TableCell>{task.title}</TableCell>
-                      <TableCell>{getEventTitleBySlug(task.eventSlug)}</TableCell>
+                      <TableCell className="font-medium">{task.title}</TableCell>
+                      <TableCell>{task.assignedToUserIds?.map(uid => allStaff.find(s => s.uid === uid)?.fullName || 'N/A').join(', ')}</TableCell>
+                      <TableCell>{getEventTitleBySlug(task.subEventId)}</TableCell>
                       <TableCell>{task.dueDate ? format(parseISO(task.dueDate), 'MMM dd, yyyy') : 'N/A'}</TableCell>
                       <TableCell><Badge variant={getPriorityBadgeVariant(task.priority)}>{task.priority}</Badge></TableCell>
                       <TableCell><Badge className={getStatusBadgeVariant(task.status).colorClass}>{task.status}</Badge></TableCell>
-                      <TableCell>
+                      <TableCell className="space-x-1">
                         <Button variant="ghost" size="icon" onClick={() => openEditTaskDialog(task)}><Edit2 className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => {setTaskToDelete(task); setIsDeleteConfirmDialogOpen(true);}}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        {(userProfile?.role === 'admin' || userProfile?.role === 'overall_head') && 
+                            <Button variant="ghost" size="icon" onClick={() => {setTaskToDelete(task); setIsDeleteConfirmDialogOpen(true);}}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        }
+                        {task.status !== 'Completed' && (userProfile?.role === 'admin' || userProfile?.role === 'overall_head' || userProfile?.role === 'event_representative') && (
+                          <Button size="sm" onClick={() => handleMarkTaskComplete(task)}>Mark Complete</Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </div>
+          )}
         </CardContent>
       </Card>
       
       <Dialog open={isTaskFormDialogOpen} onOpenChange={(isOpen) => {
+            if (!isOpen) { setEditingTaskId(null); }
             setIsTaskFormDialogOpen(isOpen);
-            if (!isOpen) {
-                setEditingTaskId(null);
-                setCurrentTaskForm(defaultTaskFormState);
-            }
         }}>
-            <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-                <DialogTitle>{editingTaskId ? 'Edit Task' : 'Create New Task'}</DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-                <Input placeholder="Title" value={currentTaskForm.title} onChange={e => setCurrentTaskForm({ ...currentTaskForm, title: e.target.value })} />
-                <Textarea placeholder="Description" value={currentTaskForm.description} onChange={e => setCurrentTaskForm({ ...currentTaskForm, description: e.target.value })} />
-                <Popover>
-                    <PopoverTrigger asChild>
-                    <Button variant="outline" className={`justify-start text-left font-normal ${!currentTaskForm.dueDate && "text-muted-foreground"}`}>
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {currentTaskForm.dueDate ? format(currentTaskForm.dueDate, "PPP") : <span>Pick a due date</span>}
-                    </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar mode="single" selected={currentTaskForm.dueDate} onSelect={date => setCurrentTaskForm({ ...currentTaskForm, dueDate: date })} initialFocus />
-                    </PopoverContent>
-                </Popover>
-                <Select value={currentTaskForm.priority} onValueChange={v => setCurrentTaskForm({...currentTaskForm, priority: v})}>
-                    <SelectTrigger><SelectValue placeholder="Priority"/></SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="High">High</SelectItem>
-                        <SelectItem value="Medium">Medium</SelectItem>
-                        <SelectItem value="Low">Low</SelectItem>
-                    </SelectContent>
-                </Select>
-                 <Select value={currentTaskForm.eventSlug} onValueChange={v => setCurrentTaskForm({...currentTaskForm, eventSlug: v})}>
-                    <SelectTrigger><SelectValue placeholder="Assign to Event"/></SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="general">General</SelectItem>
-                        {allEvents.map(e => <SelectItem key={e.id} value={e.slug}>{e.title}</SelectItem>)}
-                    </SelectContent>
-                </Select>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader><DialogTitle>{editingTaskId ? 'Edit Task' : 'Create New Task'}</DialogTitle></DialogHeader>
+          <div className="grid gap-4 py-4">
+              <Input placeholder="Title" value={currentTaskForm.title} onChange={e => setCurrentTaskForm({ ...currentTaskForm, title: e.target.value })} />
+              <Textarea placeholder="Description" value={currentTaskForm.description} onChange={e => setCurrentTaskForm({ ...currentTaskForm, description: e.target.value })} />
+              <Popover>
+                  <PopoverTrigger asChild>
+                  <Button variant="outline" className={`justify-start text-left font-normal ${!currentTaskForm.dueDate && "text-muted-foreground"}`}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {currentTaskForm.dueDate ? format(currentTaskForm.dueDate, "PPP") : <span>Pick a due date</span>}
+                  </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar mode="single" selected={currentTaskForm.dueDate} onSelect={date => setCurrentTaskForm({ ...currentTaskForm, dueDate: date })} initialFocus />
+                  </PopoverContent>
+              </Popover>
+              <Select value={currentTaskForm.priority} onValueChange={v => setCurrentTaskForm({...currentTaskForm, priority: v})}>
+                  <SelectTrigger><SelectValue placeholder="Priority"/></SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="High">High</SelectItem>
+                      <SelectItem value="Medium">Medium</SelectItem>
+                      <SelectItem value="Low">Low</SelectItem>
+                  </SelectContent>
+              </Select>
+              <Select value={currentTaskForm.subEventId} onValueChange={v => setCurrentTaskForm({...currentTaskForm, subEventId: v})}>
+                  <SelectTrigger><SelectValue placeholder="Assign to Event"/></SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="general">General</SelectItem>
+                      {allEvents.map(e => <SelectItem key={e.id} value={e.id}>{e.title}</SelectItem>)}
+                  </SelectContent>
+              </Select>
+              <div>
+                <Label>Assign To</Label>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="outline" className="justify-between">
-                            {currentTaskForm.assignedTo.length > 0 ? `${currentTaskForm.assignedTo.length} users selected` : "Select Assignees"}
+                        <Button variant="outline" className="w-full justify-between" disabled={canSelfAssignOnly}>
+                            {currentTaskForm.assignedToUserIds.length > 0 ? `${currentTaskForm.assignedToUserIds.length} users selected` : "Select Assignees"}
                             <ChevronDown className="ml-2 h-4 w-4 opacity-50"/>
                         </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                        {mockAssignableUsersForEvent.map(user => (
-                        <DropdownMenuCheckboxItem key={user} checked={currentTaskForm.assignedTo.includes(user)} onCheckedChange={checked => {
-                            const newAssigned = checked ? [...currentTaskForm.assignedTo, user] : currentTaskForm.assignedTo.filter((u:string) => u !== user);
-                            setCurrentTaskForm({...currentTaskForm, assignedTo: newAssigned});
-                        }}>{user}</DropdownMenuCheckboxItem>
+                    <DropdownMenuContent className="w-full">
+                        {allStaff.map(user => (
+                        <DropdownMenuCheckboxItem key={user.uid} checked={currentTaskForm.assignedToUserIds.includes(user.uid)} onCheckedChange={checked => {
+                            const newAssigned = checked ? [...currentTaskForm.assignedToUserIds, user.uid] : currentTaskForm.assignedToUserIds.filter((uid:string) => uid !== user.uid);
+                            setCurrentTaskForm({...currentTaskForm, assignedToUserIds: newAssigned});
+                        }}>{user.fullName} ({user.role})</DropdownMenuCheckboxItem>
                         ))}
                     </DropdownMenuContent>
                 </DropdownMenu>
+              </div>
+              <div>
+                <Label htmlFor="points">Points on Completion</Label>
+                <Input id="points" type="number" value={currentTaskForm.pointsOnCompletion} onChange={e => setCurrentTaskForm({...currentTaskForm, pointsOnCompletion: Number(e.target.value)})} disabled={!canEditPoints} />
+              </div>
 
-            </div>
-            <DialogFooter>
-                <Button onClick={handleTaskFormSubmit}>Save Task</Button>
-            </DialogFooter>
-            </DialogContent>
-        </Dialog>
+          </div>
+          <DialogFooter>
+            <Button onClick={handleTaskFormSubmit}>Save Task</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       
       <AlertDialog open={isDeleteConfirmDialogOpen} onOpenChange={setIsDeleteConfirmDialogOpen}>
         <AlertDialogContent>

@@ -20,33 +20,23 @@ export interface Task {
   id: string;
   title: string;
   description?: string;
-  assignedTo?: string[]; // Names for display
-  assignedToUid?: string; // UID for assignment
-  assignedByName?: string;
-  assignedByUid?: string;
+  assignedToUserIds: string[]; // UIDs of assigned users
+  assignedTo?: string[]; // Kept for display names if needed, but logic should use UIDs
+  assignedByUserId?: string; // UID of the user who assigned the task
   eventSlug?: string;
-  eventId?: string;
+  subEventId?: string; // Explicit link to event
   dueDate?: string; // ISO Date string
   priority: TaskPriority;
   status: TaskStatus;
-  points?: number;
+  pointsOnCompletion?: number; // Points awarded for completion
+  completedByUserId?: string | null; // UID of user who marked it complete
+  completedAt?: string | null; // ISO Date string
   attachments?: { name: string, url: string }[];
   subtasks?: { text: string, completed: boolean }[];
   createdBy?: string; // UID of creator
   createdAt: string; // ISO Date string
   updatedAt: string; // ISO Date string
-  completedAt?: string; // ISO Date string for when task was completed
   customTaskData?: Record<string, any>;
-}
-
-export interface RegisteredEventInfo { 
-  eventSlug: string;
-  teamName?: string;
-  teamMembers?: { id: string, name: string, role?: string }[];
-  admitCardStatus?: 'published' | 'pending' | 'unavailable';
-  eventDate?: string;
-  registrationDate?: string;
-  paymentStatus?: 'paid' | 'pending' | 'waived' | 'failed';
 }
 
 export interface UserProfileData {
@@ -64,15 +54,14 @@ export interface UserProfileData {
   role: UserRole;
   photoURL?: string | null;
   department?: string | null; 
-  assignedEventSlug?: string;
-  assignedEventSlugs?: string[];
+  assignedEventUids?: string[]; // For Event Reps/Overall Heads
+  studentDataEventAccess?: Record<string, boolean>; // For Organizers
+  credibilityScore: number;
+  points: number; // Legacy, may be merged with credibilityScore or used for gamification
   subEventsManaged?: string[];
   phoneNumbers?: string[];
   additionalNumber?: string | null;
   tasks?: Task[];
-  points?: number;
-  credibilityScore?: number;
-  allPlatformParticipants?: EventParticipant[];
   createdAt?: any; 
   updatedAt?: any; 
   registeredEventIds?: string[]; 
@@ -95,8 +84,8 @@ export interface SubEvent {
   isTeamBased: boolean;
   minTeamMembers?: number;
   maxTeamMembers?: number;
-  eventReps?: string[]; 
-  organizerUids?: string[];
+  eventReps: string[]; // UIDs of Event Representatives
+  organizerUids: string[]; // UIDs of Organizers
   status?: EventStatus;
   venue?: string;
   registeredParticipantCount?: number;
@@ -138,28 +127,6 @@ export interface CustomColumnDefinition {
   description?: string;
 }
 
-export interface CustomTaskColumnDefinition extends CustomColumnDefinition {}
-
-export type ParticipantCustomData = Record<string, any> & {
-  levels?: Record<string, {
-    present: boolean;
-    venue?: string;
-    qualified: 'yes' | 'no' | 'auto';
-  }>;
-};
-
-export interface EventParticipant {
-  id: string; // user UID
-  name: string;
-  email: string;
-  contactNumber?: string;
-  schoolName?: string;
-  registrationDate: string; // ISO Date string
-  paymentStatus: 'paid' | 'pending' | 'waived' | 'failed';
-  customData?: ParticipantCustomData;
-  registeredEventSlugs?: string[];
-}
-
 export interface ActiveDynamicFilter {
   id: string;
   columnId: string;
@@ -168,18 +135,16 @@ export interface ActiveDynamicFilter {
   isCustom: boolean;
 }
 
-export interface ActiveTaskFilter extends ActiveDynamicFilter {}
-
-export interface SchoolData {
-  id: string;
-  name: string;
-  city?: string;
-  state?: string;
-  country?: string;
-  isVerified: boolean;
-  addedBy?: string;
-  createdAt?: string;
+export interface UserColumnPreference {
+    id?: string;
+    userId: string | null;
+    subEventId: string | null;
+    dashboardArea: 'studentList' | 'taskList' | 'eventDetails' | 'userList';
+    columnsVisible: string[];
+    filtersApplied: Record<string, any>; // or stringified JSON
+    isSharedAcrossEvent: boolean;
 }
+
 
 // For Firestore event_registrations collection
 export type EventRegistration = {

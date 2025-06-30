@@ -23,23 +23,21 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Calendar } from '@/components/ui/calendar';
 import { auth, db, storage } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, getDoc, updateDoc, serverTimestamp, addDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, updateDoc, serverTimestamp, addDoc, deleteDoc, runTransaction, orderBy, limit } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 import dynamic from 'next/dynamic';
 
-
 import { format, isToday, isPast, isThisWeek, startOfDay, parseISO, isValid } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import {
-  Loader2, BarChartBig, Edit, Users, FileScan, Settings, BookUser, ListChecks, CalendarDays, UserCircle, Bell, GraduationCap, School, Download, Info, Briefcase, Newspaper, Award, Star, CheckCircle, ClipboardList, TrendingUp, Building, Activity, ShieldCheck, ExternalLink, Home, Search, CalendarCheck, Ticket, Users2, Phone, Mail, Milestone, MapPin, Clock, UsersRound, CheckSquare, BarChartHorizontalBig, Rss, AlertTriangle, Filter as FilterIcon, PlusCircle, GanttChartSquare, Rows, Tag, X as XIcon, Pencil, Trash2, CalendarRange, LayoutDashboard, CalendarIcon, UploadCloud, Image as ImageIcon, Trash
+  Loader2, BarChartBig, Edit, Users, FileScan, Settings, BookUser, ListChecks, CalendarDays, UserCircle, Bell, GraduationCap, School, Download, Info, Briefcase, Newspaper, Award, Star, CheckCircle, ClipboardList, TrendingUp, Building, Activity, ShieldCheck, ExternalLink, Home, Search, CalendarCheck, Ticket, Users2, Phone, Mail, Milestone, MapPin, Clock, UsersRound, CheckSquare, BarChartHorizontalBig, Rss, AlertTriangle, Filter as FilterIcon, PlusCircle, GanttChartSquare, Rows, Tag, X as XIcon, Pencil, Trash2, CalendarRange, LayoutDashboard, CalendarIcon, UploadCloud, Image as ImageIcon, Trash, Trophy
 } from 'lucide-react';
 
 
 const ReactQuill = dynamic(() => import('react-quill'), { ssr: false });
 
-
-const defaultEventFormState: Omit<SubEvent, 'id' | 'slug' | 'mainImage' | 'organizerUids'> & { mainImageSrc: string; mainImageAlt: string; mainImageAiHint: string; eventReps: string; organizers_str: string } = {
+const defaultEventFormState: Omit<SubEvent, 'id' | 'slug' | 'mainImage' | 'organizerUids' | 'eventReps'> & { mainImageSrc: string; mainImageAlt: string; mainImageAiHint: string; organizers_str: string; eventReps_str: string } = {
   title: '',
   superpowerCategory: 'The Thinker',
   shortDescription: '',
@@ -55,7 +53,7 @@ const defaultEventFormState: Omit<SubEvent, 'id' | 'slug' | 'mainImage' | 'organ
   maxTeamMembers: 1,
   status: 'Planning',
   venue: '',
-  eventReps: '',
+  eventReps_str: '',
   registeredParticipantCount: 0,
   organizers_str: '',
   galleryImages: [],
@@ -88,6 +86,71 @@ const getEventStatusBadgeVariant = (status: EventStatus | undefined): "default" 
     }
 };
 
+const Leaderboard = () => {
+  const [leaderboard, setLeaderboard] = useState<UserProfileData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      setLoading(true);
+      try {
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('role', 'in', ['organizer', 'event_representative', 'overall_head', 'admin']), orderBy('credibilityScore', 'desc'), limit(10));
+        const querySnapshot = await getDocs(q);
+        const leaders = querySnapshot.docs.map(doc => doc.data() as UserProfileData);
+        setLeaderboard(leaders);
+      } catch (error) {
+        console.error("Error fetching leaderboard data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchLeaderboard();
+  }, []);
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader><CardTitle>Leaderboard</CardTitle></CardHeader>
+        <CardContent className="flex justify-center items-center p-6">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="shadow-md-soft rounded-xl">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-2xl text-primary"><Trophy className="h-7 w-7"/>Credibility Leaderboard</CardTitle>
+        <CardDescription>Top performing staff members based on task completions and responsibilities.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Rank</TableHead>
+              <TableHead>Name</TableHead>
+              <TableHead>Role</TableHead>
+              <TableHead className="text-right">Score</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {leaderboard.map((user, index) => (
+              <TableRow key={user.uid}>
+                <TableCell className="font-bold">#{index + 1}</TableCell>
+                <TableCell>{user.fullName || user.displayName}</TableCell>
+                <TableCell className="capitalize">{user.role?.replace('_', ' ')}</TableCell>
+                <TableCell className="text-right font-semibold text-accent">{user.credibilityScore}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+};
+
 
 export default function DashboardPage() {
   const { authUser, userProfile, setUserProfile, loading } = useAuth();
@@ -103,32 +166,8 @@ export default function DashboardPage() {
   const [isLeavingTeam, setIsLeavingTeam] = useState(false);
   const [selectedEventForLeave, setSelectedEventForLeave] = useState<StudentRegisteredEventDisplay | null>(null);
 
-
   const [allUsers, setAllUsers] = useState<UserProfileData[]>([]);
-  const [globalSearchTerm, setGlobalSearchTerm] = useState('');
-  const [globalSchoolFilter, setGlobalSchoolFilter] = useState('all');
-  const [globalPaymentStatusFilter, setGlobalPaymentStatusFilter] = useState('all'); // This will be mock for now
-  const [globalEventFilter, setGlobalEventFilter] = useState('all');
-  
-  const [globalCustomColumnDefinitions, setGlobalCustomColumnDefinitions] = useState<CustomColumnDefinition[]>([]);
-  const [isAddGlobalCustomColumnDialogOpen, setIsAddGlobalCustomColumnDialogOpen] = useState(false);
-  const [newGlobalCustomColumnForm, setNewGlobalCustomColumnForm] = useState<{ name: string; dataType: CustomColumnDefinition['dataType']; options: string; defaultValue: string; description: string;}>({ name: '', dataType: 'text', options: '', defaultValue: '', description: '' });
-  const [editingGlobalCustomCell, setEditingGlobalCustomCell] = useState<{ participantId: string; columnId: string } | null>(null);
-  
-  const [activeGlobalDynamicFilters, setActiveGlobalDynamicFilters] = useState<ActiveDynamicFilter[]>([]);
-  const [isAddGlobalFilterPopoverOpen, setIsAddGlobalFilterPopoverOpen] = useState(false);
-  const [newGlobalFilterColumn, setNewGlobalFilterColumn] = useState<{ id: string, name: string, isCustom: boolean } | null>(null);
-  const [newGlobalFilterValue, setNewGlobalFilterValue] = useState('');
-
   const [allPlatformEvents, setAllPlatformEvents] = useState<SubEvent[]>([]); 
-  const [eventSearchTerm, setEventSearchTerm] = useState('');
-  const [eventStatusFilter, setEventStatusFilter] = useState<EventStatus | 'all'>('all');
-  const [eventCategoryFilter, setEventCategoryFilter] = useState('all');
-  
-  const [activeEventDynamicFilters, setActiveEventDynamicFilters] = useState<ActiveDynamicFilter[]>([]);
-  const [isAddEventFilterPopoverOpen, setIsAddEventFilterPopoverOpen] = useState(false);
-  const [newEventFilterColumn, setNewEventFilterColumn] = useState<{ id: string, name: string, isCustom: boolean } | null>(null);
-  const [newEventFilterValue, setNewEventFilterValue] = useState('');
   
   const [isEventFormDialogOpen, setIsEventFormDialogOpen] = useState(false);
   const [currentEventForm, setCurrentEventForm] = useState(defaultEventFormState);
@@ -142,14 +181,6 @@ export default function DashboardPage() {
   const [isDeleteEventConfirmOpen, setIsDeleteEventConfirmOpen] = useState(false);
   const [eventToDelete, setEventToDelete] = useState<SubEvent | null>(null);
 
-  // New state for custom columns for events
-  const [eventCustomColumnDefinitions, setEventCustomColumnDefinitions] = useState<CustomColumnDefinition[]>([]);
-  const [isAddEventCustomColumnDialogOpen, setIsAddEventCustomColumnDialogOpen] = useState(false);
-  const [newEventCustomColumnForm, setNewEventCustomColumnForm] = useState<{ name: string; dataType: CustomColumnDefinition['dataType']; options: string; defaultValue: string; description: string;}>({ name: '', dataType: 'text', options: '', defaultValue: '', description: '' });
-  const [editingEventCustomCell, setEditingEventCustomCell] = useState<{ eventId: string; columnId: string } | null>(null);
-
-
-
   useEffect(() => {
     if (!loading && !authUser) {
       router.push('/login?redirect=/dashboard');
@@ -157,9 +188,9 @@ export default function DashboardPage() {
   }, [authUser, loading, router]);
 
 
-  // Fetch all data needed for admin/overall head views
+  // Fetch data needed for admin/overall head/rep views
   useEffect(() => {
-    if (userProfile && (userProfile.role === 'admin' || userProfile.role === 'overall_head')) {
+    if (userProfile && (userProfile.role !== 'student')) {
       const fetchAdminData = async () => {
         // Fetch all events
         const eventsQuery = query(collection(db, 'subEvents'));
@@ -167,7 +198,7 @@ export default function DashboardPage() {
         const eventsList = eventsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SubEvent));
         setAllPlatformEvents(eventsList);
 
-        // Fetch all users
+        // Fetch all users (for assignment dropdowns etc)
         const usersQuery = query(collection(db, 'users'));
         const usersSnapshot = await getDocs(usersQuery);
         const usersList = usersSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfileData));
@@ -182,8 +213,8 @@ export default function DashboardPage() {
     if (authUser && userProfile) {
       // Fetch tasks assigned to the current user
       const fetchMyTasks = async () => {
-        if (userProfile.displayName) {
-          const tasksQuery = query(collection(db, 'tasks'), where('assignedTo', 'array-contains', userProfile.displayName));
+        if (userProfile.uid) {
+          const tasksQuery = query(collection(db, 'tasks'), where('assignedToUserIds', 'array-contains', userProfile.uid));
           const tasksSnapshot = await getDocs(tasksQuery);
           const tasksList = tasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
           setTasks(tasksList);
@@ -191,7 +222,8 @@ export default function DashboardPage() {
           setTasks([]);
         }
       };
-      fetchMyTasks();
+      
+      if(userProfile.role !== 'student') fetchMyTasks();
 
       // Fetch student-specific registration data
       if (userProfile.role === 'student' || userProfile.role === 'test') {
@@ -309,21 +341,20 @@ export default function DashboardPage() {
          throw new Error("You are not a member of this team.");
       }
       
-      // Perform updates
-      await updateDoc(teamRef, {
-        memberUids: newMemberUids,
-        teamSize: newMemberUids.length,
-        updatedAt: serverTimestamp(),
-      });
-
-      await updateDoc(registrationRef, {
-        registrationStatus: 'cancelled',
-        lastUpdatedAt: serverTimestamp(),
+      await runTransaction(db, async (transaction) => {
+        transaction.update(teamRef, {
+            memberUids: newMemberUids,
+            teamSize: newMemberUids.length,
+            updatedAt: serverTimestamp(),
+        });
+        transaction.update(registrationRef, {
+            registrationStatus: 'cancelled',
+            lastUpdatedAt: serverTimestamp(),
+        });
       });
 
       toast({ title: "Success", description: "You have left the team. Your registration for this event is now cancelled." });
 
-      // Refresh UI by removing the event from the local state
       setStudentRegisteredFullEvents(prev => prev.filter(event => event.registrationId !== registrationId));
       
     } catch (error: any) {
@@ -335,27 +366,6 @@ export default function DashboardPage() {
       setSelectedEventForLeave(null);
     }
   };
-
-  const tasksDueToday = tasks.filter(task => task.dueDate && isValid(parseISO(task.dueDate)) && isToday(parseISO(task.dueDate)) && task.status !== 'Completed').length;
-  const overdueTasks = tasks.filter(task => task.dueDate && isValid(parseISO(task.dueDate)) && isPast(parseISO(task.dueDate)) && !isToday(parseISO(task.dueDate)) && task.status !== 'Completed').length;
-  const tasksThisWeek = tasks.filter(task => task.dueDate && isValid(parseISO(task.dueDate)) && isThisWeek(parseISO(task.dueDate), { weekStartsOn: 1 }) && task.status !== 'Completed').length;
-
-  const allStudents = useMemo(() => allUsers.filter(u => u.role === 'student'), [allUsers]);
-
-  const uniqueGlobalSchoolNames = useMemo(() => {
-    const schools = new Set(allStudents.map(p => p.schoolName).filter(Boolean) as string[]);
-    return ['all', ...Array.from(schools)];
-  }, [allStudents]);
-
-  const allEventTitles = useMemo(() => {
-     return [{slug: 'all', title: 'All Events'}, ...allPlatformEvents.map(event => ({slug: event.slug, title: event.title}))];
-  }, [allPlatformEvents]);
-
-
-  const filteredGlobalParticipants = useMemo(() => {
-    return allStudents; // Add filtering logic here later
-  }, [allStudents]);
-
   
   const handleImageFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -434,7 +444,7 @@ export default function DashboardPage() {
             maxTeamMembers: Number(currentEventForm.maxTeamMembers),
             status: currentEventForm.status,
             venue: currentEventForm.venue,
-            eventReps: currentEventForm.eventReps.split(',').map(s => s.trim()).filter(Boolean),
+            eventReps: currentEventForm.eventReps_str.split(',').map(s => s.trim()).filter(Boolean),
             organizerUids: currentEventForm.organizers_str.split(',').map(s => s.trim()).filter(Boolean),
             registeredParticipantCount: currentEventForm.registeredParticipantCount || 0,
             customData: currentEventForm.customData || {},
@@ -443,7 +453,7 @@ export default function DashboardPage() {
         if (editingEventId) {
           const eventRef = doc(db, "subEvents", editingEventId);
           await updateDoc(eventRef, { ...eventDataToSave, slug });
-          setAllPlatformEvents(prev => prev.map(event => event.id === editingEventId ? { ...event, ...eventDataToSave, slug, id: editingEventId } : event));
+          setAllPlatformEvents(prev => prev.map(event => event.id === editingEventId ? { ...event, ...eventDataToSave, slug, id: editingEventId } as SubEvent : event));
           toast({ title: "Event Updated", description: `Event "${eventDataToSave.title}" has been updated.`});
         } else {
           const docRef = await addDoc(collection(db, "subEvents"), { ...eventDataToSave, slug });
@@ -488,7 +498,7 @@ export default function DashboardPage() {
         mainImageAlt: event.mainImage.alt,
         mainImageAiHint: event.mainImage.dataAiHint,
         organizers_str: (event.organizerUids || []).join(', '),
-        eventReps: (event.eventReps || []).join(', '),
+        eventReps_str: (event.eventReps || []).join(', '),
     });
     setIsEventFormDialogOpen(true);
   };
@@ -721,7 +731,14 @@ export default function DashboardPage() {
     );
   }
 
-  // Fallback for Organizer/Admin roles until specific dashboards are fleshed out
+  const assignedEvents = allPlatformEvents.filter(event => 
+    userProfile.role === 'admin' ||
+    userProfile.role === 'overall_head' ||
+    (userProfile.role === 'event_representative' && userProfile.assignedEventUids?.includes(event.id)) ||
+    (userProfile.role === 'organizer' && event.organizerUids?.includes(userProfile.uid))
+  );
+
+  // Staff Dashboards (Organizer, Rep, Overall Head, Admin)
   return (
     <div className="space-y-8 animate-fade-in-up">
       <header className="flex flex-col md:flex-row justify-between items-start gap-4">
@@ -746,88 +763,90 @@ export default function DashboardPage() {
         )}
       </header>
 
-      <section>
-        <Card>
-          <CardHeader>
-            <CardTitle>Welcome, Organizer!</CardTitle>
-            <CardDescription>This is your centralized dashboard. More role-specific features are coming soon.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <Link href="/admin/users" className="p-4 bg-muted/50 rounded-lg hover:bg-muted text-center">
-                <Users className="mx-auto h-8 w-8 text-primary mb-2" />
-                <p className="font-semibold">Manage Users</p>
-              </Link>
-              <Link href="/organizer/event-tasks" className="p-4 bg-muted/50 rounded-lg hover:bg-muted text-center">
-                <ListChecks className="mx-auto h-8 w-8 text-primary mb-2" />
-                <p className="font-semibold">Manage Tasks</p>
-              </Link>
-              <Link href="/ocr-tool" className="p-4 bg-muted/50 rounded-lg hover:bg-muted text-center">
-                <FileScan className="mx-auto h-8 w-8 text-primary mb-2" />
-                <p className="font-semibold">OCR Tool</p>
-              </Link>
-               <Link href="/profile" className="p-4 bg-muted/50 rounded-lg hover:bg-muted text-center">
-                <UserCircle className="mx-auto h-8 w-8 text-primary mb-2" />
-                <p className="font-semibold">My Profile</p>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+            <Card>
+                <CardHeader>
+                    <CardTitle>My Tasks</CardTitle>
+                    <CardDescription>Tasks assigned to you across all events.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                   {tasks.length > 0 ? (
+                        <div className="space-y-2">
+                            {tasks.slice(0, 5).map(task => (
+                                <div key={task.id} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
+                                    <div>
+                                        <p className="font-medium">{task.title}</p>
+                                        <p className="text-xs text-muted-foreground">Due: {task.dueDate ? format(parseISO(task.dueDate), 'MMM dd, yyyy') : 'N/A'}</p>
+                                    </div>
+                                    <Badge variant={getPriorityBadgeVariant(task.priority)}>{task.priority}</Badge>
+                                </div>
+                            ))}
+                        </div>
+                   ) : <p className="text-muted-foreground text-sm">No tasks assigned to you yet.</p>}
+                </CardContent>
+                <CardFooter>
+                    <Button variant="outline" asChild><Link href="/organizer/event-tasks">View All Tasks</Link></Button>
+                </CardFooter>
+            </Card>
 
-      {(role === 'admin' || role === 'overall_head') && (
-        <section id="manage-all-events">
-          <Card className="shadow-md-soft rounded-xl">
-            <CardHeader>
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                <CardTitle className="flex items-center gap-2 text-2xl text-primary"><CalendarRange className="h-7 w-7"/>Manage All Platform Events</CardTitle>
-                <Button className="bg-accent hover:bg-accent/90 text-accent-foreground" onClick={openCreateEventDialog}>
-                    <PlusCircle className="mr-2 h-4 w-4"/> Add New Event
-                </Button>
-              </div>
-              <CardDescription>Oversee, edit, or create new events on the platform. Showing {allPlatformEvents.length} events.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                <div className="overflow-x-auto rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Event Name</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Participants</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {allPlatformEvents.map(event => (
-                        <TableRow key={event.id}>
-                          <TableCell className="font-medium">
-                            <Link href={`/organizer/events/manage/${event.slug}`}>{event.title}</Link>
-                          </TableCell>
-                          <TableCell>{event.eventDate ? format(parseISO(event.eventDate), 'MMM dd, yyyy') : 'TBA'}</TableCell>
-                          <TableCell>
-                            <Badge variant={getEventStatusBadgeVariant(event.status)} className="capitalize">{event.status || 'N/A'}</Badge>
-                          </TableCell>
-                          <TableCell>{event.registeredParticipantCount || 0}</TableCell>
-                          <TableCell className="text-right space-x-1">
-                            <Button variant="ghost" size="icon" className="hover:bg-muted/50 h-8 w-8" onClick={() => openEditEventDialog(event)}>
-                              <Pencil className="h-4 w-4" /> <span className="sr-only">Edit Event</span>
-                            </Button>
-                             <Button variant="ghost" size="icon" className="hover:bg-destructive/10 h-8 w-8" onClick={() => { setEventToDelete(event); setIsDeleteEventConfirmOpen(true); }}>
-                                <Trash2 className="h-4 w-4 text-destructive" /> <span className="sr-only">Delete Event</span>
-                            </Button>
-                          </TableCell>
-                        </TableRow>
+            {(role === 'admin' || role === 'overall_head') && (
+              <Leaderboard />
+            )}
+
+            <Card>
+              <CardHeader>
+                <CardTitle>My Assigned Events</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {assignedEvents.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {assignedEvents.map(event => (
+                        <Link href={`/organizer/events/manage/${event.slug}`} key={event.id}>
+                          <Card className="hover:border-primary transition-colors">
+                              <CardHeader>
+                                <CardTitle className="text-lg">{event.title}</CardTitle>
+                                <CardDescription className="capitalize">{event.status}</CardDescription>
+                              </CardHeader>
+                          </Card>
+                        </Link>
                       ))}
-                    </TableBody>
-                  </Table>
-                </div>
-            </CardContent>
-          </Card>
-        </section>
-      )}
-
+                    </div>
+                ) : <p className="text-muted-foreground text-sm">You are not assigned to any events.</p>}
+              </CardContent>
+            </Card>
+        </div>
+        <div className="space-y-6">
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><Award className="h-6 w-6 text-primary"/>My Stats</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div>
+                        <Label>Credibility Score</Label>
+                        <p className="text-3xl font-bold text-accent">{userProfile.credibilityScore || 0}</p>
+                    </div>
+                     <div>
+                        <Label>Tasks Completed</Label>
+                        <p className="text-xl font-bold">{tasks.filter(t => t.status === 'Completed').length}</p>
+                    </div>
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader><CardTitle>Quick Actions</CardTitle></CardHeader>
+                <CardContent className="flex flex-col gap-2">
+                     <Button variant="outline" asChild><Link href="/organizer/event-tasks"><ListChecks className="mr-2"/>Manage Tasks</Link></Button>
+                     {(role === 'admin' || role === 'overall_head') && <Button variant="outline" asChild><Link href="/admin/users"><Users className="mr-2"/>Manage Users</Link></Button>}
+                     <Button variant="outline" asChild><Link href="/ocr-tool"><FileScan className="mr-2"/>OCR Tool</Link></Button>
+                     <Button variant="outline" asChild><Link href="/profile"><UserCircle className="mr-2"/>My Profile</Link></Button>
+                </CardContent>
+            </Card>
+            {(role !== 'admin' && role !== 'overall_head') && (
+              <Leaderboard />
+            )}
+        </div>
+      </div>
+      
       {/* Dialog for Create/Edit Event */}
       <Dialog open={isEventFormDialogOpen} onOpenChange={(isOpen) => {
             if (isUploading) return;
@@ -848,7 +867,7 @@ export default function DashboardPage() {
                 </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleEventFormSubmit} className="grid gap-4 py-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <Label htmlFor="eventTitle">Event Title</Label>
                         <Input id="eventTitle" value={currentEventForm.title} onChange={e => setCurrentEventForm(f => ({...f, title: e.target.value}))} required />
@@ -866,7 +885,7 @@ export default function DashboardPage() {
                         </Select>
                     </div>
                 </div>
-                    <div>
+                <div>
                     <Label htmlFor="shortDescription">Short Description (for cards)</Label>
                     <Textarea id="shortDescription" value={currentEventForm.shortDescription} onChange={e => setCurrentEventForm(f => ({...f, shortDescription: e.target.value}))} rows={2}/>
                 </div>
@@ -929,7 +948,7 @@ export default function DashboardPage() {
                         </Popover>
                     </div>
                 </div>
-                    <div className="space-y-2">
+                <div className="space-y-2">
                     <Label>Team Settings</Label>
                     <div className='flex items-center space-x-2'>
                         <Checkbox id="isTeamBased" checked={currentEventForm.isTeamBased} onCheckedChange={checked => setCurrentEventForm(f => ({...f, isTeamBased: !!checked}))} />
@@ -950,9 +969,9 @@ export default function DashboardPage() {
                 </div>
                 <div>
                     <Label htmlFor="eventReps">Event Representative UIDs (comma-separated)</Label>
-                    <Input id="eventReps" value={currentEventForm.eventReps} onChange={e => setCurrentEventForm(f => ({...f, eventReps: e.target.value}))} />
+                    <Input id="eventReps" value={currentEventForm.eventReps_str} onChange={e => setCurrentEventForm(f => ({...f, eventReps_str: e.target.value}))} />
                 </div>
-                    <div>
+                <div>
                     <Label htmlFor="organizers_str">Organizer UIDs (comma-separated)</Label>
                     <Input id="organizers_str" value={currentEventForm.organizers_str} onChange={e => setCurrentEventForm(f => ({...f, organizers_str: e.target.value}))} />
                 </div>
@@ -991,5 +1010,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
