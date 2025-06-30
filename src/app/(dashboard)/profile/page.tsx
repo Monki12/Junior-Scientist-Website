@@ -131,7 +131,9 @@ export default function ProfilePage() {
     if (typeof value === 'boolean') {
       return value ? 'Yes' : 'No';
     }
-    if (value instanceof Date || (typeof value === 'string' && !isNaN(Date.parse(value)))) {
+    // A string is likely a date if it contains a hyphen and can be parsed. This avoids parsing "11" as a date.
+    const isPotentialDateString = typeof value === 'string' && value.includes('-') && !isNaN(Date.parse(value));
+    if (value instanceof Date || isPotentialDateString) {
         try {
             return format(new Date(value), 'PPP');
         } catch {
@@ -250,7 +252,7 @@ export default function ProfilePage() {
                         </SelectContent>
                     </Select>
                 ) : (
-                    <ReadOnlyField label="" value={userProfile.standard ? `Grade ${userProfile.standard}` : null} />
+                    <ReadOnlyField label="" value={userProfile.standard} />
                 )}
             </div>
 
@@ -310,4 +312,5 @@ export default function ProfilePage() {
     </div>
   );
 }
+
 
