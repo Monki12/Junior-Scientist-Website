@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -24,7 +23,8 @@ import {
   GraduationCap,
   LogOut,
   HelpCircle,
-  Menu
+  Menu,
+  ScanLine
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from './logo';
@@ -34,34 +34,39 @@ import { useToast } from '@/hooks/use-toast';
 const getNavLinksForRole = (role: string | undefined) => {
   const baseLinks = [
     { href: '/dashboard', label: 'Dashboard', icon: Home },
-    { href: '/leaderboard', label: 'Leaderboard', icon: Trophy },
+    
   ];
 
   const studentLinks = [
     ...baseLinks,
     { href: '/events', label: 'Browse Events', icon: Calendar },
+    { href: '/leaderboard', label: 'Leaderboard', icon: Trophy },
   ];
 
   const organizerLinks = [
     ...baseLinks,
+    { href: '/my-events', label: 'My Events', icon: Calendar },
     { href: '/tasks', label: 'My Tasks', icon: ClipboardList },
-    { href: '/events', label: 'My Events', icon: Calendar },
+    { href: '/leaderboard', label: 'Leaderboard', icon: Trophy },
   ];
 
   const repLinks = [
     ...baseLinks,
-    { href: '/events', label: 'My Events', icon: Calendar },
+    { href: '/my-events', label: 'My Events', icon: Calendar },
     { href: '/staff', label: 'Event Staff', icon: Users },
     { href: '/students', label: 'Event Students', icon: GraduationCap },
     { href: '/tasks', label: 'Event Tasks', icon: ClipboardList },
+    { href: '/leaderboard', label: 'Leaderboard', icon: Trophy },
   ];
 
   const overallHeadLinks = [
     ...baseLinks,
-    { href: '/events', label: 'All Events', icon: Calendar },
+    { href: '/my-events', label: 'All Events', icon: Calendar },
     { href: '/staff', label: 'Manage Staff', icon: Users },
     { href: '/students', label: 'Manage Students', icon: GraduationCap },
     { href: '/tasks', label: 'Global Tasks', icon: ClipboardList },
+    { href: '/leaderboard', label: 'Leaderboard', icon: Trophy },
+    { href: '/ocr-tool', label: 'OCR Scanner', icon: ScanLine },
     { href: '/settings', label: 'Settings', icon: Settings },
   ];
 
