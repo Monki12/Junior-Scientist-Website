@@ -7,8 +7,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import { Bell, Camera, HelpCircle, LogOut, UserCircle } from 'lucide-react';
+import { Bell, Camera, HelpCircle, LogOut, UserCircle, Menu } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
+import { Logo } from './logo';
 
 export default function DashboardHeader() {
   const { userProfile, authUser, logOut } = useAuth();
@@ -33,7 +35,7 @@ export default function DashboardHeader() {
   const pageTitles: { [key: string]: string } = {
     '/dashboard': 'Dashboard Overview',
     '/staff': 'Staff Management',
-    '/students': 'Student Management',
+    '/students': 'Student Data',
     '/events': 'Event Management',
     '/tasks': 'Task Management',
     '/leaderboard': 'Leaderboard',
@@ -44,16 +46,24 @@ export default function DashboardHeader() {
   };
 
   const getPageTitle = () => {
-    return pageTitles[pathname] || 'Junior Scientist';
+    const matchedTitle = Object.entries(pageTitles).find(([path]) => pathname.startsWith(path));
+    return matchedTitle ? matchedTitle[1] : 'Junior Scientist';
   };
 
   return (
-    <header className="sticky top-0 z-40 flex h-14 items-center gap-4 border-b bg-background px-4 sm:h-16 sm:px-6">
-      <SidebarTrigger className="sm:hidden" />
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:px-6">
+       <div className="lg:hidden">
+         <SidebarTrigger asChild>
+            <Button size="icon" variant="outline">
+              <Menu className="h-5 w-5" />
+            </Button>
+          </SidebarTrigger>
+       </div>
+      
       <div className="flex-1">
-        <h1 className="text-lg font-semibold">{getPageTitle()}</h1>
+        <h1 className="text-lg font-semibold tracking-wide">{getPageTitle()}</h1>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 md:gap-4">
         <Button variant="ghost" size="icon" onClick={() => router.push('/ocr-tool')} aria-label="OCR Scan">
           <Camera className="h-5 w-5" />
         </Button>
@@ -64,14 +74,17 @@ export default function DashboardHeader() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0">
-              <Avatar className="h-9 w-9">
+              <Avatar className="h-9 w-9 border">
                 <AvatarImage src={userProfile?.photoURL || undefined} alt={userProfile?.displayName || 'User'} />
-                <AvatarFallback>{(userProfile?.displayName || authUser?.email || 'U')[0].toUpperCase()}</AvatarFallback>
+                <AvatarFallback>{(userProfile?.fullName || authUser?.email || 'U')[0].toUpperCase()}</AvatarFallback>
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>My Account</DropdownMenuLabel>
+            <DropdownMenuLabel>
+              <p className="font-semibold truncate">{userProfile?.fullName || userProfile?.displayName}</p>
+              <p className="text-xs text-muted-foreground font-normal">{authUser?.email}</p>
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => router.push('/profile')}>
               <UserCircle className="mr-2 h-4 w-4" />
@@ -82,7 +95,7 @@ export default function DashboardHeader() {
               <span>Help</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:bg-destructive/90">
+            <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
               <LogOut className="mr-2 h-4 w-4" />
               <span>Log out</span>
             </DropdownMenuItem>

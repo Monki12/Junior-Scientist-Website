@@ -2,34 +2,20 @@
 'use client';
 
 import { useAuth } from '@/hooks/use-auth';
-import { Loader2, Users, ShieldCheck, Trophy, Briefcase, ListChecks, Award } from 'lucide-react';
+import { Loader2, Users, ShieldCheck, Trophy, Briefcase, ListChecks, Award, BarChart3, LineChart } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useEffect, useState }from 'react';
 import type { SubEvent, Task, UserProfileData } from '@/types';
-import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
-// Mock data for charts
-const registrationData = [
-  { name: 'Jan', students: 400 },
-  { name: 'Feb', students: 300 },
-  { name: 'Mar', students: 500 },
-  { name: 'Apr', students: 780 },
-  { name: 'May', students: 600 },
-];
-
-const taskData = [
-  { name: 'Event A', completed: 40, pending: 24 },
-  { name: 'Event B', completed: 30, pending: 13 },
-  { name: 'Event C', completed: 50, pending: 8 },
-];
-
 const OverallHeadDashboard = () => {
-  const [stats, setStats] = useState({ events: 0, staff: 0, students: 0 });
+  const [stats, setStats] = useState({ events: 0, staff: 0, students: 0, avgParticipants: '0.0' });
   const [topStaff, setTopStaff] = useState<UserProfileData[]>([]);
+  const [eventParticipantData, setEventParticipantData] = useState<{name: string, participants: number}[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -37,18 +23,28 @@ const OverallHeadDashboard = () => {
             const eventsSnapshot = await getDocs(collection(db, 'subEvents'));
             const staffQuery = query(collection(db, 'users'), where('role', 'in', ['admin', 'overall_head', 'event_representative', 'organizer']));
             const staffSnapshot = await getDocs(staffQuery);
-            const studentsQuery = query(collection(db, 'users'), where('role', '==', 'student'));
-            const studentsSnapshot = await getDocs(studentsQuery);
+            const studentsSnapshot = await getDocs(collection(db, 'users'), where('role', '==', 'student'));
 
-            const leaderboardQuery = query(staffQuery, orderBy('credibilityScore', 'desc'), limit(3));
-            const leaderboardSnapshot = await getDocs(leaderboardQuery);
-            
+            const eventsList = eventsSnapshot.docs.map(doc => doc.data() as SubEvent);
+            const totalParticipants = eventsList.reduce((acc, event) => acc + (event.registeredParticipantCount || 0), 0);
+            const avgParticipants = eventsList.length > 0 ? (totalParticipants / eventsList.length).toFixed(1) : '0.0';
+
             setStats({
                 events: eventsSnapshot.size,
                 staff: staffSnapshot.size,
                 students: studentsSnapshot.size,
+                avgParticipants: avgParticipants
             });
 
+            const topEvents = eventsList.sort((a, b) => (b.registeredParticipantCount || 0) - (a.registeredParticipantCount || 0)).slice(0, 10);
+            setEventParticipantData(topEvents.map(event => ({
+                name: event.title.length > 15 ? event.title.substring(0, 15) + '...' : event.title,
+                participants: event.registeredParticipantCount || 0,
+            })));
+
+
+            const leaderboardQuery = query(staffQuery, orderBy('credibilityScore', 'desc'), limit(3));
+            const leaderboardSnapshot = await getDocs(leaderboardQuery);
             setTopStaff(leaderboardSnapshot.docs.map(doc => doc.data() as UserProfileData));
 
         } catch (error) {
@@ -60,10 +56,10 @@ const OverallHeadDashboard = () => {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Events</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Active Events</CardTitle>
             <Briefcase className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -83,12 +79,22 @@ const OverallHeadDashboard = () => {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Students</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Students Registered</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.students}</div>
-            <p className="text-xs text-muted-foreground">Registered participants</p>
+            <p className="text-xs text-muted-foreground">Across all events</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Avg. Participants / Event</CardTitle>
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.avgParticipants}</div>
+            <p className="text-xs text-muted-foreground">Average engagement per event</p>
           </CardContent>
         </Card>
       </div>
@@ -96,18 +102,18 @@ const OverallHeadDashboard = () => {
       <div className="grid gap-6 lg:grid-cols-7">
         <Card className="lg:col-span-4">
             <CardHeader>
-                <CardTitle>Student Registration Trends</CardTitle>
-                <CardDescription>Mock data showing monthly registrations.</CardDescription>
+                <CardTitle>Top Events by Participant Count</CardTitle>
+                <CardDescription>A look at the most popular events based on registrations.</CardDescription>
             </CardHeader>
             <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={registrationData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" />
-                        <YAxis />
-                        <Tooltip />
+                    <BarChart data={eventParticipantData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="name" angle={-10} textAnchor="end" height={50} interval={0} />
+                        <YAxis allowDecimals={false} />
+                        <Tooltip cursor={{fill: 'hsla(var(--primary), 0.1)'}} />
                         <Legend />
-                        <Bar dataKey="students" fill="hsl(var(--primary))" />
+                        <Bar dataKey="participants" name="Participants" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                     </BarChart>
                 </ResponsiveContainer>
             </CardContent>
@@ -115,7 +121,7 @@ const OverallHeadDashboard = () => {
          <Card className="lg:col-span-3">
             <CardHeader>
                 <CardTitle className="flex items-center"><Trophy className="h-5 w-5 mr-2 text-yellow-500"/>Credibility Leaders</CardTitle>
-                <CardDescription>Top performing staff members.</CardDescription>
+                <CardDescription>Top performing staff members based on credibility score.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                 {topStaff.map((staff, index) => (
@@ -123,12 +129,12 @@ const OverallHeadDashboard = () => {
                         <div className="text-xl font-bold mr-4">#{index + 1}</div>
                         <div>
                             <p className="font-semibold">{staff.fullName}</p>
-                            <p className="text-sm text-muted-foreground">{staff.role?.replace(/_/g, ' ')}</p>
+                            <p className="text-sm text-muted-foreground capitalize">{staff.role?.replace(/_/g, ' ')}</p>
                         </div>
                         <div className="ml-auto text-lg font-bold text-accent">{staff.credibilityScore}</div>
                     </div>
                 ))}
-                <Button asChild variant="outline" className="w-full">
+                <Button asChild variant="outline" className="w-full mt-2">
                     <Link href="/leaderboard">View Full Leaderboard</Link>
                 </Button>
             </CardContent>
