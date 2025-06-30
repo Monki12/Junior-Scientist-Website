@@ -111,7 +111,7 @@ export default function MyRegistrationsPage() {
            <CardContent>
             <AlertCircle className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-xl font-semibold">No Registrations Found</h3>
-            <p className="text-muted-foreground mt-2">You haven't registered for any events yet. Time to explore!</p>
+            <p className="text-muted-foreground mt-2">You have not registered for any events yet. Time to explore!</p>
             <Button asChild variant="default" className="mt-4 bg-accent text-accent-foreground hover:bg-accent/90">
               <Link href="/events">Explore Events Now</Link>
             </Button>

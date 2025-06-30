@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { format } from 'date-fns';
 
 export default function ProfilePage() {
   const { authUser, userProfile, loading, setUserProfile } = useAuth();
@@ -123,6 +124,33 @@ export default function ProfilePage() {
   const isStudentRole = userProfile.role === 'student' || userProfile.role === 'test';
   const isOrganizerRole = !isStudentRole;
 
+  const displayValue = (value: any, placeholder = 'N/A') => {
+    if (value === null || value === undefined || (typeof value === 'string' && !value.trim())) {
+      return <span className="text-muted-foreground/80 italic">{placeholder}</span>;
+    }
+    if (typeof value === 'boolean') {
+      return value ? 'Yes' : 'No';
+    }
+    if (value instanceof Date || (typeof value === 'string' && !isNaN(Date.parse(value)))) {
+        try {
+            return format(new Date(value), 'PPP');
+        } catch {
+            return value.toString();
+        }
+    }
+    return value.toString();
+  };
+  
+  const ReadOnlyField = ({ label, value, placeholder }: { label: string; value: any; placeholder?: string }) => (
+    <div className="space-y-1">
+        <Label>{label}</Label>
+        <div className="text-base p-2 min-h-[40px] bg-muted/50 rounded-md flex items-center">
+            {displayValue(value, placeholder)}
+        </div>
+    </div>
+  );
+
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <header className="text-left">
@@ -156,30 +184,40 @@ export default function ProfilePage() {
                 </div>
             )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-            <div className="space-y-1">
-              <Label htmlFor="fullName">Full Name</Label>
-              <Input id="fullName" value={userProfile.fullName || 'N/A'} disabled />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="email">Email Address</Label>
-              <Input id="email" value={displayEmail || 'N/A'} disabled />
-            </div>
+            
+             {isEditing ? (
+                 <>
+                    <div className="space-y-1">
+                        <Label htmlFor="fullName">Full Name</Label>
+                        <Input id="fullName" value={editableProfile.fullName || ''} disabled />
+                        <p className="text-xs text-muted-foreground">Full name cannot be changed.</p>
+                    </div>
+                     <div className="space-y-1">
+                        <Label htmlFor="email">Email Address</Label>
+                        <Input id="email" value={displayEmail || ''} disabled />
+                        <p className="text-xs text-muted-foreground">Email cannot be changed.</p>
+                    </div>
+                 </>
+             ) : (
+                <>
+                    <ReadOnlyField label="Full Name" value={userProfile.fullName} />
+                    <ReadOnlyField label="Email Address" value={displayEmail} />
+                </>
+             )}
+
             
             {isOrganizerRole && (
-                 <div className="space-y-1">
-                    <Label htmlFor="collegeRollNumber">College Roll Number</Label>
-                    <Input id="collegeRollNumber" value={userProfile.collegeRollNumber || 'N/A'} disabled />
-                 </div>
-            )}
-            {isOrganizerRole && (
-                 <div className="space-y-1">
-                    <Label htmlFor="department">Department</Label>
-                    {isEditing ? (
-                        <Input id="department" value={editableProfile?.department || ''} onChange={(e) => handleInputChange('department', e.target.value)} placeholder="e.g., Computer Science" />
-                    ) : (
-                        <p className="text-base p-2 min-h-[40px] bg-muted/50 rounded-md">{userProfile.department || 'Not Set'}</p>
-                    )}
-                 </div>
+                 <>
+                  {isEditing ? (
+                      <div className="space-y-1">
+                          <Label htmlFor="department">Department</Label>
+                          <Input id="department" value={editableProfile?.department || ''} onChange={(e) => handleInputChange('department', e.target.value)} placeholder="e.g., Computer Science" />
+                      </div>
+                  ) : (
+                      <ReadOnlyField label="Department" value={userProfile.department} />
+                  )}
+                  <ReadOnlyField label="College Roll Number" value={userProfile.collegeRollNumber} />
+                 </>
             )}
 
             {isStudentRole && (
@@ -190,7 +228,7 @@ export default function ProfilePage() {
                  <Input id="schoolName" value={editableProfile?.schoolName || ''} onChange={(e) => handleInputChange('schoolName', e.target.value)} placeholder="Your School Name" />
               ) : (
                 <div className="flex items-center gap-2 p-2 min-h-[40px] bg-muted/50 rounded-md">
-                    <p className="text-base">{userProfile.schoolName || 'Not Set'}</p>
+                    <p className="text-base">{displayValue(userProfile.schoolName)}</p>
                     {userProfile.schoolName && (
                         <Badge variant={userProfile.schoolVerifiedByOrganizer ? "default" : "outline"} className={`text-xs ${userProfile.schoolVerifiedByOrganizer ? 'bg-green-100 text-green-700 border-green-300' : 'text-yellow-700 border-yellow-400 bg-yellow-50'}`}>
                         {userProfile.schoolVerifiedByOrganizer ? 'Verified' : 'Pending Review'}
@@ -212,7 +250,7 @@ export default function ProfilePage() {
                         </SelectContent>
                     </Select>
                 ) : (
-                    <p className="text-base p-2 min-h-[40px] bg-muted/50 rounded-md">{userProfile.standard ? `Grade ${userProfile.standard}` : 'Not Set'}</p>
+                    <ReadOnlyField label="" value={userProfile.standard ? `Grade ${userProfile.standard}` : null} />
                 )}
             </div>
 
@@ -221,7 +259,7 @@ export default function ProfilePage() {
               {isEditing ? (
                 <Input id="division" value={editableProfile?.division || ''} onChange={(e) => handleInputChange('division', e.target.value)} placeholder="e.g., A" />
               ) : (
-                <p className="text-base p-2 min-h-[40px] bg-muted/50 rounded-md">{userProfile.division || 'Not Set'}</p>
+                <ReadOnlyField label="" value={userProfile.division} />
               )}
             </div>
             </>
@@ -232,19 +270,25 @@ export default function ProfilePage() {
               {isEditing ? (
                 <Input id="phoneNumber" type="tel" value={editableProfile?.phoneNumbers?.[0] || ''} onChange={(e) => handlePhoneNumberChange(0, e.target.value)} placeholder="+91 12345 67890" />
               ) : (
-                <p className="text-base p-2 min-h-[40px] bg-muted/50 rounded-md">{userProfile.phoneNumbers?.[0] || 'Not Set'}</p>
+                <ReadOnlyField label="" value={userProfile.phoneNumbers?.[0]} />
               )}
             </div>
-             <div className="space-y-1 md:col-span-2">
+             <div className="space-y-1">
               <Label htmlFor="additionalNumber">Additional Phone Number (Optional)</Label>
               {isEditing ? (
                 <Input id="additionalNumber" type="tel" value={editableProfile?.additionalNumber || ''} onChange={(e) => handleInputChange('additionalNumber', e.target.value)} placeholder="Secondary contact number" />
               ) : (
-                <p className="text-base p-2 min-h-[40px] bg-muted/50 rounded-md">{userProfile.additionalNumber || 'Not Set'}</p>
+                <ReadOnlyField label="" value={userProfile.additionalNumber} />
               )}
             </div>
+            {!isEditing && (
+              <>
+                <ReadOnlyField label="Account Created" value={userProfile.createdAt} />
+                <ReadOnlyField label="Last Updated" value={userProfile.updatedAt} />
+              </>
+            )}
           </div>
-          <div className="flex gap-2 justify-end pt-4 border-t">
+          <div className="flex gap-2 justify-end pt-4 border-t mt-6">
             {isEditing ? (
               <>
                 <Button variant="outline" onClick={() => { setIsEditing(false); setEditableProfile(userProfile); }} disabled={isUpdating}>
@@ -266,3 +310,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+
