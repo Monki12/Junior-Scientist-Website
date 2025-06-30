@@ -56,7 +56,8 @@ export default function LeaderboardPage() {
   }, [userProfile, authLoading, canViewPage, router, toast]);
 
   const topThree = leaderboard.slice(0, 3);
-  const restOfBoard = leaderboard.slice(3);
+  const nextSeven = leaderboard.slice(3, 10);
+  const restOfBoard = leaderboard.slice(10);
 
   const userRank = leaderboard.findIndex(u => u.uid === userProfile?.uid) + 1;
 
@@ -140,9 +141,34 @@ export default function LeaderboardPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <tbody>
-                {restOfBoard.map((user, index) => (
+                {nextSeven.map((user, index) => (
                   <tr key={user.uid} className={cn("border-b last:border-none hover:bg-muted/50", user.uid === userProfile?.uid && 'bg-primary/10')}>
                     <td className="p-3 text-center font-bold text-lg w-16">{index + 4}</td>
+                    <td className="p-3 flex items-center gap-3">
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={user.photoURL || undefined} />
+                        <AvatarFallback>{(user.fullName || 'U')[0]}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-semibold">{user.fullName}</p>
+                        <p className="text-xs text-muted-foreground capitalize">{user.role?.replace(/_/g, ' ')}</p>
+                      </div>
+                    </td>
+                    <td className="p-3 text-right font-bold text-lg text-accent w-24">{user.credibilityScore}</td>
+                  </tr>
+                ))}
+
+                {restOfBoard.length > 0 && (
+                  <tr className="bg-muted/40">
+                      <td colSpan={3} className="py-2 px-4 text-center text-xs text-muted-foreground font-semibold tracking-wider uppercase">
+                          ...
+                      </td>
+                  </tr>
+                )}
+                
+                {restOfBoard.map((user, index) => (
+                  <tr key={user.uid} className={cn("border-b last:border-none hover:bg-muted/50", user.uid === userProfile?.uid && 'bg-primary/10')}>
+                    <td className="p-3 text-center font-bold text-lg w-16">{index + 11}</td>
                     <td className="p-3 flex items-center gap-3">
                       <Avatar className="h-10 w-10">
                         <AvatarImage src={user.photoURL || undefined} />
