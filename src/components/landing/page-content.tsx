@@ -11,29 +11,42 @@ import { collection, getDocs, query, where, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { SubEvent } from '@/types';
 import { motion, useInView, animate } from 'framer-motion';
+import TiltedCard from '@/components/ui/TiltedCard';
+
+interface Superpower {
+    id: number;
+    icon: React.ReactNode;
+    title: string;
+    description: string;
+    events: { title: string; slug: string }[];
+}
 
 const baseSuperpowerCategories = [
   {
+    id: 1,
+    icon: <MessageSquare className="tilted-card-img-superpower" />,
     name: 'The Thinker',
-    icon: <MessageSquare className="h-10 w-10 text-primary mb-4" />,
     description: 'Excel in debating, global affairs, and public speaking? Born diplomat!',
     events: [],
   },
   {
+    id: 2,
+    icon: <Brain className="tilted-card-img-superpower" />,
     name: 'The Brainiac',
-    icon: <Brain className="h-10 w-10 text-primary mb-4" />,
     description: 'Obsessed with facts, quizzes, and science puzzles? You see the patterns others miss.',
     events: [],
   },
   {
+    id: 3,
+    icon: <Puzzle className="tilted-card-img-superpower" />,
     name: 'The Strategist',
-    icon: <Puzzle className="h-10 w-10 text-primary mb-4" />,
     description: 'Enjoy solving math riddles and cracking logic games? Master of numbers and patterns.',
     events: [],
   },
   {
+    id: 4,
+    icon: <Bot className="tilted-card-img-superpower" />,
     name: 'The Innovator',
-    icon: <Bot className="h-10 w-10 text-primary mb-4" />,
     description: 'Love to design, build, and bring new ideas to life? Future tech pioneer!',
     events: [],
   },
@@ -98,9 +111,12 @@ export default function PageContent() {
         fetchEvents();
     }, []);
 
-    const superpowerCategories = baseSuperpowerCategories.map(category => ({
+    const superpowerCategories: Superpower[] = baseSuperpowerCategories.map(category => ({
         ...category,
-        events: events.filter(event => event.superpowerCategory === category.name).map(e => ({ title: e.title, slug: e.slug })),
+        title: category.name,
+        events: events
+            .filter(event => event.superpowerCategory === category.name)
+            .map(e => ({ title: e.title, slug: e.slug })),
     }));
 
     return (
@@ -175,29 +191,33 @@ export default function PageContent() {
             <section id="find-your-path" className="w-full py-12 md:py-20 bg-card/50">
                 <div className="container mx-auto px-4">
                     <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} viewport={{ once: true }}>
-                        <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary">Find Your Path</h2>
-                        <p className="text-lg text-muted-foreground text-center mt-2 max-w-xl mx-auto">Find events tailored to your interests and talents.</p>
+                        <h2 className="text-center font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary" style={{ fontSize: 'clamp(2.5rem, 6vw, 4rem)' }}>What's Your Superpower?</h2>
+                        <p className="text-lg text-muted-foreground text-center mt-2 max-w-xl mx-auto mb-16">Discover events tailored to your unique interests and unlock your true potential.</p>
                     </motion.div>
                     {loading ? (
                         <div className="flex justify-center items-center h-48"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>
                     ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                        {superpowerCategories.map((category, i) => (
-                            <motion.div key={category.name} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: i * 0.1 }} viewport={{ once: true }}>
-                                <Card className="bg-card shadow-soft hover:shadow-primary/20 transition-all duration-300 flex flex-col text-center p-6 rounded-xl border border-border/30 hover:border-primary/50 hover:-translate-y-2 h-full">
-                                    <CardHeader className="items-center p-0 mb-4">{category.icon}<CardTitle className="text-xl text-primary">{category.name}</CardTitle></CardHeader>
-                                    <CardContent className="flex-grow p-0 mb-4"><p className="text-muted-foreground text-base">{category.description}</p></CardContent>
-                                    <div className="flex-col items-center p-0">
-                                        <p className="text-sm text-muted-foreground/80 mb-2">Related Events:</p>
-                                        <ul className="space-y-1">
-                                            {category.events.length > 0 ? category.events.slice(0,2).map(event => (
-                                                <li key={event.slug}>
-                                                    <Button variant="link" asChild className="text-accent hover:text-primary p-0 h-auto text-base"><Link href={`/events/${event.slug}`}>{event.title}</Link></Button>
-                                                </li>
-                                            )) : <li className="text-sm text-muted-foreground italic">No events yet</li>}
-                                        </ul>
-                                    </div>
-                                </Card>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 justify-items-center">
+                        {superpowerCategories.map((superpower, i) => (
+                             <motion.div key={superpower.id} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: i * 0.1 }} viewport={{ once: true }}>
+                                <TiltedCard
+                                    icon={superpower.icon}
+                                    superpowerTitle={superpower.title}
+                                    superpowerDescription={superpower.description}
+                                    backContent={
+                                    <ul>
+                                        {superpower.events.length > 0 ? (
+                                        superpower.events.map((event, index) => (
+                                            <li key={index}>
+                                            <Link href={`/events/${event.slug}`}>{event.title}</Link>
+                                            </li>
+                                        ))
+                                        ) : (
+                                        <li>No events yet</li>
+                                        )}
+                                    </ul>
+                                    }
+                                />
                             </motion.div>
                         ))}
                     </div>
