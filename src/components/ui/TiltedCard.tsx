@@ -2,7 +2,7 @@
 'use client';
 
 import { useRef, useState } from "react";
-import { motion, useSpring } from "framer-motion";
+import { motion, useMotionValue, useSpring } from "framer-motion";
 import Image from "next/image";
 
 import "./TiltedCard.css";
@@ -13,7 +13,15 @@ const springValues = {
   mass: 2,
 };
 
-interface TiltedCardProps {
+export default function TiltedCard({
+  superpowerImage,
+  superpowerIcon,
+  superpowerTitle,
+  superpowerDescription,
+  backContent,
+  tiltAmplitude = 14,
+  scaleOnHover = 1.05,
+}: {
   superpowerImage: string;
   superpowerIcon: React.ReactNode;
   superpowerTitle: string;
@@ -21,26 +29,21 @@ interface TiltedCardProps {
   backContent: React.ReactNode;
   tiltAmplitude?: number;
   scaleOnHover?: number;
-}
-
-export default function TiltedCard({
-  superpowerImage,
-  superpowerIcon,
-  superpowerTitle,
-  superpowerDescription,
-  backContent,
-  tiltAmplitude = 10,
-  scaleOnHover = 1.05,
-}: TiltedCardProps) {
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const [isFlipped, setIsFlipped] = useState(false);
 
-  const rotateX = useSpring(0, springValues);
-  const rotateY = useSpring(0, springValues);
+  const rotateX = useSpring(useMotionValue(0), springValues);
+  const rotateY = useSpring(useMotionValue(0), springValues);
   const scale = useSpring(1, springValues);
-  const flipRotation = useSpring(0, springValues);
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+  const flipRotation = useSpring(0, {
+    damping: 25,
+    stiffness: 80,
+    mass: 1.5
+  });
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!ref.current || isFlipped) return;
 
     const rect = ref.current.getBoundingClientRect();
@@ -82,26 +85,35 @@ export default function TiltedCard({
   };
 
   return (
-    <motion.figure
+    <div
       ref={ref}
       className="tilted-card-figure"
       onMouseMove={handleMouseMove}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onClick={handleClick}
-      style={{ scale }}
     >
       <motion.div
-        className="tilted-card-inner-container"
+        className="tilted-card-flipper"
         style={{
-            rotateY: flipRotation,
+          rotateY: flipRotation,
+          transformStyle: "preserve-3d",
         }}
-        transition={{ duration: 0.6 }}
+        transition={{ duration: 0.7 }}
       >
-        {/* Front Face of the Card */}
         <motion.div
           className="tilted-card-face tilted-card-face-front"
-          style={{ rotateX, rotateY }}
+          style={{
+            rotateX: rotateX,
+            rotateY: rotateY,
+            scale: scale,
+            backfaceVisibility: "hidden",
+          }}
+          transition={{
+            scale: springValues,
+            rotateX: springValues,
+            rotateY: springValues,
+          }}
         >
           <Image
             src={superpowerImage}
@@ -118,14 +130,20 @@ export default function TiltedCard({
           <p className="superpower-description-front">{superpowerDescription}</p>
         </motion.div>
 
-        {/* Back Face of the Card */}
-        <div className="tilted-card-face tilted-card-face-back">
+        <div
+          className="tilted-card-face tilted-card-face-back"
+          style={{
+            transform: "rotateY(180deg)",
+            backfaceVisibility: "hidden",
+          }}
+        >
           <h4 className="superpower-back-title">Related Events:</h4>
           <div className="superpower-back-content">
             {backContent}
           </div>
+          <span className="flip-back-hint">Click to flip back</span>
         </div>
       </motion.div>
-    </motion.figure>
+    </div>
   );
 }

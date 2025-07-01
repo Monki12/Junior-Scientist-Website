@@ -1,4 +1,5 @@
 
+
 .tilted-card-figure {
   position: relative;
   height: 380px; /* Consistent height for cards */
@@ -16,15 +17,14 @@
   box-shadow: 0 0 25px rgba(168, 0, 255, 0.6); /* More intense glow on hover */
 }
 
-/* This is the container that will do the main 180-degree flip */
-.tilted-card-inner-container {
+/* This is the new container that performs the 180-degree flip */
+.tilted-card-flipper {
   position: relative;
   width: 100%;
   height: 100%;
-  /* perspective and transform-style are crucial here for 3D effect */
-  perspective: 1000px; /* Defines the 3D space */
-  transform-style: preserve-3d; /* Allows children to be in 3D space */
+  transform-style: preserve-3d; /* Allows children (faces) to be in 3D space */
 }
+
 
 /* Both front and back faces */
 .tilted-card-face {
@@ -33,12 +33,12 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start; /* Adjust content alignment if needed */
   align-items: center;
   padding: 20px;
   background: #1A1A33; /* Faces have same background as figure */
-  border-radius: 12px; /* Match parent */
-  overflow: hidden; /* To ensure content doesn't spill during tilt/flip */
+  border-radius: 12px; /* Match outer border radius */
+  overflow: hidden;
   /* backface-visibility handles hiding the backside of the face */
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden; /* For Safari */
@@ -47,12 +47,7 @@
 /* Front Face Specifics */
 .tilted-card-face-front {
   z-index: 2; /* Ensure front is on top initially */
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  align-items: center;
-  padding: 20px;
-  position: relative; /* For positioning superpower-icon and main image */
+  position: relative; /* For positioning superpower-icon over main image */
 }
 
 /* Back Face Specifics */
@@ -61,41 +56,48 @@
   background: #2B1D4F; /* Slightly darker background for the back */
   color: #E0E0E0;
   padding: 20px;
+  justify-content: center; /* Center content on back face */
 }
 
-/* Imagery for the card front */
+/* Imagery and text for the card front */
 .superpower-main-image {
-  width: 100%; /* Fill card width */
-  height: 120px; /* Fixed height for consistency */
-  object-fit: cover; /* Cover the area, crop if needed */
-  border-radius: 8px; /* Slightly less rounded than card */
-  margin-bottom: 20px;
-  filter: brightness(0.8) contrast(1.2); /* Enhance visual for dark theme */
-  box-shadow: 0 0 15px rgba(74, 0, 255, 0.3); /* Subtle glow for image */
+  width: calc(100% + 40px); /* Extend slightly beyond padding for full bleed */
+  height: 150px; /* Increased height for prominence */
+  object-fit: cover;
+  border-radius: 8px;
+  margin-top: -20px; /* Pull up to cover top padding */
+  margin-left: -20px; /* Pull left to cover left padding */
+  margin-bottom: 15px;
+  filter: brightness(0.8) contrast(1.2);
+  box-shadow: 0 0 15px rgba(74, 0, 255, 0.3);
 }
 
 .superpower-icon {
-  position: absolute; /* Position over the main image or at top */
-  top: 90px; 
+  position: absolute;
+  top: 130px; /* Position below main image, adjust as needed */
   left: 50%;
-  transform: translateX(-50%);
-  width: 60px; /* Icon size */
-  height: 60px;
-  color: hsl(var(--primary));
-  filter: drop-shadow(0 0 10px rgba(168, 0, 255, 0.7));
+  transform: translate(-50%, -50%); /* Center horizontally, pull up */
+  width: 70px; /* Icon size */
+  height: 70px;
+  background: linear-gradient(90deg, #4A00FF, #A800FF);
   border-radius: 50%;
-  padding: 8px;
-  background-color: #1A1A33;
-  border: 2px solid hsl(var(--primary) / 0.5);
+  padding: 10px; /* Padding around the icon to give it space */
+  border: 3px solid #1A1A33; /* Match card background to create a "cutout" effect */
+  box-shadow: 0 0 15px rgba(168, 0, 255, 0.8), inset 0 0 10px rgba(168, 0, 255, 0.4); /* Stronger glow + inner glow */
+  z-index: 3; /* Ensure icon is above image */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
 }
 
 
 .superpower-title-front {
   font-size: 1.6rem;
   font-weight: 700;
-  margin-top: 15px; 
+  margin-top: 55px; /* Space from icon */
   margin-bottom: 10px;
-  background: linear-gradient(90deg, hsl(var(--accent)), hsl(var(--primary)));
+  background: linear-gradient(90deg, #4A00FF, #A800FF);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -107,13 +109,14 @@
   color: #B0B0B0;
   text-align: center;
   line-height: 1.5;
+  padding: 0 10px; /* Little padding for text */
 }
 
 /* Back content styles */
 .superpower-back-title {
   font-size: 1.4rem;
   font-weight: 600;
-  color: hsl(var(--primary)); /* Accent color */
+  color: #A800FF; /* Accent color */
   margin-bottom: 15px;
 }
 
@@ -121,8 +124,8 @@
   font-size: 1rem;
   color: #E0E0E0;
   text-align: center;
-  flex-grow: 1; /* Allow content to take up space */
-  display: flex; /* For centering back content if needed */
+  flex-grow: 1;
+  display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
@@ -140,13 +143,20 @@
 }
 
 .superpower-back-content a {
-  color: hsl(var(--accent));
+  color: #4A00FF;
   text-decoration: none;
   transition: color 0.3s ease-in-out;
 }
 
 .superpower-back-content a:hover {
-  color: hsl(var(--primary));
+  color: #A800FF;
   text-decoration: underline;
-  filter: drop-shadow(0 0 5px hsla(var(--accent), 0.5));
+  filter: drop-shadow(0 0 5px rgba(74, 0, 255, 0.5));
+}
+
+.flip-back-hint {
+    font-size: 0.8rem;
+    color: #888;
+    margin-top: 15px;
+    opacity: 0.7;
 }

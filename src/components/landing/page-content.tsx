@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ShieldCheck, BookOpen, Users2, Phone, Mail, Instagram, Facebook, Twitter, Sparkles, Zap, Trophy, MessageSquare, Brain, Puzzle, Bot, Info, Loader2 } from 'lucide-react';
+import { ShieldCheck, BookOpen, Users2, Phone, Mail, Instagram, Facebook, Twitter, Sparkles, Zap, Trophy, MessageSquare, Brain, Puzzle, Bot, Info, Loader2, Lightbulb, Rocket } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import { collection, getDocs, query, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -112,30 +112,40 @@ export default function PageContent() {
         fetchEvents();
     }, []);
 
-    const superpowerCategories: Superpower[] = baseSuperpowerCategories.map(category => ({
+    const superpowers: Superpower[] = baseSuperpowerCategories.map(category => ({
         ...category,
         events: events
             .filter(event => event.superpowerCategory === category.title)
             .map(e => ({ title: e.title, slug: e.slug })),
     }));
 
+
     const sectionVariants = {
         hidden: { opacity: 0, y: 50 },
         visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } }
     };
+    
+    const galleryImages = [
+        { src: 'https://placehold.co/600x400.png', alt: 'Robotics Challenge 2024', dataAiHint: 'robotics competition' },
+        { src: 'https://placehold.co/600x400.png', alt: 'Science Fair Project', dataAiHint: 'science fair project' },
+        { src: 'https://placehold.co/600x400.png', alt: 'Students Coding', dataAiHint: 'students coding' },
+        { src: 'https://placehold.co/600x400.png', alt: 'Debate Championship', dataAiHint: 'public speaking' },
+        { src: 'https://placehold.co/600x400.png', alt: 'Mathamaze Finals', dataAiHint: 'mathematics puzzle' },
+    ];
+
 
     return (
-        <div className="space-y-24 md:space-y-32 bg-background z-10 relative w-full overflow-hidden">
+        <div className="space-y-24 md:space-y-32 bg-background z-10 relative w-full overflow-x-hidden">
             
             <motion.section id="about-us" className="w-full py-12 md:py-20 scroll-mt-20" initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.2 }} variants={sectionVariants}>
                 <div className="container mx-auto px-4">
                     <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary">About Junior Scientist</h2>
                     <div className="grid md:grid-cols-2 gap-12 items-center">
-                        <div className="space-y-4 text-lg text-muted-foreground">
+                         <motion.div initial={{ opacity: 0, x: -50 }} whileInView={{ opacity: 1, x: 0 }} transition={{ duration: 0.6 }} viewport={{ once: true, amount: 0.3 }} className="space-y-4 text-lg text-muted-foreground">
                             <p>At Junior Scientist, we are passionate about fostering curiosity and innovation in young minds. Our mission is to provide an engaging platform where students can explore scientific principles, critical thinking, and problem-solving through hands-on experiences and competitive events.</p>
                             <p>We believe in nurturing the next generation of innovators and leaders by creating an environment that is not only challenging but also supportive and fun.</p>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
+                        </motion.div>
+                         <motion.div initial={{ opacity: 0, x: 50 }} whileInView={{ opacity: 1, x: 0 }} transition={{ duration: 0.6 }} viewport={{ once: true, amount: 0.3 }} className="grid grid-cols-2 gap-4">
                             <div className="relative aspect-square rounded-xl shadow-2xl shadow-primary/20 col-span-2">
                                 <Image src="https://placehold.co/600x400.png" alt="Abstract data visualization" data-ai-hint="data visualization" fill style={{ objectFit: 'cover' }} className="rounded-xl" />
                             </div>
@@ -145,7 +155,7 @@ export default function PageContent() {
                             <div className="relative aspect-square rounded-xl shadow-2xl shadow-primary/20">
                                 <Image src="https://placehold.co/400x400.png" alt="Glowing trophy for an award" data-ai-hint="glowing trophy" fill style={{ objectFit: 'cover' }} className="rounded-xl" />
                             </div>
-                        </div>
+                        </motion.div>
                     </div>
                 </div>
             </motion.section>
@@ -189,7 +199,7 @@ export default function PageContent() {
                 </div>
             </motion.section>
 
-            <motion.section id="find-your-path" className="w-full py-12 md:py-20 bg-card/50" initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.2 }} variants={sectionVariants}>
+             <motion.section id="find-your-path" className="w-full py-12 md:py-20 bg-card/50" initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.2 }} variants={sectionVariants}>
                 <div className="container mx-auto px-4">
                     <h2 className="text-center font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary" style={{ fontSize: 'clamp(2.5rem, 6vw, 4rem)' }}>What's Your Superpower?</h2>
                     <p className="text-lg text-muted-foreground text-center mt-2 max-w-xl mx-auto mb-16">Discover events tailored to your unique interests and unlock your true potential.</p>
@@ -197,7 +207,7 @@ export default function PageContent() {
                         <div className="flex justify-center items-center h-48"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>
                     ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 justify-items-center">
-                        {superpowerCategories.map((superpower, i) => (
+                        {superpowers.map((superpower, i) => (
                             <TiltedCard
                                 key={superpower.id}
                                 superpowerImage={superpower.mainImage}
@@ -221,6 +231,30 @@ export default function PageContent() {
                         ))}
                     </div>
                     )}
+                </div>
+            </motion.section>
+
+             <motion.section id="gallery" className="w-full py-12 md:py-20" initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.2 }} variants={sectionVariants}>
+                <div className="container mx-auto px-4">
+                    <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary">Moments of Brilliance</h2>
+                    <div className="flex overflow-x-auto space-x-6 pb-4">
+                       {galleryImages.map((image, index) => (
+                         <motion.div key={index} className="flex-shrink-0 w-80 md:w-96 rounded-xl overflow-hidden shadow-lg hover:shadow-primary/40 transition-shadow duration-300 group"
+                            initial={{ opacity: 0, x: 50 }}
+                            whileInView={{ opacity: 1, x: 0 }}
+                            transition={{ duration: 0.5, delay: index * 0.1 }}
+                            viewport={{ once: true }}
+                         >
+                            <div className="relative h-64">
+                                <Image src={image.src} alt={image.alt} fill style={{ objectFit: 'cover' }} data-ai-hint={image.dataAiHint} className="group-hover:scale-105 transition-transform duration-300" />
+                                <div className="absolute inset-0 bg-black/30"></div>
+                                <div className="absolute bottom-4 left-4 text-white">
+                                    <p className="font-bold text-lg">{image.alt}</p>
+                                </div>
+                            </div>
+                         </motion.div>
+                       ))}
+                    </div>
                 </div>
             </motion.section>
             
