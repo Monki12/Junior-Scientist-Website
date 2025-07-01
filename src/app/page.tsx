@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ArrowDown, Loader2 } from "lucide-react";
 import PageContent from "@/components/landing/page-content";
+import MagnetLines from '@/components/ui/magnet-lines';
 
 function BackgroundVisuals() {
     return (
@@ -25,6 +26,10 @@ function BackgroundVisuals() {
                 animate={{ y: '-100%' }}
                 transition={{ duration: 30, repeat: Infinity, repeatType: 'mirror', ease: 'linear' }}
                 className="absolute top-0 left-1/4 w-1/2 h-[200%] bg-gradient-to-b from-transparent via-accent/5 to-transparent"
+            />
+            <MagnetLines
+              className="absolute inset-0 opacity-20"
+              lineColor="hsl(var(--primary))"
             />
         </div>
     );
