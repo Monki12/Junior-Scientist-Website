@@ -1,78 +1,99 @@
 
 .tilted-card-figure {
   position: relative;
-  display: flex; /* Use flex for centering content */
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  margin: 0; /* Remove default figure margin */
-  padding: 20px; /* Internal padding for content */
-  background: #1A1A33; /* Dark background for cards */
-  border-radius: 12px; /* Rounded corners */
-  overflow: hidden; /* Hide anything outside */
-  cursor: pointer; /* Indicate interactivity */
-  box-shadow: 0 0 10px rgba(74, 0, 255, 0.2); /* Subtle initial glow */
-  transition: box-shadow 0.3s ease-in-out, transform 0.3s ease-in-out; /* Smooth transitions */
+  height: 380px; /* Consistent height for cards */
+  width: 300px; /* Consistent width for cards */
+  cursor: pointer;
+  background: #1A1A33; /* Dark card background */
+  border-radius: 12px;
+  box-shadow: 0 0 10px rgba(74, 0, 255, 0.2); /* Initial subtle glow */
+  overflow: hidden; /* Important for clean edges during tilt/flip */
+  transition: box-shadow 0.3s ease-in-out; /* Only box-shadow for non-Framer motion properties */
 }
 
-/* Hover effect for the entire figure/card */
+/* Hover glow for the whole figure */
 .tilted-card-figure:hover {
-  box-shadow: 0 0 25px rgba(168, 0, 255, 0.6); /* Intensify glow on hover */
-  transform: translateY(-5px); /* Subtle lift on hover */
+  box-shadow: 0 0 25px rgba(168, 0, 255, 0.6); /* More intense glow on hover */
 }
 
-.tilted-card-inner {
+/* This is the container that will do the main 180-degree flip */
+.tilted-card-inner-container {
   position: relative;
   width: 100%;
   height: 100%;
-  text-align: center;
-  /* preserve-3d is crucial for the 3D flip effect */
-  transform-style: preserve-3d;
-  /* The transition duration is handled by Framer Motion's `transition` prop */
+  /* perspective and transform-style are crucial here for 3D effect */
+  perspective: 1000px; /* Defines the 3D space */
+  transform-style: preserve-3d; /* Allows children to be in 3D space */
 }
 
+/* Both front and back faces */
 .tilted-card-face {
   position: absolute;
   width: 100%;
   height: 100%;
-  -webkit-backface-visibility: hidden; /* Safari */
-  backface-visibility: hidden; /* Hide the back face when not flipped */
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  padding: 20px; /* Ensure content is padded inside the face */
+  padding: 20px;
+  background: #1A1A33; /* Faces have same background as figure */
+  border-radius: 12px; /* Match parent */
+  overflow: hidden; /* To ensure content doesn't spill during tilt/flip */
+  /* backface-visibility handles hiding the backside of the face */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden; /* For Safari */
 }
 
+/* Front Face Specifics */
 .tilted-card-face-front {
-  background: #1A1A33; /* Same background as the figure */
-  border-radius: 12px; /* Match outer border radius */
-}
-
-.tilted-card-face-back {
-  background: #2B1D4F; /* Slightly darker background for the back */
-  border-radius: 12px; /* Match outer border radius */
-  transform: rotateY(180deg); /* Start rotated for the back face */
-  color: #E0E0E0; /* Text color for the back */
+  z-index: 2; /* Ensure front is on top initially */
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
+  padding: 20px;
+  position: relative; /* For positioning superpower-icon and main image */
 }
 
-/* Specific styles for superpower card content */
-.tilted-card-img-superpower {
-  width: 70px; /* Larger icon size */
-  height: 70px;
-  margin-bottom: 15px;
-  /* Apply accent gradient to the icon if it's an SVG or a mask, otherwise just glow */
-  filter: drop-shadow(0 0 5px rgba(74, 0, 255, 0.5)); /* Subtle glow for icon */
+/* Back Face Specifics */
+.tilted-card-face-back {
+  transform: rotateY(180deg); /* Initially rotated to be the back */
+  background: #2B1D4F; /* Slightly darker background for the back */
+  color: #E0E0E0;
+  padding: 20px;
+}
+
+/* Imagery for the card front */
+.superpower-main-image {
+  width: 100%; /* Fill card width */
+  height: 120px; /* Fixed height for consistency */
+  object-fit: cover; /* Cover the area, crop if needed */
+  border-radius: 8px; /* Slightly less rounded than card */
+  margin-bottom: 20px;
+  filter: brightness(0.8) contrast(1.2); /* Enhance visual for dark theme */
+  box-shadow: 0 0 15px rgba(74, 0, 255, 0.3); /* Subtle glow for image */
+}
+
+.superpower-icon {
+  position: absolute; /* Position over the main image or at top */
+  top: 90px; 
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px; /* Icon size */
+  height: 60px;
   color: hsl(var(--primary));
+  filter: drop-shadow(0 0 10px rgba(168, 0, 255, 0.7));
+  border-radius: 50%;
+  padding: 8px;
+  background-color: #1A1A33;
+  border: 2px solid hsl(var(--primary) / 0.5);
 }
 
-.tilted-card-title-superpower {
+
+.superpower-title-front {
   font-size: 1.6rem;
   font-weight: 700;
+  margin-top: 15px; 
   margin-bottom: 10px;
   background: linear-gradient(90deg, hsl(var(--accent)), hsl(var(--primary)));
   -webkit-background-clip: text;
@@ -81,51 +102,51 @@
   text-fill-color: transparent;
 }
 
-.tilted-card-description-superpower {
+.superpower-description-front {
   font-size: 0.95rem;
   color: #B0B0B0;
   text-align: center;
   line-height: 1.5;
 }
 
-.tilted-card-back-title {
+/* Back content styles */
+.superpower-back-title {
   font-size: 1.4rem;
   font-weight: 600;
-  color: hsl(var(--primary)); /* Accent color for the back title */
+  color: hsl(var(--primary)); /* Accent color */
   margin-bottom: 15px;
 }
 
-.tilted-card-back-content {
+.superpower-back-content {
   font-size: 1rem;
   color: #E0E0E0;
   text-align: center;
+  flex-grow: 1; /* Allow content to take up space */
+  display: flex; /* For centering back content if needed */
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
 
-.tilted-card-back-content ul {
-  list-style: none; /* Remove default list style */
+.superpower-back-content ul {
+  list-style: none;
   padding: 0;
   margin: 0;
 }
 
-.tilted-card-back-content li {
+.superpower-back-content li {
   margin-bottom: 8px;
   font-weight: 500;
 }
 
-.tilted-card-back-content a {
-  color: hsl(var(--accent)); /* Link color */
+.superpower-back-content a {
+  color: hsl(var(--accent));
   text-decoration: none;
   transition: color 0.3s ease-in-out;
 }
 
-.tilted-card-back-content a:hover {
+.superpower-back-content a:hover {
   color: hsl(var(--primary));
   text-decoration: underline;
-  filter: drop-shadow(0 0 5px hsla(var(--accent), 0.5)); /* Subtle glow on link hover */
-}
-
-/* Ensure mobile warning and tooltip are removed/hidden if not used */
-.tilted-card-mobile-alert,
-.tilted-card-caption {
-  display: none; /* Hide if not desired for this effect */
+  filter: drop-shadow(0 0 5px hsla(var(--accent), 0.5));
 }

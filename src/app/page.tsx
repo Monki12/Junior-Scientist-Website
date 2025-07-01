@@ -43,6 +43,14 @@ export default function JuniorScientistHomePage() {
   const { authUser, loading } = useAuth();
   const router = useRouter();
 
+  const heroRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({
+    target: heroRef,
+    offset: ["start start", "end start"],
+  });
+  const y = useTransform(scrollYProgress, [0, 1], ["0%", "50%"]);
+
+
   useEffect(() => {
     if (!loading && authUser) {
       router.replace('/dashboard');
@@ -59,9 +67,9 @@ export default function JuniorScientistHomePage() {
 
   return (
     <div className="flex flex-col items-center text-foreground -mt-[4rem]">
-      <section className="relative w-full h-screen flex items-center justify-center overflow-hidden">
+      <section ref={heroRef} className="relative w-full h-screen flex items-center justify-center overflow-hidden">
         <BackgroundVisuals />
-        <div className="relative z-10 flex flex-col items-center justify-center h-full text-center px-4">
+        <motion.div style={{ y }} className="relative z-10 flex flex-col items-center justify-center h-full text-center px-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -103,7 +111,7 @@ export default function JuniorScientistHomePage() {
               <p className="mb-1">Scroll to learn more</p>
               <ArrowDown className="h-4 w-4 animate-bounce" />
           </motion.a>
-        </div>
+        </motion.div>
       </section>
 
       <PageContent />
