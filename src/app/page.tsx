@@ -62,7 +62,7 @@ export default function JuniorScientistHomePage() {
               JUNIOR SCIENTIST
             </h1>
             <p className="mt-6 text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-              Discover, register, and manage your event participation seamlessly. Let the journey begin!
+              Ignite Curiosity, Compete with Brilliance, and Lead the Change Across Realms!
             </p>
           </motion.div>
 
