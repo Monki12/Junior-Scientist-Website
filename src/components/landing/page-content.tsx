@@ -11,7 +11,7 @@ import { collection, getDocs, query, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { SubEvent } from '@/types';
 import { motion, useInView, animate, useScroll, useTransform } from 'framer-motion';
-import TiltedCard from '@/components/ui/TiltedCard';
+import TiltedFlipCard from '@/components/ui/TiltedFlipCard';
 import { cn } from '@/lib/utils';
 
 interface AnimatedNumberProps {
@@ -73,15 +73,24 @@ const AnimatedContent = ({ children, direction = 'up', className, delay = 0 }: {
 
 const SectionWrapper = ({ children, className, id }: { children: React.ReactNode, className?: string, id?: string }) => {
     const ref = useRef(null);
-    const isInView = useInView(ref, { once: true, amount: 0.2 });
+    const { ref: inViewRef, inView } = useInView({
+      triggerOnce: true,
+      threshold: 0.1,
+    });
+    
+    // Combine refs
+    const setRefs = (node: any) => {
+        (ref as React.MutableRefObject<any>).current = node;
+        inViewRef(node);
+    };
     
     return (
         <motion.section
             id={id}
-            ref={ref}
+            ref={setRefs}
             className={cn("w-full py-12 md:py-20", className)}
             initial={{ opacity: 0, y: 50 }}
-            animate={isInView ? { opacity: 1, y: 0 } : {}}
+            animate={inView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.6, ease: "easeOut" }}
         >
             {children}
@@ -96,14 +105,14 @@ function GallerySection() {
       offset: ['start end', 'end start'],
     });
 
-    const x = useTransform(scrollYProgress, [0, 1], ['1%', '-95%']);
+    const x = useTransform(scrollYProgress, [0, 1], ['-5%', '5%']);
 
     const galleryImages = [
         { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Science_fair_project.jpg/1280px-Science_fair_project.jpg', alt: 'Science fair project', dataAiHint: 'science fair' },
         { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Girl_uses_a_microscope_at_a_science_camp.jpg/1280px-Girl_uses_a_microscope_at_a_science_camp.jpg', alt: 'Girl uses a microscope', dataAiHint: 'student microscope' },
         { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Robot_at_a_STEM_camp.jpg/1280px-Robot_at_a_STEM_camp.jpg', alt: 'Robot at a STEM camp', dataAiHint: 'student robot' },
         { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/Computer_programming_class_for_kids.jpg/1280px-Computer_programming_class_for_kids.jpg', alt: 'Kids coding class', dataAiHint: 'students coding' },
-        { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Students_doing_an_experiment.jpg/1280px-Students_doing_an_experiment.jpg', alt: 'chemistry experiment', },
+        { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Students_doing_an_experiment.jpg/1280px-Students_doing_an_experiment.jpg', alt: 'chemistry experiment', dataAiHint: 'student experiment' },
     ];
 
     return (
@@ -134,26 +143,26 @@ export default function PageContent() {
     const [loading, setLoading] = useState(true);
 
     const refTitle = useRef(null);
-    const inViewTitle = useInView(refTitle, { once: true, amount: 0.5 });
+    const { ref: inViewRefTitle, inView: inViewTitle } = useInView({ triggerOnce: true, threshold: 0.5 });
     
     const refPara1 = useRef(null);
-    const inViewPara1 = useInView(refPara1, { once: true, amount: 0.6 });
+    const { ref: inViewRefPara1, inView: inViewPara1 } = useInView({ triggerOnce: true, threshold: 0.6 });
     
     const refImg1 = useRef(null);
-    const inViewImg1 = useInView(refImg1, { once: true, amount: 0.7 });
+    const { ref: inViewRefImg1, inView: inViewImg1 } = useInView({ triggerOnce: true, threshold: 0.7 });
 
     const refPara2 = useRef(null);
-    const inViewPara2 = useInView(refPara2, { once: true, amount: 0.6 });
+    const { ref: inViewRefPara2, inView: inViewPara2 } = useInView({ triggerOnce: true, threshold: 0.6 });
 
     const refImg2 = useRef(null);
-    const inViewImg2 = useInView(refImg2, { once: true, amount: 0.7 });
+    const { ref: inViewRefImg2, inView: inViewImg2 } = useInView({ triggerOnce: true, threshold: 0.7 });
 
     const refPara3 = useRef(null);
-    const inViewPara3 = useInView(refPara3, { once: true, amount: 0.6 });
+    const { ref: inViewRefPara3, inView: inViewPara3 } = useInView({ triggerOnce: true, threshold: 0.6 });
 
     const quoteRef = useRef(null);
-    const inViewQuote = useInView(quoteRef, { once: true, amount: 0.5 });
-
+    const { ref: inViewRefQuote, inView: inViewQuote } = useInView({ triggerOnce: true, threshold: 0.5 });
+    
     const superpowers = [
         {
           id: 1,
@@ -161,7 +170,7 @@ export default function PageContent() {
           icon: 'https://img.icons8.com/ios-filled/100/A800FF/speech-bubble--v1.png',
           title: "The Thinker",
           description: "Excel in debating, global affairs, and public speaking? Born diplomat!",
-          events: ["Mathamaze", "Model United Nations", "Debate Championship"],
+          gradient: "from-[#A800FF] to-[#6C00FF]",
         },
         {
           id: 2,
@@ -169,7 +178,7 @@ export default function PageContent() {
           icon: 'https://img.icons8.com/ios-filled/100/A800FF/brain.png',
           title: "The Brainiac",
           description: "Obsessed with facts, quizzes, and science puzzles? You see the patterns others miss.",
-          events: ["Ex-Quiz-It", "Science Olympiad", "Code-a-thon"],
+          gradient: "from-[#4D00FF] to-[#0051FF]",
         },
         {
           id: 3,
@@ -177,7 +186,7 @@ export default function PageContent() {
           icon: 'https://img.icons8.com/ios-filled/100/A800FF/gears.png',
           title: "The Strategist",
           description: "Enjoy solving math riddles and cracking logic games? Master of numbers and patterns.",
-          events: ["Chess Tournament", "Logic Puzzles Challenge"],
+          gradient: "from-[#009688] to-[#4DB6AC]",
         },
         {
           id: 4,
@@ -185,7 +194,7 @@ export default function PageContent() {
           icon: 'https://img.icons8.com/ios-filled/100/A800FF/rocket.png',
           title: "The Innovator",
           description: "Love to design, build, and bring new ideas to life? Future tech pioneer!",
-          events: ["Robotics Competition", "3D Printing Workshop", "Junior Hackathon"],
+          gradient: "from-[#FF0077] to-[#A800FF]",
         },
       ];
 
@@ -230,7 +239,7 @@ export default function PageContent() {
             <SectionWrapper id="about-us" className="scroll-mt-20">
                 <div className="container mx-auto px-4">
                     <motion.h2
-                        ref={refTitle}
+                        ref={inViewRefTitle}
                         className="text-3xl md:text-4xl font-bold text-center mb-16 bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary"
                         initial={{ opacity: 0, y: 50 }}
                         animate={inViewTitle ? { opacity: 1, y: 0 } : {}}
@@ -242,7 +251,7 @@ export default function PageContent() {
                     <div className="space-y-12 md:space-y-16">
                         <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
                             <motion.div
-                                ref={refPara1}
+                                ref={inViewRefPara1}
                                 initial={{ opacity: 0, x: -100 }}
                                 animate={inViewPara1 ? { opacity: 1, x: 0 } : {}}
                                 transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
@@ -251,7 +260,7 @@ export default function PageContent() {
                                 <p>At Junior Scientist, we are passionate about fostering curiosity and innovation in young minds.</p>
                             </motion.div>
                              <motion.div
-                                ref={refImg1}
+                                ref={inViewRefImg1}
                                 initial={{ opacity: 0, x: 100, scale: 0.9 }}
                                 animate={inViewImg1 ? { opacity: 1, x: 0, scale: 1 } : {}}
                                 transition={{ duration: 0.9, delay: 0.4, ease: "easeOut" }}
@@ -271,7 +280,7 @@ export default function PageContent() {
 
                         <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
                             <motion.div 
-                                ref={refPara2}
+                                ref={inViewRefPara2}
                                 initial={{ opacity: 0, x: 100 }}
                                 animate={inViewPara2 ? { opacity: 1, x: 0 } : {}}
                                 transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
@@ -280,7 +289,7 @@ export default function PageContent() {
                                 <p>Our mission is to provide an engaging platform where students can explore scientific principles, critical thinking, and problem-solving through hands-on experiences and competitive events. We believe in nurturing the next generation of innovators and leaders by creating an environment that is not only challenging but also supportive and fun.</p>
                             </motion.div>
                              <motion.div
-                                ref={refImg2}
+                                ref={inViewRefImg2}
                                 initial={{ opacity: 0, x: -100, scale: 0.9 }}
                                 animate={inViewImg2 ? { opacity: 1, x: 0, scale: 1 } : {}}
                                 transition={{ duration: 0.9, delay: 0.4, ease: "easeOut" }}
@@ -301,7 +310,7 @@ export default function PageContent() {
                         
                         <div className="text-center">
                             <motion.div
-                                ref={refPara3}
+                                ref={inViewRefPara3}
                                 initial={{ opacity: 0, y: 50 }}
                                 animate={inViewPara3 ? { opacity: 1, y: 0 } : {}}
                                 transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
@@ -364,7 +373,7 @@ export default function PageContent() {
             <SectionWrapper id="superpowers">
                 <div className="container mx-auto px-4">
                     <AnimatedContent>
-                      <h2 className="text-center font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary" style={{ fontSize: 'clamp(2.5rem, 6vw, 4rem)' }}>What's Your Superpower?</h2>
+                      <h2 className="text-center font-headline bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary" style={{ fontSize: 'clamp(2.5rem, 6vw, 4rem)', fontWeight: 800 }}>What's Your Superpower?</h2>
                       <p className="text-lg text-muted-foreground text-center mt-2 max-w-xl mx-auto mb-16">Discover events tailored to your unique interests and unlock your true potential.</p>
                     </AnimatedContent>
                     {loading ? (
@@ -388,23 +397,20 @@ export default function PageContent() {
                                 }}
                                 transition={{ duration: 0.8, ease: "easeOut" }}
                             >
-                            <TiltedCard
-                                superpowerImage={superpower.mainImage}
-                                superpowerIcon={superpower.icon}
-                                superpowerTitle={superpower.title}
-                                superpowerDescription={superpower.description}
-                                backContent={
-                                <ul>
-                                    {events.filter(e => e.superpowerCategory === superpower.title).length > 0 ? (
-                                        events.filter(e => e.superpowerCategory === superpower.title).map((event, index) => (
-                                            <li key={index}>
-                                                <Link href={`/events/${event.slug}`}>{event.title}</Link>
-                                            </li>
-                                        ))
-                                    ) : (
-                                        <li>No events yet</li>
-                                    )}
-                                </ul>
+                            <TiltedFlipCard
+                                id={superpower.id}
+                                imageSrc={superpower.mainImage}
+                                icon={superpower.icon}
+                                title={superpower.title}
+                                description={superpower.description}
+                                gradient={superpower.gradient}
+                                events={
+                                    events
+                                    .filter(e => e.superpowerCategory === superpower.title)
+                                    .map(event => ({
+                                        name: event.title,
+                                        link: `/events/${event.slug}`
+                                    }))
                                 }
                             />
                             </motion.div>
@@ -419,7 +425,7 @@ export default function PageContent() {
             <SectionWrapper>
                 <div className="container mx-auto px-4 text-center">
                     <motion.div
-                        ref={quoteRef}
+                        ref={inViewRefQuote}
                         className="quote-container"
                         initial={{ opacity: 0, x: -200 }}
                         animate={inViewQuote ? { opacity: 1, x: 0 } : {}}

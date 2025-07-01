@@ -20,10 +20,15 @@ export default {
     },
     extend: {
       fontFamily: {
-        body: ['Inter', 'sans-serif'],
-        headline: ['Inter', 'sans-serif'],
+        body: ['PT Sans', 'sans-serif'],
+        headline: ['Space Grotesk', 'sans-serif'],
       },
       colors: {
+        'science-dark': '#1A1A33',
+        'science-darker': '#0A0A15',
+        'science-blue': '#4A00FF',
+        'science-purple': '#A800FF',
+        'science-cyan': '#00BFFF',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {
