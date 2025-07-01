@@ -1,3 +1,4 @@
+
 'use client';
 
 import Image from 'next/image';
@@ -13,59 +14,30 @@ import { motion, useInView, animate } from 'framer-motion';
 import TiltedCard from '@/components/ui/TiltedCard';
 import { cn } from '@/lib/utils';
 
-interface Superpower {
-    id: number;
-    icon: string;
-    title: string;
-    description: string;
-    mainImage: string;
-    events: { title: string; slug: string }[];
+interface AnimatedNumberProps {
+  to: number;
+  suffix?: string;
+  prefix?: string;
 }
 
-const perks = [
-  {
-    icon: <ShieldCheck className="h-10 w-10 text-accent" />,
-    title: 'Safe Campus Environment',
-    description: 'Ensuring a secure and supportive atmosphere for all participants.',
-  },
-  {
-    icon: <BookOpen className="h-10 w-10 text-accent" />,
-    title: 'Real Learning Beyond Textbooks',
-    description: 'Practical application of knowledge and development of critical skills.',
-  },
-  {
-    icon: <Users2 className="h-10 w-10 text-accent" />,
-    title: 'Organized Supervision & Verified Volunteers',
-    description: 'Dedicated team to guide and assist students throughout the event.',
-  },
-];
+function AnimatedNumber({ to, suffix = '', prefix = '' }: AnimatedNumberProps) {
+  const ref = useRef<HTMLParagraphElement>(null);
+  const isInView = useInView(ref, { once: true, margin: "-100px" });
 
-const galleryImages = [
-    { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Science_fair_project.jpg/1280px-Science_fair_project.jpg', alt: 'Science fair project', dataAiHint: 'science fair' },
-    { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Girl_uses_a_microscope_at_a_science_camp.jpg/1280px-Girl_uses_a_microscope_at_a_science_camp.jpg', alt: 'Girl uses a microscope', dataAiHint: 'student microscope' },
-    { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Robot_at_a_STEM_camp.jpg/1280px-Robot_at_a_STEM_camp.jpg', alt: 'Robot at a STEM camp', dataAiHint: 'student robot' },
-    { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/Computer_programming_class_for_kids.jpg/1280px-Computer_programming_class_for_kids.jpg', alt: 'Kids coding class', dataAiHint: 'students coding' },
-    { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Students_doing_an_experiment.jpg/1280px-Students_doing_an_experiment.jpg', alt: 'Students doing an experiment', dataAiHint: 'chemistry experiment' },
-];
+  useEffect(() => {
+    if (isInView && ref.current) {
+      animate(0, to, {
+        duration: 2,
+        onUpdate(value) {
+          if (ref.current) {
+            ref.current.textContent = prefix + Math.floor(value).toLocaleString() + suffix;
+          }
+        },
+      });
+    }
+  }, [isInView, to, suffix, prefix]);
 
-function AnimatedNumber({ to, suffix = '', prefix = '' }: { to: number, suffix?: string, prefix?: string }) {
-    const ref = useRef<HTMLParagraphElement>(null);
-    const isInView = useInView(ref, { once: true, margin: "-100px" });
-
-    useEffect(() => {
-        if (isInView && ref.current) {
-            animate(0, to, {
-                duration: 2,
-                onUpdate(value) {
-                    if (ref.current) {
-                        ref.current.textContent = prefix + Math.floor(value).toLocaleString() + suffix;
-                    }
-                },
-            });
-        }
-    }, [isInView, to, suffix, prefix]);
-
-    return <p ref={ref} className="text-4xl lg:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary" style={{ filter: 'drop-shadow(0 0 10px hsl(var(--primary) / 0.5))' }} >{prefix}0{suffix}</p>;
+  return <p ref={ref} className="text-4xl lg:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary" style={{ filter: 'drop-shadow(0 0 10px hsl(var(--primary) / 0.5))' }} >{prefix}0{suffix}</p>;
 }
 
 const AnimatedContent = ({ children, direction = 'up', className, delay = 0 }: { children: React.ReactNode, direction?: 'up' | 'left' | 'right', className?: string, delay?: number }) => {
@@ -99,12 +71,13 @@ const AnimatedContent = ({ children, direction = 'up', className, delay = 0 }: {
   );
 };
 
-const SectionWrapper = ({ children, className }: { children: React.ReactNode, className?: string }) => {
+const SectionWrapper = ({ children, className, id }: { children: React.ReactNode, className?: string, id?: string }) => {
     const ref = useRef(null);
     const isInView = useInView(ref, { once: true, amount: 0.2 });
     
     return (
         <motion.section
+            id={id}
             ref={ref}
             className={cn("w-full py-12 md:py-20", className)}
             initial={{ opacity: 0, y: 50 }}
@@ -120,36 +93,48 @@ export default function PageContent() {
     const [events, setEvents] = useState<SubEvent[]>([]);
     const [loading, setLoading] = useState(true);
 
-    const baseSuperpowerCategories: Omit<Superpower, 'events'>[] = [
-      {
-        id: 1,
-        icon: 'https://img.icons8.com/ios-filled/100/A800FF/speech-bubble--v1.png',
-        title: 'The Thinker',
-        description: 'Excel in debating, global affairs, and public speaking? Born diplomat!',
-        mainImage: 'https://i.ibb.co/VMy1wz4/thinking-student.jpg',
-      },
-      {
-        id: 2,
-        icon: 'https://img.icons8.com/ios-filled/100/A800FF/brain.png',
-        title: 'The Brainiac',
-        description: 'Obsessed with facts, quizzes, and science puzzles? You see the patterns others miss.',
-        mainImage: 'https://i.ibb.co/1K7x5y4/student-lab.jpg',
-      },
-      {
-        id: 3,
-        icon: 'https://img.icons8.com/ios-filled/100/A800FF/gears.png',
-        title: 'The Strategist',
-        description: 'Enjoy solving math riddles and cracking logic games? Master of numbers and patterns.',
-        mainImage: 'https://i.ibb.co/L5m9Q4V/puzzle-solving.jpg',
-      },
-      {
-        id: 4,
-        icon: 'https://img.icons8.com/ios-filled/100/A800FF/rocket.png',
-        title: 'The Innovator',
-        description: 'Love to design, build, and bring new ideas to life? Future tech pioneer!',
-        mainImage: 'https://i.ibb.co/g42K90t/robotics-student.jpg',
-      },
-    ];
+    const [refTitle, inViewTitle] = useInView({ triggerOnce: true, threshold: 0.5 });
+    const [refPara1, inViewPara1] = useInView({ triggerOnce: true, threshold: 0.6 });
+    const [refImg1, inViewImg1] = useInView({ triggerOnce: true, threshold: 0.7 });
+    const [refPara2, inViewPara2] = useInView({ triggerOnce: true, threshold: 0.6 });
+    const [refImg2, inViewImg2] = useInView({ triggerOnce: true, threshold: 0.7 });
+    const [refPara3, inViewPara3] = useInView({ triggerOnce: true, threshold: 0.6 });
+    const [quoteRef, inViewQuote] = useInView({ triggerOnce: true, threshold: 0.5 });
+
+    const superpowers = [
+        {
+          id: 1,
+          mainImage: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cf/Teenage_boy_reading.jpg/1200px-Teenage_boy_reading.jpg',
+          icon: 'https://img.icons8.com/ios-filled/100/A800FF/speech-bubble--v1.png',
+          title: "The Thinker",
+          description: "Excel in debating, global affairs, and public speaking? Born diplomat!",
+          events: ["Mathamaze", "Model United Nations", "Debate Championship"],
+        },
+        {
+          id: 2,
+          mainImage: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Kids_at_science_fair.jpg/1280px-Kids_at_science_fair.jpg',
+          icon: 'https://img.icons8.com/ios-filled/100/A800FF/brain.png',
+          title: "The Brainiac",
+          description: "Obsessed with facts, quizzes, and science puzzles? You see the patterns others miss.",
+          events: ["Ex-Quiz-It", "Science Olympiad", "Code-a-thon"],
+        },
+        {
+          id: 3,
+          mainImage: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/Chess_problem.jpg/1280px-Chess_problem.jpg',
+          icon: 'https://img.icons8.com/ios-filled/100/A800FF/gears.png',
+          title: "The Strategist",
+          description: "Enjoy solving math riddles and cracking logic games? Master of numbers and patterns.",
+          events: ["Chess Tournament", "Logic Puzzles Challenge"],
+        },
+        {
+          id: 4,
+          mainImage: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Kid_with_robot_at_exhibition.jpg/1280px-Kid_with_robot_at_exhibition.jpg',
+          icon: 'https://img.icons8.com/ios-filled/100/A800FF/rocket.png',
+          title: "The Innovator",
+          description: "Love to design, build, and bring new ideas to life? Future tech pioneer!",
+          events: ["Robotics Competition", "3D Printing Workshop", "Junior Hackathon"],
+        },
+      ];
 
     useEffect(() => {
         const fetchEvents = async () => {
@@ -168,12 +153,31 @@ export default function PageContent() {
         fetchEvents();
     }, []);
 
-    const superpowers: Superpower[] = baseSuperpowerCategories.map(category => ({
-        ...category,
-        events: events
-            .filter(event => event.superpowerCategory === category.title)
-            .map(e => ({ title: e.title, slug: e.slug })),
-    }));
+    const perks = [
+      {
+        icon: <ShieldCheck className="h-10 w-10 text-accent" />,
+        title: 'Safe Campus Environment',
+        description: 'Ensuring a secure and supportive atmosphere for all participants.',
+      },
+      {
+        icon: <BookOpen className="h-10 w-10 text-accent" />,
+        title: 'Real Learning Beyond Textbooks',
+        description: 'Practical application of knowledge and development of critical skills.',
+      },
+      {
+        icon: <Users2 className="h-10 w-10 text-accent" />,
+        title: 'Organized Supervision & Verified Volunteers',
+        description: 'Dedicated team to guide and assist students throughout the event.',
+      },
+    ];
+
+    const galleryImages = [
+        { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Science_fair_project.jpg/1280px-Science_fair_project.jpg', alt: 'Science fair project', dataAiHint: 'science fair' },
+        { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Girl_uses_a_microscope_at_a_science_camp.jpg/1280px-Girl_uses_a_microscope_at_a_science_camp.jpg', alt: 'Girl uses a microscope', dataAiHint: 'student microscope' },
+        { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Robot_at_a_STEM_camp.jpg/1280px-Robot_at_a_STEM_camp.jpg', alt: 'Robot at a STEM camp', dataAiHint: 'student robot' },
+        { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/Computer_programming_class_for_kids.jpg/1280px-Computer_programming_class_for_kids.jpg', alt: 'Kids coding class', dataAiHint: 'students coding' },
+        { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Students_doing_an_experiment.jpg/1280px-Students_doing_an_experiment.jpg', alt: 'Students doing an experiment', dataAiHint: 'chemistry experiment' },
+    ];
 
 
     return (
@@ -181,28 +185,32 @@ export default function PageContent() {
             
             <SectionWrapper id="about-us" className="scroll-mt-20">
                 <div className="container mx-auto px-4">
-                    <AnimatedContent>
-                        <h2 className="text-3xl md:text-4xl font-bold text-center mb-16 bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary">
-                            About Junior Scientist
-                        </h2>
-                    </AnimatedContent>
+                    <motion.h2
+                        ref={refTitle}
+                        className="text-3xl md:text-4xl font-bold text-center mb-16 bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary"
+                        initial={{ opacity: 0, y: 50 }}
+                        animate={inViewTitle ? { opacity: 1, y: 0 } : {}}
+                        transition={{ duration: 0.8, type: "spring", stiffness: 100 }}
+                    >
+                        About Junior Scientist
+                    </motion.h2>
                     
                     <div className="space-y-12 md:space-y-16">
                         <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
                             <motion.div
-                              initial={{ opacity: 0, x: -100 }}
-                              whileInView={{ opacity: 1, x: 0 }}
-                              transition={{ duration: 0.8, ease: "easeOut" }}
-                              viewport={{ once: true, amount: 0.5 }}
-                              className="space-y-4 text-lg text-muted-foreground"
+                                ref={refPara1}
+                                initial={{ opacity: 0, x: -100 }}
+                                animate={inViewPara1 ? { opacity: 1, x: 0 } : {}}
+                                transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
+                                className="space-y-4 text-lg text-muted-foreground"
                             >
                                 <p>At Junior Scientist, we are passionate about fostering curiosity and innovation in young minds.</p>
                             </motion.div>
                              <motion.div
+                                ref={refImg1}
                                 initial={{ opacity: 0, x: 100, scale: 0.9 }}
-                                whileInView={{ opacity: 1, x: 0, scale: 1 }}
-                                transition={{ duration: 0.9, ease: "easeOut" }}
-                                viewport={{ once: true, amount: 0.5 }}
+                                animate={inViewImg1 ? { opacity: 1, x: 0, scale: 1 } : {}}
+                                transition={{ duration: 0.9, delay: 0.4, ease: "easeOut" }}
                              >
                                 <div className="relative aspect-video rounded-xl shadow-2xl shadow-primary/20">
                                     <Image
@@ -219,19 +227,19 @@ export default function PageContent() {
 
                         <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
                             <motion.div 
+                                ref={refPara2}
                                 initial={{ opacity: 0, x: 100 }}
-                                whileInView={{ opacity: 1, x: 0 }}
-                                transition={{ duration: 0.8, ease: "easeOut" }}
-                                viewport={{ once: true, amount: 0.5 }}
+                                animate={inViewPara2 ? { opacity: 1, x: 0 } : {}}
+                                transition={{ duration: 0.8, delay: 0.6, ease: "easeOut" }}
                                 className="space-y-4 text-lg text-muted-foreground md:order-2"
                             >
                                 <p>Our mission is to provide an engaging platform where students can explore scientific principles, critical thinking, and problem-solving through hands-on experiences and competitive events. We believe in nurturing the next generation of innovators and leaders by creating an environment that is not only challenging but also supportive and fun.</p>
                             </motion.div>
                              <motion.div
+                                ref={refImg2}
                                 initial={{ opacity: 0, x: -100, scale: 0.9 }}
-                                whileInView={{ opacity: 1, x: 0, scale: 1 }}
-                                transition={{ duration: 0.9, ease: "easeOut" }}
-                                viewport={{ once: true, amount: 0.5 }}
+                                animate={inViewImg2 ? { opacity: 1, x: 0, scale: 1 } : {}}
+                                transition={{ duration: 0.9, delay: 0.8, ease: "easeOut" }}
                                 className="md:order-1"
                              >
                                 <div className="relative aspect-video rounded-xl shadow-2xl shadow-primary/20">
@@ -249,10 +257,10 @@ export default function PageContent() {
                         
                         <div className="text-center">
                             <motion.div
+                                ref={refPara3}
                                 initial={{ opacity: 0, y: 50 }}
-                                whileInView={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.8, ease: "easeOut" }}
-                                viewport={{ once: true, amount: 0.8 }}
+                                animate={inViewPara3 ? { opacity: 1, y: 0 } : {}}
+                                transition={{ duration: 0.8, delay: 1.0, ease: "easeOut" }}
                                 className="space-y-4 text-lg text-muted-foreground max-w-3xl mx-auto"
                             >
                                  <p>Join us in fostering the bright minds of tomorrow, where every experiment is a step towards discovery.</p>
@@ -343,14 +351,14 @@ export default function PageContent() {
                                 superpowerDescription={superpower.description}
                                 backContent={
                                 <ul>
-                                    {superpower.events.length > 0 ? (
-                                    superpower.events.map((event, index) => (
-                                        <li key={index}>
-                                        <Link href={`/events/${event.slug}`}>{event.title}</Link>
-                                        </li>
-                                    ))
+                                    {events.filter(e => e.superpowerCategory === superpower.title).length > 0 ? (
+                                        events.filter(e => e.superpowerCategory === superpower.title).map((event, index) => (
+                                            <li key={index}>
+                                                <Link href={`/events/${event.slug}`}>{event.title}</Link>
+                                            </li>
+                                        ))
                                     ) : (
-                                    <li>No events yet</li>
+                                        <li>No events yet</li>
                                     )}
                                 </ul>
                                 }
@@ -379,17 +387,43 @@ export default function PageContent() {
                      </motion.div>
                    ))}
                 </div>
+                 <div className="scroll-hint">Scroll to explore more moments</div>
             </section>
             
             <SectionWrapper>
                 <div className="container mx-auto px-4 text-center">
-                    <AnimatedContent>
-                        <MessageSquare className="h-12 w-12 text-primary mx-auto mb-6 opacity-70" />
-                        <p className="text-2xl md:text-3xl font-medium italic max-w-4xl mx-auto text-foreground">
+                    <motion.div
+                        ref={quoteRef}
+                        className="quote-container"
+                        initial={{ opacity: 0, x: -200 }}
+                        animate={inViewQuote ? { opacity: 1, x: 0 } : {}}
+                        transition={{ duration: 1.0, ease: "easeOut", type: "spring", stiffness: 80 }}
+                      >
+                        <motion.div
+                          className="quote-icon"
+                          initial={{ scale: 0, opacity: 0 }}
+                          animate={inViewQuote ? { scale: 1, opacity: 1 } : {}}
+                          transition={{ duration: 0.5, delay: 0.5, ease: "easeOut" }}
+                        >
+                            <MessageSquare className="h-12 w-12 text-primary opacity-70" />
+                        </motion.div>
+                        <motion.p
+                          className="text-2xl md:text-3xl font-medium italic max-w-4xl mx-auto text-foreground"
+                          initial={{ opacity: 0 }}
+                          animate={inViewQuote ? { opacity: 1 } : {}}
+                          transition={{ duration: 1.2, delay: 0.8, ease: "easeOut" }}
+                        >
                             "We empower students to explore their potential and shape the future through engaging events."
-                        </p>
-                        <p className="text-lg text-muted-foreground mt-4">- The Junior Scientist Team</p>
-                    </AnimatedContent>
+                        </motion.p>
+                        <motion.p
+                          className="text-lg text-muted-foreground mt-4"
+                          initial={{ opacity: 0 }}
+                          animate={inViewQuote ? { opacity: 1 } : {}}
+                          transition={{ duration: 1.2, delay: 1.0, ease: "easeOut" }}
+                        >
+                            - The Junior Scientist Team
+                        </motion.p>
+                    </motion.div>
                 </div>
             </SectionWrapper>
 

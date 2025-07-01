@@ -3,7 +3,6 @@
 
 import React, { useRef, useState, useEffect } from "react";
 import { motion, useMotionValue, useSpring } from "framer-motion";
-import Image from "next/image";
 
 import "./TiltedCard.css";
 
@@ -56,7 +55,7 @@ export default function TiltedCard({
     }
   }, [isFlipped, isHovered, rotateX, rotateY, scale]);
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
     if (!ref.current || isFlipped) return;
 
     const rect = ref.current.getBoundingClientRect();
@@ -78,28 +77,36 @@ export default function TiltedCard({
 
   const handleMouseLeave = () => {
     setIsHovered(false);
+    if (isFlipped) return;
+    scale.set(1);
+    rotateX.set(0);
+    rotateY.set(0);
   };
 
   const handleClick = () => {
     setIsFlipped((prev) => {
       const newState = !prev;
-      flipRotation.set(newState ? 180 : 0);
+      if (newState) {
+        flipRotation.set(180);
+      } else {
+        flipRotation.set(0);
+      }
       return newState;
     });
   };
 
   return (
-    <div
+    <figure
+      ref={ref}
       className="tilted-card-figure"
+      onMouseMove={handleMouseMove}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onClick={handleClick}
       style={{ perspective: "1000px" }}
     >
       <motion.div
-        ref={ref}
         className="tilted-card-flipper"
-        onMouseMove={handleMouseMove}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        onClick={handleClick}
         style={{
           rotateY: flipRotation,
           transformStyle: "preserve-3d",
@@ -109,27 +116,28 @@ export default function TiltedCard({
         <motion.div
           className="tilted-card-face tilted-card-face-front"
           style={{
-            rotateX,
-            rotateY,
-            scale,
+            rotateX: rotateX,
+            rotateY: rotateY,
+            scale: scale,
             backfaceVisibility: "hidden",
           }}
+          transition={{
+            scale: springValues,
+            rotateX: springValues,
+            rotateY: springValues,
+          }}
         >
-          <Image
+          <img
             src={superpowerImage}
             alt={`${superpowerTitle} superpower`}
             className="superpower-main-image"
-            width={300}
-            height={150}
-            data-ai-hint="futuristic technology"
+            onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/300x150.png'; }}
           />
-          <Image
+          <img
             src={superpowerIcon}
             alt={`${superpowerTitle} icon`}
             className="superpower-icon"
-            width={70}
-            height={70}
-            data-ai-hint="icon"
+            onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/70x70.png'; }}
           />
           <h3 className="superpower-title-front">{superpowerTitle}</h3>
           <p className="superpower-description-front">{superpowerDescription}</p>
@@ -147,6 +155,6 @@ export default function TiltedCard({
           <span className="flip-back-hint">Click to flip back</span>
         </div>
       </motion.div>
-    </div>
+    </figure>
   );
 }
