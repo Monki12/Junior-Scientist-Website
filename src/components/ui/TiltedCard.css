@@ -1,101 +1,90 @@
 
-
 .tilted-card-figure {
   position: relative;
-  height: 380px; /* Consistent height for cards */
-  width: 300px; /* Consistent width for cards */
+  height: 380px; /* Consistent height */
+  width: 300px; /* Consistent width */
   cursor: pointer;
   background: #1A1A33; /* Dark card background */
   border-radius: 12px;
   box-shadow: 0 0 10px rgba(74, 0, 255, 0.2); /* Initial subtle glow */
-  overflow: hidden; /* Important for clean edges during tilt/flip */
-  transition: box-shadow 0.3s ease-in-out; /* Only box-shadow for non-Framer motion properties */
+  overflow: hidden; /* Essential for containing content during transforms */
+  transition: box-shadow 0.3s ease-in-out;
 }
 
-/* Hover glow for the whole figure */
 .tilted-card-figure:hover {
   box-shadow: 0 0 25px rgba(168, 0, 255, 0.6); /* More intense glow on hover */
 }
 
-/* This is the new container that performs the 180-degree flip */
 .tilted-card-flipper {
   position: relative;
   width: 100%;
   height: 100%;
-  transform-style: preserve-3d; /* Allows children (faces) to be in 3D space */
+  /* transform-style MUST be on the flipper for the faces to behave correctly in 3D */
+  transform-style: preserve-3d;
 }
 
-
-/* Both front and back faces */
 .tilted-card-face {
   position: absolute;
   width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start; /* Adjust content alignment if needed */
   align-items: center;
-  padding: 20px;
-  background: #1A1A33; /* Faces have same background as figure */
-  border-radius: 12px; /* Match outer border radius */
-  overflow: hidden;
-  /* backface-visibility handles hiding the backside of the face */
+  padding: 20px; /* Ensure padding for content */
+  background: #1A1A33; /* Default face background */
+  border-radius: 12px;
+  overflow: hidden; /* Important for image clipping etc. */
+  /* backface-visibility is crucial for a clean flip effect */
   backface-visibility: hidden;
-  -webkit-backface-visibility: hidden; /* For Safari */
+  -webkit-backface-visibility: hidden; /* For Safari compatibility */
 }
 
-/* Front Face Specifics */
 .tilted-card-face-front {
   z-index: 2; /* Ensure front is on top initially */
-  position: relative; /* For positioning superpower-icon over main image */
+  justify-content: flex-start;
+  position: relative;
 }
 
-/* Back Face Specifics */
 .tilted-card-face-back {
-  transform: rotateY(180deg); /* Initially rotated to be the back */
-  background: #2B1D4F; /* Slightly darker background for the back */
+  transform: rotateY(180deg); /* Positioned to be the back */
+  background: #2B1D4F; /* Slightly different background for visual distinction */
   color: #E0E0E0;
-  padding: 20px;
-  justify-content: center; /* Center content on back face */
+  justify-content: center;
+  text-align: center;
 }
 
-/* Imagery and text for the card front */
+/* Imagery for the card front */
 .superpower-main-image {
-  width: calc(100% + 40px); /* Extend slightly beyond padding for full bleed */
-  height: 150px; /* Increased height for prominence */
-  object-fit: cover;
+  width: calc(100% + 40px); /* Extends to cover padding areas */
+  height: 150px; /* Fixed height for consistency */
+  object-fit: cover; /* Ensures image covers area without distortion */
   border-radius: 8px;
-  margin-top: -20px; /* Pull up to cover top padding */
-  margin-left: -20px; /* Pull left to cover left padding */
-  margin-bottom: 15px;
+  margin-top: -20px;
+  margin-left: -20px;
+  margin-bottom: 15px; /* Space below image */
   filter: brightness(0.8) contrast(1.2);
   box-shadow: 0 0 15px rgba(74, 0, 255, 0.3);
 }
 
 .superpower-icon {
   position: absolute;
-  top: 130px; /* Position below main image, adjust as needed */
+  top: 135px;
   left: 50%;
-  transform: translate(-50%, -50%); /* Center horizontally, pull up */
-  width: 70px; /* Icon size */
+  transform: translate(-50%, -50%);
+  width: 70px;
   height: 70px;
   background: linear-gradient(90deg, #4A00FF, #A800FF);
   border-radius: 50%;
-  padding: 10px; /* Padding around the icon to give it space */
-  border: 3px solid #1A1A33; /* Match card background to create a "cutout" effect */
-  box-shadow: 0 0 15px rgba(168, 0, 255, 0.8), inset 0 0 10px rgba(168, 0, 255, 0.4); /* Stronger glow + inner glow */
-  z-index: 3; /* Ensure icon is above image */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
+  padding: 10px;
+  border: 3px solid #1A1A33;
+  box-shadow: 0 0 15px rgba(168, 0, 255, 0.8), inset 0 0 10px rgba(168, 0, 255, 0.4);
+  z-index: 3;
 }
-
 
 .superpower-title-front {
   font-size: 1.6rem;
   font-weight: 700;
-  margin-top: 55px; /* Space from icon */
+  margin-top: 50px; /* Space from icon to title */
   margin-bottom: 10px;
   background: linear-gradient(90deg, #4A00FF, #A800FF);
   -webkit-background-clip: text;
@@ -109,14 +98,14 @@
   color: #B0B0B0;
   text-align: center;
   line-height: 1.5;
-  padding: 0 10px; /* Little padding for text */
+  padding: 0 10px;
 }
 
 /* Back content styles */
 .superpower-back-title {
   font-size: 1.4rem;
   font-weight: 600;
-  color: #A800FF; /* Accent color */
+  color: #A800FF;
   margin-bottom: 15px;
 }
 
@@ -129,12 +118,14 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  width: 100%;
 }
 
 .superpower-back-content ul {
   list-style: none;
   padding: 0;
   margin: 0;
+  width: 80%;
 }
 
 .superpower-back-content li {

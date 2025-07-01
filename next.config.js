@@ -23,26 +23,26 @@ const nextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'upload.wikimedia.org',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'img.icons8.com',
+        port: '',
+        pathname: '/**',
+      },
+       {
+        protocol: 'https',
+        hostname: 'www.publicdomainpictures.net',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
-  // If you also need to handle .glb or .png files with a custom webpack rule,
-  // ensure it's added here. For example:
-  // webpack: (config, { isServer }) => {
-  //   config.module.rules.push({
-  //     test: /\.(glb|png)$/,
-  //     use: [
-  //       {
-  //         loader: 'file-loader',
-  //         options: {
-  //           publicPath: '/_next/static/media/',
-  //           outputPath: 'static/media/',
-  //           name: '[name].[hash].[ext]',
-  //         },
-  //       },
-  //     ],
-  //   });
-  //   return config;
-  // },
 };
 
 module.exports = nextConfig;

@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { motion, useMotionValue, useSpring } from "framer-motion";
 import Image from "next/image";
 
@@ -23,7 +23,7 @@ export default function TiltedCard({
   scaleOnHover = 1.05,
 }: {
   superpowerImage: string;
-  superpowerIcon: React.ReactNode;
+  superpowerIcon: string;
   superpowerTitle: string;
   superpowerDescription: string;
   backContent: React.ReactNode;
@@ -32,6 +32,7 @@ export default function TiltedCard({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [isFlipped, setIsFlipped] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
   const rotateX = useSpring(useMotionValue(0), springValues);
   const rotateY = useSpring(useMotionValue(0), springValues);
@@ -40,8 +41,20 @@ export default function TiltedCard({
   const flipRotation = useSpring(0, {
     damping: 25,
     stiffness: 80,
-    mass: 1.5
+    mass: 1.5,
   });
+
+  useEffect(() => {
+    if (isFlipped) {
+      rotateX.set(0);
+      rotateY.set(0);
+      scale.set(1);
+    } else if (!isHovered) {
+      rotateX.set(0);
+      rotateY.set(0);
+      scale.set(1);
+    }
+  }, [isFlipped, isHovered, rotateX, rotateY, scale]);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!ref.current || isFlipped) return;
@@ -58,43 +71,35 @@ export default function TiltedCard({
   };
 
   const handleMouseEnter = () => {
+    setIsHovered(true);
     if (isFlipped) return;
     scale.set(scaleOnHover);
   };
 
   const handleMouseLeave = () => {
-    if (isFlipped) return;
-    scale.set(1);
-    rotateX.set(0);
-    rotateY.set(0);
+    setIsHovered(false);
   };
 
   const handleClick = () => {
     setIsFlipped((prev) => {
       const newState = !prev;
-      if (newState) {
-        rotateX.set(0);
-        rotateY.set(0);
-        scale.set(1);
-        flipRotation.set(180);
-      } else {
-        flipRotation.set(0);
-      }
+      flipRotation.set(newState ? 180 : 0);
       return newState;
     });
   };
 
   return (
     <div
-      ref={ref}
       className="tilted-card-figure"
-      onMouseMove={handleMouseMove}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      onClick={handleClick}
+      style={{ perspective: "1000px" }}
     >
       <motion.div
+        ref={ref}
         className="tilted-card-flipper"
+        onMouseMove={handleMouseMove}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onClick={handleClick}
         style={{
           rotateY: flipRotation,
           transformStyle: "preserve-3d",
@@ -104,15 +109,10 @@ export default function TiltedCard({
         <motion.div
           className="tilted-card-face tilted-card-face-front"
           style={{
-            rotateX: rotateX,
-            rotateY: rotateY,
-            scale: scale,
+            rotateX,
+            rotateY,
+            scale,
             backfaceVisibility: "hidden",
-          }}
-          transition={{
-            scale: springValues,
-            rotateX: springValues,
-            rotateY: springValues,
           }}
         >
           <Image
@@ -123,9 +123,14 @@ export default function TiltedCard({
             height={150}
             data-ai-hint="futuristic technology"
           />
-          <div className="superpower-icon">
-            {superpowerIcon}
-          </div>
+          <Image
+            src={superpowerIcon}
+            alt={`${superpowerTitle} icon`}
+            className="superpower-icon"
+            width={70}
+            height={70}
+            data-ai-hint="icon"
+          />
           <h3 className="superpower-title-front">{superpowerTitle}</h3>
           <p className="superpower-description-front">{superpowerDescription}</p>
         </motion.div>
@@ -138,9 +143,7 @@ export default function TiltedCard({
           }}
         >
           <h4 className="superpower-back-title">Related Events:</h4>
-          <div className="superpower-back-content">
-            {backContent}
-          </div>
+          <div className="superpower-back-content">{backContent}</div>
           <span className="flip-back-hint">Click to flip back</span>
         </div>
       </motion.div>

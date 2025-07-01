@@ -15,43 +15,12 @@ import TiltedCard from '@/components/ui/TiltedCard';
 
 interface Superpower {
     id: number;
-    icon: React.ReactNode;
+    icon: string;
     title: string;
     description: string;
     mainImage: string;
     events: { title: string; slug: string }[];
 }
-
-const baseSuperpowerCategories: Omit<Superpower, 'events'>[] = [
-  {
-    id: 1,
-    icon: <MessageSquare className="h-8 w-8" />,
-    title: 'The Thinker',
-    description: 'Excel in debating, global affairs, and public speaking? Born diplomat!',
-    mainImage: 'https://placehold.co/300x150.png',
-  },
-  {
-    id: 2,
-    icon: <Brain className="h-8 w-8" />,
-    title: 'The Brainiac',
-    description: 'Obsessed with facts, quizzes, and science puzzles? You see the patterns others miss.',
-    mainImage: 'https://placehold.co/300x150.png',
-  },
-  {
-    id: 3,
-    icon: <Puzzle className="h-8 w-8" />,
-    title: 'The Strategist',
-    description: 'Enjoy solving math riddles and cracking logic games? Master of numbers and patterns.',
-    mainImage: 'https://placehold.co/300x150.png',
-  },
-  {
-    id: 4,
-    icon: <Bot className="h-8 w-8" />,
-    title: 'The Innovator',
-    description: 'Love to design, build, and bring new ideas to life? Future tech pioneer!',
-    mainImage: 'https://placehold.co/300x150.png',
-  },
-];
 
 const perks = [
   {
@@ -69,6 +38,14 @@ const perks = [
     title: 'Organized Supervision & Verified Volunteers',
     description: 'Dedicated team to guide and assist students throughout the event.',
   },
+];
+
+const galleryImages = [
+    { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Science_fair_project.jpg/1280px-Science_fair_project.jpg', alt: 'Science fair project', dataAiHint: 'science fair' },
+    { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Girl_uses_a_microscope_at_a_science_camp.jpg/1280px-Girl_uses_a_microscope_at_a_science_camp.jpg', alt: 'Girl uses a microscope', dataAiHint: 'student microscope' },
+    { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Robot_at_a_STEM_camp.jpg/1280px-Robot_at_a_STEM_camp.jpg', alt: 'Robot at a STEM camp', dataAiHint: 'student robot' },
+    { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/Computer_programming_class_for_kids.jpg/1280px-Computer_programming_class_for_kids.jpg', alt: 'Kids coding class', dataAiHint: 'students coding' },
+    { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Students_doing_an_experiment.jpg/1280px-Students_doing_an_experiment.jpg', alt: 'Students doing an experiment', dataAiHint: 'chemistry experiment' },
 ];
 
 function AnimatedNumber({ to, suffix = '', prefix = '' }: { to: number, suffix?: string, prefix?: string }) {
@@ -91,17 +68,15 @@ function AnimatedNumber({ to, suffix = '', prefix = '' }: { to: number, suffix?:
     return <p ref={ref} className="text-4xl lg:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary" style={{ filter: 'drop-shadow(0 0 10px hsl(var(--primary) / 0.5))' }} >{prefix}0{suffix}</p>;
 }
 
-
-// Helper component for animated content reveals on scroll
-const AnimatedContent = ({ children, direction = 'up', className }: { children: React.ReactNode, direction?: 'up' | 'left' | 'right', className?: string }) => {
+const AnimatedContent = ({ children, direction = 'up', className, delay = 0 }: { children: React.ReactNode, direction?: 'up' | 'left' | 'right', className?: string, delay?: number }) => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, amount: 0.3 });
 
   const variants = {
     hidden: { 
       opacity: 0, 
-      x: direction === 'left' ? -100 : direction === 'right' ? 100 : 0,
-      y: direction === 'up' ? 50 : 0,
+      x: direction === 'left' ? -50 : direction === 'right' ? 50 : 0,
+      y: direction === 'up' ? 20 : 0,
     },
     visible: { 
       opacity: 1, 
@@ -117,17 +92,64 @@ const AnimatedContent = ({ children, direction = 'up', className }: { children: 
       variants={variants}
       initial="hidden"
       animate={isInView ? "visible" : "hidden"}
-      transition={{ duration: 0.8, ease: "easeOut" }}
+      transition={{ duration: 0.8, delay, ease: "easeOut" }}
     >
       {children}
     </motion.div>
   );
 };
 
+const SectionWrapper = ({ children, className }: { children: React.ReactNode, className?: string }) => {
+    const ref = useRef(null);
+    const isInView = useInView(ref, { once: true, amount: 0.2 });
+    
+    return (
+        <motion.section
+            ref={ref}
+            className={cn("w-full py-12 md:py-20", className)}
+            initial={{ opacity: 0, y: 50 }}
+            animate={isInView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+        >
+            {children}
+        </motion.section>
+    )
+}
 
 export default function PageContent() {
     const [events, setEvents] = useState<SubEvent[]>([]);
     const [loading, setLoading] = useState(true);
+
+    const baseSuperpowerCategories: Omit<Superpower, 'events'>[] = [
+      {
+        id: 1,
+        icon: 'https://img.icons8.com/ios-filled/100/A800FF/speech-bubble--v1.png',
+        title: 'The Thinker',
+        description: 'Excel in debating, global affairs, and public speaking? Born diplomat!',
+        mainImage: 'https://i.ibb.co/VMy1wz4/thinking-student.jpg',
+      },
+      {
+        id: 2,
+        icon: 'https://img.icons8.com/ios-filled/100/A800FF/brain.png',
+        title: 'The Brainiac',
+        description: 'Obsessed with facts, quizzes, and science puzzles? You see the patterns others miss.',
+        mainImage: 'https://i.ibb.co/1K7x5y4/student-lab.jpg',
+      },
+      {
+        id: 3,
+        icon: 'https://img.icons8.com/ios-filled/100/A800FF/gears.png',
+        title: 'The Strategist',
+        description: 'Enjoy solving math riddles and cracking logic games? Master of numbers and patterns.',
+        mainImage: 'https://i.ibb.co/L5m9Q4V/puzzle-solving.jpg',
+      },
+      {
+        id: 4,
+        icon: 'https://img.icons8.com/ios-filled/100/A800FF/rocket.png',
+        title: 'The Innovator',
+        description: 'Love to design, build, and bring new ideas to life? Future tech pioneer!',
+        mainImage: 'https://i.ibb.co/g42K90t/robotics-student.jpg',
+      },
+    ];
 
     useEffect(() => {
         const fetchEvents = async () => {
@@ -154,37 +176,23 @@ export default function PageContent() {
     }));
 
 
-    const sectionVariants = {
-        hidden: { opacity: 0, y: 50 },
-        visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } }
-    };
-    
-    const galleryImages = [
-        { src: 'https://placehold.co/600x400.png', alt: 'Robotics Challenge 2024', dataAiHint: 'robotics competition' },
-        { src: 'https://placehold.co/600x400.png', alt: 'Science Fair Project', dataAiHint: 'science fair project' },
-        { src: 'https://placehold.co/600x400.png', alt: 'Students Coding', dataAiHint: 'students coding' },
-        { src: 'https://placehold.co/600x400.png', alt: 'Debate Championship', dataAiHint: 'public speaking' },
-        { src: 'https://placehold.co/600x400.png', alt: 'Mathamaze Finals', dataAiHint: 'mathematics puzzle' },
-    ];
-
-
     return (
         <div className="space-y-24 md:space-y-32 bg-background z-10 relative w-full overflow-x-hidden">
             
-            <section id="about-us" className="w-full py-12 md:py-20 scroll-mt-20">
+            <SectionWrapper id="about-us" className="scroll-mt-20">
                 <div className="container mx-auto px-4">
-                    <AnimatedContent direction="up">
+                    <AnimatedContent>
                         <h2 className="text-3xl md:text-4xl font-bold text-center mb-16 bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary">
                             About Junior Scientist
                         </h2>
                     </AnimatedContent>
                     
-                    <div className="space-y-16 md:space-y-24">
+                    <div className="space-y-12 md:space-y-16">
                         <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
                             <AnimatedContent direction="left" className="space-y-4 text-lg text-muted-foreground">
                                 <p>At Junior Scientist, we are passionate about fostering curiosity and innovation in young minds.</p>
                             </AnimatedContent>
-                            <AnimatedContent direction="right">
+                             <AnimatedContent direction="right">
                                 <div className="relative aspect-video rounded-xl shadow-2xl shadow-primary/20">
                                     <Image
                                         src="https://i.ibb.co/C07F81B/collaboration.jpg"
@@ -199,15 +207,15 @@ export default function PageContent() {
                         </div>
 
                         <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
-                            <AnimatedContent direction="right" className="space-y-4 text-lg text-muted-foreground order-1 md:order-2">
+                            <AnimatedContent direction="right" className="space-y-4 text-lg text-muted-foreground md:order-2">
                                 <p>Our mission is to provide an engaging platform where students can explore scientific principles, critical thinking, and problem-solving through hands-on experiences and competitive events. We believe in nurturing the next generation of innovators and leaders by creating an environment that is not only challenging but also supportive and fun.</p>
                             </AnimatedContent>
-                             <AnimatedContent direction="left" className="order-2 md:order-1">
+                             <AnimatedContent direction="left" className="md:order-1">
                                 <div className="relative aspect-video rounded-xl shadow-2xl shadow-primary/20">
-                                    <Image
+                                     <Image
                                         src="https://i.ibb.co/q1zR2x9/abstract-tech.jpg"
                                         alt="Abstract technology visualization"
-                                        data-ai-hint="abstract technology"
+                                        data-ai-hint="data visualization"
                                         fill
                                         style={{ objectFit: 'cover' }}
                                         className="rounded-xl"
@@ -223,56 +231,67 @@ export default function PageContent() {
                         </div>
                     </div>
                 </div>
-            </section>
+            </SectionWrapper>
             
-            <motion.section id="stats" className="w-full py-12 md:py-20 bg-card/50" initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.3 }} variants={sectionVariants}>
+            <SectionWrapper id="stats" className="bg-card/50">
                 <div className="container mx-auto px-4">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-                        <div className="p-6">
-                            <Users2 className="h-12 w-12 text-accent mx-auto mb-4" />
-                            <AnimatedNumber to={50} suffix="+" />
-                            <p className="text-muted-foreground mt-2">Partner Schools</p>
-                        </div>
-                        <div className="p-6">
-                            <Trophy className="h-12 w-12 text-accent mx-auto mb-4" />
-                            <AnimatedNumber to={100000} prefix="₹" suffix="+" />
-                            <p className="text-muted-foreground mt-2">Worth of Prizes</p>
-                        </div>
-                        <div className="p-6">
-                            <Zap className="h-12 w-12 text-accent mx-auto mb-4" />
-                            <AnimatedNumber to={15000} suffix="+" />
-                            <p className="text-muted-foreground mt-2">Expected Participants</p>
-                        </div>
+                        <AnimatedContent delay={0}>
+                            <div className="p-6">
+                                <Users2 className="h-12 w-12 text-accent mx-auto mb-4" />
+                                <AnimatedNumber to={50} suffix="+" />
+                                <p className="text-muted-foreground mt-2">Partner Schools</p>
+                            </div>
+                        </AnimatedContent>
+                        <AnimatedContent delay={0.2}>
+                            <div className="p-6">
+                                <Trophy className="h-12 w-12 text-accent mx-auto mb-4" />
+                                <AnimatedNumber to={100000} prefix="₹" suffix="+" />
+                                <p className="text-muted-foreground mt-2">Worth of Prizes</p>
+                            </div>
+                        </AnimatedContent>
+                        <AnimatedContent delay={0.4}>
+                            <div className="p-6">
+                                <Zap className="h-12 w-12 text-accent mx-auto mb-4" />
+                                <AnimatedNumber to={15000} suffix="+" />
+                                <p className="text-muted-foreground mt-2">Expected Participants</p>
+                            </div>
+                        </AnimatedContent>
                     </div>
                 </div>
-            </motion.section>
+            </SectionWrapper>
 
-            <motion.section id="why-choose-us" className="w-full py-12 md:py-20 bg-background" initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.2 }} variants={sectionVariants}>
+            <SectionWrapper id="why-choose-us">
                 <div className="container mx-auto px-4">
-                    <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary">Why Choose Junior Scientist?</h2>
+                    <AnimatedContent>
+                        <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary">Why Choose Junior Scientist?</h2>
+                    </AnimatedContent>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                         {perks.map((perk, i) => (
-                            <motion.div key={perk.title} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: i * 0.1 }} viewport={{ once: true }}>
+                           <AnimatedContent key={perk.title} delay={i * 0.2}>
                                 <Card className="bg-card shadow-soft hover:shadow-primary/20 transition-all duration-300 p-8 text-center rounded-xl border border-border/30 hover:border-primary/50 hover:-translate-y-2 h-full">
                                     {perk.icon}
                                     <h3 className="text-xl font-bold mt-4 mb-2 text-foreground">{perk.title}</h3>
                                     <p className="text-base text-muted-foreground">{perk.description}</p>
                                 </Card>
-                            </motion.div>
+                            </AnimatedContent>
                         ))}
                     </div>
                 </div>
-            </motion.section>
+            </SectionWrapper>
 
-             <motion.section id="find-your-path" className="w-full py-12 md:py-20 bg-card/50" initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.2 }} variants={sectionVariants}>
+            <SectionWrapper id="superpowers">
                 <div className="container mx-auto px-4">
-                    <h2 className="text-center font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary" style={{ fontSize: 'clamp(2.5rem, 6vw, 4rem)' }}>What's Your Superpower?</h2>
-                    <p className="text-lg text-muted-foreground text-center mt-2 max-w-xl mx-auto mb-16">Discover events tailored to your unique interests and unlock your true potential.</p>
+                    <AnimatedContent>
+                      <h2 className="text-center font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary" style={{ fontSize: 'clamp(2.5rem, 6vw, 4rem)' }}>What's Your Superpower?</h2>
+                      <p className="text-lg text-muted-foreground text-center mt-2 max-w-xl mx-auto mb-16">Discover events tailored to your unique interests and unlock your true potential.</p>
+                    </AnimatedContent>
                     {loading ? (
                         <div className="flex justify-center items-center h-48"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>
                     ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 justify-items-center">
                         {superpowers.map((superpower, i) => (
+                           <AnimatedContent key={superpower.id} delay={i * 0.15}>
                             <TiltedCard
                                 key={superpower.id}
                                 superpowerImage={superpower.mainImage}
@@ -293,71 +312,75 @@ export default function PageContent() {
                                 </ul>
                                 }
                             />
+                            </AnimatedContent>
                         ))}
                     </div>
                     )}
                 </div>
-            </motion.section>
+            </SectionWrapper>
 
-             <motion.section id="gallery" className="w-full py-12 md:py-20" initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.2 }} variants={sectionVariants}>
-                <div className="container mx-auto px-4">
-                    <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary">Moments of Brilliance</h2>
-                    <div className="flex overflow-x-auto space-x-6 pb-4">
-                       {galleryImages.map((image, index) => (
-                         <motion.div key={index} className="flex-shrink-0 w-80 md:w-96 rounded-xl overflow-hidden shadow-lg hover:shadow-primary/40 transition-shadow duration-300 group"
-                            initial={{ opacity: 0, x: 50 }}
-                            whileInView={{ opacity: 1, x: 0 }}
-                            transition={{ duration: 0.5, delay: index * 0.1 }}
-                            viewport={{ once: true }}
-                         >
-                            <div className="relative h-64">
-                                <Image src={image.src} alt={image.alt} fill style={{ objectFit: 'cover' }} data-ai-hint={image.dataAiHint} className="group-hover:scale-105 transition-transform duration-300" />
-                                <div className="absolute inset-0 bg-black/30"></div>
-                                <div className="absolute bottom-4 left-4 text-white">
-                                    <p className="font-bold text-lg">{image.alt}</p>
-                                </div>
-                            </div>
-                         </motion.div>
-                       ))}
-                    </div>
+            <section id="gallery" className="gallery-section">
+                <AnimatedContent>
+                    <h2 className="text-3xl md:text-4xl font-bold text-center mb-2 bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary">Moments of Brilliance</h2>
+                    <p className="text-lg text-muted-foreground text-center mt-2 max-w-xl mx-auto mb-16">Explore our vibrant community in action.</p>
+                </AnimatedContent>
+                <div className="gallery-strip">
+                   {galleryImages.map((image, index) => (
+                     <motion.div key={index} className="gallery-item"
+                        initial={{ opacity: 0, y: 100 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5, delay: index * 0.1, ease: 'easeOut' }}
+                        viewport={{ once: true }}
+                     >
+                        <Image src={image.src} alt={image.alt} fill style={{ objectFit: 'cover' }} data-ai-hint={image.dataAiHint} />
+                     </motion.div>
+                   ))}
                 </div>
-            </motion.section>
+            </section>
             
-            <motion.section className="w-full py-20 md:py-24" initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.5 }} variants={sectionVariants}>
+            <SectionWrapper>
                 <div className="container mx-auto px-4 text-center">
-                    <MessageSquare className="h-12 w-12 text-primary mx-auto mb-6 opacity-70" />
-                    <p className="text-2xl md:text-3xl font-medium italic max-w-4xl mx-auto text-foreground">
-                        "We empower students to explore their potential and shape the future through engaging events."
-                    </p>
-                    <p className="text-lg text-muted-foreground mt-4">- The Junior Scientist Team</p>
+                    <AnimatedContent>
+                        <MessageSquare className="h-12 w-12 text-primary mx-auto mb-6 opacity-70" />
+                        <p className="text-2xl md:text-3xl font-medium italic max-w-4xl mx-auto text-foreground">
+                            "We empower students to explore their potential and shape the future through engaging events."
+                        </p>
+                        <p className="text-lg text-muted-foreground mt-4">- The Junior Scientist Team</p>
+                    </AnimatedContent>
                 </div>
-            </motion.section>
+            </SectionWrapper>
 
-            <motion.section id="contact-us" className="w-full py-12 md:py-20 bg-card/50 scroll-mt-20" initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.3 }} variants={sectionVariants}>
+            <SectionWrapper id="contact-us" className="bg-card/50 scroll-mt-20">
                 <div className="container mx-auto px-4 text-center">
-                    <h2 className="text-3xl md:text-4xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary">Get in Touch</h2>
-                    <p className="text-lg text-muted-foreground mb-8 max-w-lg mx-auto">Have questions or want to partner with us? We'd love to hear from you!</p>
-                    <div className="flex flex-col md:flex-row justify-center items-center gap-4 mb-8">
+                    <AnimatedContent>
+                        <h2 className="text-3xl md:text-4xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary">Get in Touch</h2>
+                        <p className="text-lg text-muted-foreground mb-8 max-w-lg mx-auto">Have questions or want to partner with us? We'd love to hear from you!</p>
+                    </AnimatedContent>
+                    <AnimatedContent delay={0.2} className="flex flex-col md:flex-row justify-center items-center gap-4 mb-8">
                         <Button size="lg" variant="outline" asChild><a href="mailto:contact@juniorscientist.events"><Mail className="mr-2 h-5 w-5" /> Email Us</a></Button>
                         <Button size="lg" variant="outline" asChild><a href="https://chat.whatsapp.com/YOUR_GROUP_INVITE_LINK" target="_blank" rel="noopener noreferrer"><Users2 className="mr-2 h-5 w-5" /> Join WhatsApp Group</a></Button>
-                    </div>
+                    </AnimatedContent>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-xl mx-auto mb-10">
-                        <Card className="p-4 bg-card shadow-soft border-border/30 rounded-lg">
-                            <h4 className="font-semibold text-md text-foreground">Support: Ayush</h4>
-                            <a href="tel:+919022887167" className="flex items-center justify-center text-sm text-muted-foreground hover:text-primary"><Phone className="h-4 w-4 mr-2" /> +91 90228 87167</a>
-                        </Card>
-                        <Card className="p-4 bg-card shadow-soft border-border/30 rounded-lg">
-                            <h4 className="font-semibold text-md text-foreground">Partnerships: Aditi</h4>
-                            <a href="tel:+918010214560" className="flex items-center justify-center text-sm text-muted-foreground hover:text-primary"><Phone className="h-4 w-4 mr-2" /> +91 80102 14560</a>
-                        </Card>
+                         <AnimatedContent delay={0.4}>
+                            <Card className="p-4 bg-card shadow-soft border-border/30 rounded-lg">
+                                <h4 className="font-semibold text-md text-foreground">Support: Ayush</h4>
+                                <a href="tel:+919022887167" className="flex items-center justify-center text-sm text-muted-foreground hover:text-primary"><Phone className="h-4 w-4 mr-2" /> +91 90228 87167</a>
+                            </Card>
+                        </AnimatedContent>
+                        <AnimatedContent delay={0.5}>
+                            <Card className="p-4 bg-card shadow-soft border-border/30 rounded-lg">
+                                <h4 className="font-semibold text-md text-foreground">Partnerships: Aditi</h4>
+                                <a href="tel:+918010214560" className="flex items-center justify-center text-sm text-muted-foreground hover:text-primary"><Phone className="h-4 w-4 mr-2" /> +91 80102 14560</a>
+                            </Card>
+                        </AnimatedContent>
                     </div>
-                    <div className="flex justify-center space-x-6">
+                     <AnimatedContent delay={0.6} className="flex justify-center space-x-6">
                         <Link href="#" aria-label="Facebook" className="text-muted-foreground hover:text-primary transition-transform hover:scale-125"><Facebook size={28} /></Link>
                         <Link href="#" aria-label="Instagram" className="text-muted-foreground hover:text-primary transition-transform hover:scale-125"><Instagram size={28} /></Link>
                         <Link href="#" aria-label="Twitter" className="text-muted-foreground hover:text-primary transition-transform hover:scale-125"><Twitter size={28} /></Link>
-                    </div>
+                    </AnimatedContent>
                 </div>
-            </motion.section>
+            </SectionWrapper>
         </div>
     );
 }
