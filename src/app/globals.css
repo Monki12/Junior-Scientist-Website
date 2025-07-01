@@ -5,71 +5,51 @@
 
 @layer base {
   :root {
-    /* New Light Theme (Complementary) */
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 98%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 98%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 257 67% 55%;
+    /* React Bits Inspired Dark Theme (Applied to both light and dark modes) */
+    --background: 240 22% 7%; /* ~#0A0A15 */
+    --foreground: 0 0% 88%; /* #E0E0E0 */
+    --card: 240 33% 15%; /* #1A1A33 */
+    --card-foreground: 0 0% 88%; /* #E0E0E0 */
+    --popover: 240 22% 7%;
+    --popover-foreground: 0 0% 88%;
+    --primary: 280 100% 50%; /* #A800FF */
     --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 173 58% 36%;
+    --secondary: 240 33% 20%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 33% 20%;
+    --muted-foreground: 0 0% 69%; /* #B0B0B0 */
+    --accent: 258 100% 50%; /* #4A00FF */
     --accent-foreground: 0 0% 98%;
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 70% 50%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 257 67% 55%;
-    --radius: 0.5rem;
-
-    /* Sidebar Light Theme */
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 10% 3.9%;
-    --sidebar-primary: 257 67% 55%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 173 58% 36%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 240 5.9% 88%;
-    --sidebar-ring: 257 67% 55%;
+    --border: 240 33% 25%;
+    --input: 240 33% 25%;
+    --ring: 280 100% 50%;
+    --radius: 0.8rem;
   }
 
   .dark {
-    /* New Dark Theme (React Bits Inspired) */
-    --background: 240 42% 9%;
-    --foreground: 210 40% 98%;
-    --card: 240 30% 12%;
-    --card-foreground: 210 40% 98%;
-    --popover: 240 30% 10%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 260 80% 70%;
-    --primary-foreground: 260 80% 10%;
-    --secondary: 240 25% 18%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 240 20% 20%;
-    --muted-foreground: 220 15% 65%;
-    --accent: 190 80% 60%;
-    --accent-foreground: 190 80% 5%;
+    /* React Bits Inspired Dark Theme */
+    --background: 240 22% 7%;
+    --foreground: 0 0% 88%;
+    --card: 240 33% 15%;
+    --card-foreground: 0 0% 88%;
+    --popover: 240 22% 7%;
+    --popover-foreground: 0 0% 88%;
+    --primary: 280 100% 50%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 33% 20%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 33% 20%;
+    --muted-foreground: 0 0% 69%;
+    --accent: 258 100% 50%;
+    --accent-foreground: 0 0% 98%;
     --destructive: 0 70% 50%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 20% 20%;
-    --input: 240 20% 20%;
-    --ring: 260 80% 70%;
-    --radius: 0.5rem;
-
-    /* Sidebar Dark Theme */
-    --sidebar-background: 240 42% 7%;
-    --sidebar-foreground: 210 40% 90%;
-    --sidebar-primary: 260 80% 70%;
-    --sidebar-primary-foreground: 260 80% 10%;
-    --sidebar-accent: 190 80% 60%;
-    --sidebar-accent-foreground: 190 80% 5%;
-    --sidebar-border: 240 20% 15%;
-    --sidebar-ring: 260 80% 70%;
+    --border: 240 33% 25%;
+    --input: 240 33% 25%;
+    --ring: 280 100% 50%;
+    --radius: 0.8rem;
   }
 }
 

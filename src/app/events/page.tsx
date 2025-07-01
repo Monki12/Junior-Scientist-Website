@@ -17,9 +17,9 @@ import { db } from '@/lib/firebase';
 
 function SubEventCard({ event }: { event: SubEvent }) {
   return (
-    <Card className="overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col h-full bg-card/80 backdrop-blur-sm border-border/50 hover:border-primary/50 rounded-xl">
-      <Link href={`/events/${event.slug}`} className="block group">
-        <div className="relative w-full h-56">
+    <Card className="overflow-hidden shadow-soft hover:shadow-md-soft transition-all duration-300 flex flex-col h-full bg-card border-border/30 hover:border-primary/50 rounded-xl group">
+      <Link href={`/events/${event.slug}`} className="block h-full flex flex-col">
+        <div className="relative w-full h-56 overflow-hidden">
           <Image
             src={event.mainImage.src}
             alt={event.mainImage.alt}
@@ -28,12 +28,13 @@ function SubEventCard({ event }: { event: SubEvent }) {
             data-ai-hint={event.mainImage.dataAiHint}
             className="group-hover:scale-105 transition-transform duration-300"
           />
+           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20"></div>
         </div>
         <CardHeader>
           <CardTitle className="text-2xl font-headline group-hover:text-primary transition-colors">{event.title}</CardTitle>
           <CardDescription className="line-clamp-3 text-muted-foreground">{event.shortDescription}</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm text-muted-foreground flex-grow">
+        <CardContent className="space-y-2 text-base text-muted-foreground flex-grow">
           <div className="flex items-center gap-2">
             <Tag className="h-4 w-4 text-primary" />
             <span>Category: {event.superpowerCategory}</span>
@@ -47,7 +48,7 @@ function SubEventCard({ event }: { event: SubEvent }) {
         </CardContent>
       </Link>
       <CardFooter>
-        <Button asChild className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
+        <Button asChild className="w-full">
           <Link href={`/events/${event.slug}`}>View Details</Link>
         </Button>
       </CardFooter>
@@ -55,7 +56,6 @@ function SubEventCard({ event }: { event: SubEvent }) {
   );
 }
 
-// This is the primary, public-facing page for the /events route.
 export default function SubEventsListPage() {
   const [events, setEvents] = useState<SubEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,13 +66,11 @@ export default function SubEventsListPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // This logic handles redirecting staff members away from the public events page
-    // to their own dedicated management page, resolving any routing conflicts.
     if (!authLoading && userProfile) {
       const isStaff = ['admin', 'overall_head', 'event_representative', 'organizer'].includes(userProfile.role);
       if (isStaff) {
         router.replace('/my-events');
-        return; // Early return to prevent fetching public events for staff
+        return;
       }
     }
   }, [userProfile, authLoading, router]);
@@ -116,7 +114,7 @@ export default function SubEventsListPage() {
   return (
     <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 animate-fade-in-up">
       <header className="mb-12 text-center">
-        <h1 className="text-4xl md:text-5xl font-bold text-primary mb-4">Junior Scientist Sub-Events</h1>
+        <h1 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary mb-4">Junior Scientist Sub-Events</h1>
         <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
           Explore the exciting array of sub-events designed to challenge and inspire young scientists. Find your passion and register today!
         </p>
