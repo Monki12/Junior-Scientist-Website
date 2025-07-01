@@ -10,7 +10,7 @@ import { useEffect, useState, useRef } from 'react';
 import { collection, getDocs, query, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { SubEvent } from '@/types';
-import { motion, useInView, animate } from 'framer-motion';
+import { motion, useInView, animate, useScroll, useTransform } from 'framer-motion';
 import TiltedCard from '@/components/ui/TiltedCard';
 import { cn } from '@/lib/utils';
 
@@ -89,17 +89,70 @@ const SectionWrapper = ({ children, className, id }: { children: React.ReactNode
     )
 }
 
+function GallerySection() {
+    const galleryRef = useRef(null);
+    const { scrollYProgress } = useScroll({
+      target: galleryRef,
+      offset: ['start end', 'end start'],
+    });
+
+    const x = useTransform(scrollYProgress, [0, 1], ['1%', '-95%']);
+
+    const galleryImages = [
+        { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Science_fair_project.jpg/1280px-Science_fair_project.jpg', alt: 'Science fair project', dataAiHint: 'science fair' },
+        { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Girl_uses_a_microscope_at_a_science_camp.jpg/1280px-Girl_uses_a_microscope_at_a_science_camp.jpg', alt: 'Girl uses a microscope', dataAiHint: 'student microscope' },
+        { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Robot_at_a_STEM_camp.jpg/1280px-Robot_at_a_STEM_camp.jpg', alt: 'Robot at a STEM camp', dataAiHint: 'student robot' },
+        { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/Computer_programming_class_for_kids.jpg/1280px-Computer_programming_class_for_kids.jpg', alt: 'Kids coding class', dataAiHint: 'students coding' },
+        { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Students_doing_an_experiment.jpg/1280px-Students_doing_an_experiment.jpg', alt: 'chemistry experiment', },
+    ];
+
+    return (
+        <section ref={galleryRef} className="gallery-section">
+            <AnimatedContent>
+                <h2 className="text-3xl md:text-4xl font-bold text-center mb-2 bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary">Moments of Brilliance</h2>
+                <p className="text-lg text-muted-foreground text-center mt-2 max-w-xl mx-auto mb-16">Explore our vibrant community in action.</p>
+            </AnimatedContent>
+            <motion.div style={{ x }} className="gallery-strip">
+               {galleryImages.map((image, index) => (
+                 <motion.div key={index} className="gallery-item"
+                    initial={{ opacity: 0, y: 100 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: index * 0.1, ease: 'easeOut' }}
+                    viewport={{ once: true }}
+                 >
+                    <Image src={image.src} alt={image.alt} fill style={{ objectFit: 'cover' }} data-ai-hint={image.dataAiHint} />
+                 </motion.div>
+               ))}
+            </motion.div>
+             <div className="scroll-hint">Scroll to explore more moments</div>
+        </section>
+    )
+}
+
 export default function PageContent() {
     const [events, setEvents] = useState<SubEvent[]>([]);
     const [loading, setLoading] = useState(true);
 
-    const [refTitle, inViewTitle] = useInView({ triggerOnce: true, threshold: 0.5 });
-    const [refPara1, inViewPara1] = useInView({ triggerOnce: true, threshold: 0.6 });
-    const [refImg1, inViewImg1] = useInView({ triggerOnce: true, threshold: 0.7 });
-    const [refPara2, inViewPara2] = useInView({ triggerOnce: true, threshold: 0.6 });
-    const [refImg2, inViewImg2] = useInView({ triggerOnce: true, threshold: 0.7 });
-    const [refPara3, inViewPara3] = useInView({ triggerOnce: true, threshold: 0.6 });
-    const [quoteRef, inViewQuote] = useInView({ triggerOnce: true, threshold: 0.5 });
+    const refTitle = useRef(null);
+    const inViewTitle = useInView(refTitle, { once: true, amount: 0.5 });
+    
+    const refPara1 = useRef(null);
+    const inViewPara1 = useInView(refPara1, { once: true, amount: 0.6 });
+    
+    const refImg1 = useRef(null);
+    const inViewImg1 = useInView(refImg1, { once: true, amount: 0.7 });
+
+    const refPara2 = useRef(null);
+    const inViewPara2 = useInView(refPara2, { once: true, amount: 0.6 });
+
+    const refImg2 = useRef(null);
+    const inViewImg2 = useInView(refImg2, { once: true, amount: 0.7 });
+
+    const refPara3 = useRef(null);
+    const inViewPara3 = useInView(refPara3, { once: true, amount: 0.6 });
+
+    const quoteRef = useRef(null);
+    const inViewQuote = useInView(quoteRef, { once: true, amount: 0.5 });
 
     const superpowers = [
         {
@@ -171,15 +224,6 @@ export default function PageContent() {
       },
     ];
 
-    const galleryImages = [
-        { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Science_fair_project.jpg/1280px-Science_fair_project.jpg', alt: 'Science fair project', dataAiHint: 'science fair' },
-        { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Girl_uses_a_microscope_at_a_science_camp.jpg/1280px-Girl_uses_a_microscope_at_a_science_camp.jpg', alt: 'Girl uses a microscope', dataAiHint: 'student microscope' },
-        { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Robot_at_a_STEM_camp.jpg/1280px-Robot_at_a_STEM_camp.jpg', alt: 'Robot at a STEM camp', dataAiHint: 'student robot' },
-        { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/Computer_programming_class_for_kids.jpg/1280px-Computer_programming_class_for_kids.jpg', alt: 'Kids coding class', dataAiHint: 'students coding' },
-        { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Students_doing_an_experiment.jpg/1280px-Students_doing_an_experiment.jpg', alt: 'Students doing an experiment', dataAiHint: 'chemistry experiment' },
-    ];
-
-
     return (
         <div className="space-y-24 md:space-y-32 bg-background z-10 relative w-full overflow-x-hidden">
             
@@ -230,7 +274,7 @@ export default function PageContent() {
                                 ref={refPara2}
                                 initial={{ opacity: 0, x: 100 }}
                                 animate={inViewPara2 ? { opacity: 1, x: 0 } : {}}
-                                transition={{ duration: 0.8, delay: 0.6, ease: "easeOut" }}
+                                transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
                                 className="space-y-4 text-lg text-muted-foreground md:order-2"
                             >
                                 <p>Our mission is to provide an engaging platform where students can explore scientific principles, critical thinking, and problem-solving through hands-on experiences and competitive events. We believe in nurturing the next generation of innovators and leaders by creating an environment that is not only challenging but also supportive and fun.</p>
@@ -239,7 +283,7 @@ export default function PageContent() {
                                 ref={refImg2}
                                 initial={{ opacity: 0, x: -100, scale: 0.9 }}
                                 animate={inViewImg2 ? { opacity: 1, x: 0, scale: 1 } : {}}
-                                transition={{ duration: 0.9, delay: 0.8, ease: "easeOut" }}
+                                transition={{ duration: 0.9, delay: 0.4, ease: "easeOut" }}
                                 className="md:order-1"
                              >
                                 <div className="relative aspect-video rounded-xl shadow-2xl shadow-primary/20">
@@ -260,7 +304,7 @@ export default function PageContent() {
                                 ref={refPara3}
                                 initial={{ opacity: 0, y: 50 }}
                                 animate={inViewPara3 ? { opacity: 1, y: 0 } : {}}
-                                transition={{ duration: 0.8, delay: 1.0, ease: "easeOut" }}
+                                transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
                                 className="space-y-4 text-lg text-muted-foreground max-w-3xl mx-auto"
                             >
                                  <p>Join us in fostering the bright minds of tomorrow, where every experiment is a step towards discovery.</p>
@@ -370,25 +414,7 @@ export default function PageContent() {
                 </div>
             </SectionWrapper>
 
-            <section id="gallery" className="gallery-section">
-                <AnimatedContent>
-                    <h2 className="text-3xl md:text-4xl font-bold text-center mb-2 bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary">Moments of Brilliance</h2>
-                    <p className="text-lg text-muted-foreground text-center mt-2 max-w-xl mx-auto mb-16">Explore our vibrant community in action.</p>
-                </AnimatedContent>
-                <div className="gallery-strip">
-                   {galleryImages.map((image, index) => (
-                     <motion.div key={index} className="gallery-item"
-                        initial={{ opacity: 0, y: 100 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.5, delay: index * 0.1, ease: 'easeOut' }}
-                        viewport={{ once: true }}
-                     >
-                        <Image src={image.src} alt={image.alt} fill style={{ objectFit: 'cover' }} data-ai-hint={image.dataAiHint} />
-                     </motion.div>
-                   ))}
-                </div>
-                 <div className="scroll-hint">Scroll to explore more moments</div>
-            </section>
+            <GallerySection />
             
             <SectionWrapper>
                 <div className="container mx-auto px-4 text-center">
