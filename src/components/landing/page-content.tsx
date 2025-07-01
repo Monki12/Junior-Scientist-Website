@@ -71,33 +71,6 @@ const AnimatedContent = ({ children, direction = 'up', className, delay = 0 }: {
   );
 };
 
-const SectionWrapper = ({ children, className, id }: { children: React.ReactNode, className?: string, id?: string }) => {
-    const ref = useRef(null);
-    const { ref: inViewRef, inView } = useInView({
-      triggerOnce: true,
-      threshold: 0.1,
-    });
-    
-    // Combine refs
-    const setRefs = (node: any) => {
-        (ref as React.MutableRefObject<any>).current = node;
-        inViewRef(node);
-    };
-    
-    return (
-        <motion.section
-            id={id}
-            ref={setRefs}
-            className={cn("w-full py-12 md:py-20", className)}
-            initial={{ opacity: 0, y: 50 }}
-            animate={inView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.6, ease: "easeOut" }}
-        >
-            {children}
-        </motion.section>
-    )
-}
-
 function GallerySection() {
     const galleryRef = useRef(null);
     const { scrollYProgress } = useScroll({
@@ -143,60 +116,60 @@ export default function PageContent() {
     const [loading, setLoading] = useState(true);
 
     const refTitle = useRef(null);
-    const { ref: inViewRefTitle, inView: inViewTitle } = useInView({ triggerOnce: true, threshold: 0.5 });
+    const inViewTitle = useInView(refTitle, { once: true, threshold: 0.5 });
     
     const refPara1 = useRef(null);
-    const { ref: inViewRefPara1, inView: inViewPara1 } = useInView({ triggerOnce: true, threshold: 0.6 });
+    const inViewPara1 = useInView(refPara1, { once: true, threshold: 0.6 });
     
     const refImg1 = useRef(null);
-    const { ref: inViewRefImg1, inView: inViewImg1 } = useInView({ triggerOnce: true, threshold: 0.7 });
+    const inViewImg1 = useInView(refImg1, { once: true, threshold: 0.7 });
 
     const refPara2 = useRef(null);
-    const { ref: inViewRefPara2, inView: inViewPara2 } = useInView({ triggerOnce: true, threshold: 0.6 });
+    const inViewPara2 = useInView(refPara2, { once: true, threshold: 0.6 });
 
     const refImg2 = useRef(null);
-    const { ref: inViewRefImg2, inView: inViewImg2 } = useInView({ triggerOnce: true, threshold: 0.7 });
+    const inViewImg2 = useInView(refImg2, { once: true, threshold: 0.7 });
 
     const refPara3 = useRef(null);
-    const { ref: inViewRefPara3, inView: inViewPara3 } = useInView({ triggerOnce: true, threshold: 0.6 });
+    const inViewPara3 = useInView(refPara3, { once: true, threshold: 0.6 });
 
     const quoteRef = useRef(null);
-    const { ref: inViewRefQuote, inView: inViewQuote } = useInView({ triggerOnce: true, threshold: 0.5 });
+    const inViewQuote = useInView(quoteRef, { once: true, threshold: 0.5 });
     
     const superpowers = [
-        {
-          id: 1,
-          mainImage: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cf/Teenage_boy_reading.jpg/1200px-Teenage_boy_reading.jpg',
-          icon: 'https://img.icons8.com/ios-filled/100/A800FF/speech-bubble--v1.png',
-          title: "The Thinker",
-          description: "Excel in debating, global affairs, and public speaking? Born diplomat!",
-          gradient: "from-[#A800FF] to-[#6C00FF]",
-        },
-        {
-          id: 2,
-          mainImage: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Kids_at_science_fair.jpg/1280px-Kids_at_science_fair.jpg',
-          icon: 'https://img.icons8.com/ios-filled/100/A800FF/brain.png',
-          title: "The Brainiac",
-          description: "Obsessed with facts, quizzes, and science puzzles? You see the patterns others miss.",
-          gradient: "from-[#4D00FF] to-[#0051FF]",
-        },
-        {
-          id: 3,
-          mainImage: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/Chess_problem.jpg/1280px-Chess_problem.jpg',
-          icon: 'https://img.icons8.com/ios-filled/100/A800FF/gears.png',
-          title: "The Strategist",
-          description: "Enjoy solving math riddles and cracking logic games? Master of numbers and patterns.",
-          gradient: "from-[#009688] to-[#4DB6AC]",
-        },
-        {
-          id: 4,
-          mainImage: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Kid_with_robot_at_exhibition.jpg/1280px-Kid_with_robot_at_exhibition.jpg',
-          icon: 'https://img.icons8.com/ios-filled/100/A800FF/rocket.png',
-          title: "The Innovator",
-          description: "Love to design, build, and bring new ideas to life? Future tech pioneer!",
-          gradient: "from-[#FF0077] to-[#A800FF]",
-        },
-      ];
+    {
+      id: 1,
+      mainImage: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cf/Teenage_boy_reading.jpg/1200px-Teenage_boy_reading.jpg',
+      icon: 'https://img.icons8.com/ios-filled/100/A800FF/speech-bubble--v1.png',
+      title: "The Thinker",
+      description: "Excel in debating, global affairs, and public speaking? Born diplomat!",
+      gradient: "from-[#A800FF] to-[#6C00FF]",
+    },
+    {
+      id: 2,
+      mainImage: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Kids_at_science_fair.jpg/1280px-Kids_at_science_fair.jpg',
+      icon: 'https://img.icons8.com/ios-filled/100/A800FF/brain.png',
+      title: "The Brainiac",
+      description: "Obsessed with facts, quizzes, and science puzzles? You see the patterns others miss.",
+      gradient: "from-[#4D00FF] to-[#0051FF]",
+    },
+    {
+      id: 3,
+      mainImage: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/Chess_problem.jpg/1280px-Chess_problem.jpg',
+      icon: 'https://img.icons8.com/ios-filled/100/A800FF/gears.png',
+      title: "The Strategist",
+      description: "Enjoy solving math riddles and cracking logic games? Master of numbers and patterns.",
+      gradient: "from-[#009688] to-[#4DB6AC]",
+    },
+    {
+      id: 4,
+      mainImage: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Kid_with_robot_at_exhibition.jpg/1280px-Kid_with_robot_at_exhibition.jpg',
+      icon: 'https://img.icons8.com/ios-filled/100/A800FF/rocket.png',
+      title: "The Innovator",
+      description: "Love to design, build, and bring new ideas to life? Future tech pioneer!",
+      gradient: "from-[#FF0077] to-[#A800FF]",
+    },
+  ];
 
     useEffect(() => {
         const fetchEvents = async () => {
@@ -236,10 +209,10 @@ export default function PageContent() {
     return (
         <div className="space-y-24 md:space-y-32 bg-background z-10 relative w-full overflow-x-hidden">
             
-            <SectionWrapper id="about-us" className="scroll-mt-20">
+            <section id="about-us" className="w-full py-12 md:py-20 scroll-mt-20">
                 <div className="container mx-auto px-4">
                     <motion.h2
-                        ref={inViewRefTitle}
+                        ref={refTitle}
                         className="text-3xl md:text-4xl font-bold text-center mb-16 bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary"
                         initial={{ opacity: 0, y: 50 }}
                         animate={inViewTitle ? { opacity: 1, y: 0 } : {}}
@@ -250,8 +223,8 @@ export default function PageContent() {
                     
                     <div className="space-y-12 md:space-y-16">
                         <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
-                            <motion.div
-                                ref={inViewRefPara1}
+                             <motion.div
+                                ref={refPara1}
                                 initial={{ opacity: 0, x: -100 }}
                                 animate={inViewPara1 ? { opacity: 1, x: 0 } : {}}
                                 transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
@@ -260,7 +233,7 @@ export default function PageContent() {
                                 <p>At Junior Scientist, we are passionate about fostering curiosity and innovation in young minds.</p>
                             </motion.div>
                              <motion.div
-                                ref={inViewRefImg1}
+                                ref={refImg1}
                                 initial={{ opacity: 0, x: 100, scale: 0.9 }}
                                 animate={inViewImg1 ? { opacity: 1, x: 0, scale: 1 } : {}}
                                 transition={{ duration: 0.9, delay: 0.4, ease: "easeOut" }}
@@ -280,7 +253,7 @@ export default function PageContent() {
 
                         <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
                             <motion.div 
-                                ref={inViewRefPara2}
+                                ref={refPara2}
                                 initial={{ opacity: 0, x: 100 }}
                                 animate={inViewPara2 ? { opacity: 1, x: 0 } : {}}
                                 transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
@@ -289,7 +262,7 @@ export default function PageContent() {
                                 <p>Our mission is to provide an engaging platform where students can explore scientific principles, critical thinking, and problem-solving through hands-on experiences and competitive events. We believe in nurturing the next generation of innovators and leaders by creating an environment that is not only challenging but also supportive and fun.</p>
                             </motion.div>
                              <motion.div
-                                ref={inViewRefImg2}
+                                ref={refImg2}
                                 initial={{ opacity: 0, x: -100, scale: 0.9 }}
                                 animate={inViewImg2 ? { opacity: 1, x: 0, scale: 1 } : {}}
                                 transition={{ duration: 0.9, delay: 0.4, ease: "easeOut" }}
@@ -310,7 +283,7 @@ export default function PageContent() {
                         
                         <div className="text-center">
                             <motion.div
-                                ref={inViewRefPara3}
+                                ref={refPara3}
                                 initial={{ opacity: 0, y: 50 }}
                                 animate={inViewPara3 ? { opacity: 1, y: 0 } : {}}
                                 transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
@@ -321,9 +294,9 @@ export default function PageContent() {
                         </div>
                     </div>
                 </div>
-            </SectionWrapper>
+            </section>
             
-            <SectionWrapper id="stats" className="bg-card/50">
+            <section id="stats" className="w-full py-12 md:py-20 bg-card/50">
                 <div className="container mx-auto px-4">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
                         <AnimatedContent delay={0}>
@@ -349,9 +322,9 @@ export default function PageContent() {
                         </AnimatedContent>
                     </div>
                 </div>
-            </SectionWrapper>
+            </section>
 
-            <SectionWrapper id="why-choose-us">
+            <section id="why-choose-us" className="w-full py-12 md:py-20">
                 <div className="container mx-auto px-4">
                     <AnimatedContent>
                         <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary">Why Choose Junior Scientist?</h2>
@@ -368,9 +341,9 @@ export default function PageContent() {
                         ))}
                     </div>
                 </div>
-            </SectionWrapper>
+            </section>
 
-            <SectionWrapper id="superpowers">
+            <section id="superpowers" className="w-full py-12 md:py-20">
                 <div className="container mx-auto px-4">
                     <AnimatedContent>
                       <h2 className="text-center font-headline bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary" style={{ fontSize: 'clamp(2.5rem, 6vw, 4rem)', fontWeight: 800 }}>What's Your Superpower?</h2>
@@ -379,23 +352,16 @@ export default function PageContent() {
                     {loading ? (
                         <div className="flex justify-center items-center h-48"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>
                     ) : (
-                    <motion.div 
+                    <div 
                         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 justify-items-center"
-                        variants={{
-                            visible: { transition: { staggerChildren: 0.15 } }
-                        }}
-                        initial="hidden"
-                        whileInView="visible"
-                        viewport={{ once: true, amount: 0.2 }}
                     >
                         {superpowers.map((superpower, i) => (
                            <motion.div 
                                 key={superpower.id}
-                                variants={{
-                                    hidden: { opacity: 0, y: 50 * (i % 2 === 0 ? 1 : -1) },
-                                    visible: { opacity: 1, y: 0 }
-                                }}
-                                transition={{ duration: 0.8, ease: "easeOut" }}
+                                initial={{ opacity: 0, y: 50 * (i % 2 === 0 ? 1 : -1) }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.8, delay: i * 0.1, ease: 'easeOut' }}
+                                viewport={{ once: true, amount: 0.2 }}
                             >
                             <TiltedFlipCard
                                 id={superpower.id}
@@ -415,17 +381,17 @@ export default function PageContent() {
                             />
                             </motion.div>
                         ))}
-                    </motion.div>
+                    </div>
                     )}
                 </div>
-            </SectionWrapper>
+            </section>
 
             <GallerySection />
             
-            <SectionWrapper>
+            <section className="w-full py-12 md:py-20">
                 <div className="container mx-auto px-4 text-center">
                     <motion.div
-                        ref={inViewRefQuote}
+                        ref={quoteRef}
                         className="quote-container"
                         initial={{ opacity: 0, x: -200 }}
                         animate={inViewQuote ? { opacity: 1, x: 0 } : {}}
@@ -457,9 +423,9 @@ export default function PageContent() {
                         </motion.p>
                     </motion.div>
                 </div>
-            </SectionWrapper>
+            </section>
 
-            <SectionWrapper id="contact-us" className="bg-card/50 scroll-mt-20">
+            <section id="contact-us" className="w-full py-12 md:py-20 bg-card/50 scroll-mt-20">
                 <div className="container mx-auto px-4 text-center">
                     <AnimatedContent>
                         <h2 className="text-3xl md:text-4xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary">Get in Touch</h2>
@@ -489,7 +455,7 @@ export default function PageContent() {
                         <Link href="#" aria-label="Twitter" className="text-muted-foreground hover:text-primary transition-transform hover:scale-125"><Twitter size={28} /></Link>
                     </AnimatedContent>
                 </div>
-            </SectionWrapper>
+            </section>
         </div>
     );
 }
