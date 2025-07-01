@@ -1,4 +1,3 @@
-
 'use client';
 
 import Image from 'next/image';
@@ -12,6 +11,7 @@ import { db } from '@/lib/firebase';
 import type { SubEvent } from '@/types';
 import { motion, useInView, animate } from 'framer-motion';
 import TiltedCard from '@/components/ui/TiltedCard';
+import { cn } from '@/lib/utils';
 
 interface Superpower {
     id: number;
@@ -189,10 +189,21 @@ export default function PageContent() {
                     
                     <div className="space-y-12 md:space-y-16">
                         <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
-                            <AnimatedContent direction="left" className="space-y-4 text-lg text-muted-foreground">
+                            <motion.div
+                              initial={{ opacity: 0, x: -100 }}
+                              whileInView={{ opacity: 1, x: 0 }}
+                              transition={{ duration: 0.8, ease: "easeOut" }}
+                              viewport={{ once: true, amount: 0.5 }}
+                              className="space-y-4 text-lg text-muted-foreground"
+                            >
                                 <p>At Junior Scientist, we are passionate about fostering curiosity and innovation in young minds.</p>
-                            </AnimatedContent>
-                             <AnimatedContent direction="right">
+                            </motion.div>
+                             <motion.div
+                                initial={{ opacity: 0, x: 100, scale: 0.9 }}
+                                whileInView={{ opacity: 1, x: 0, scale: 1 }}
+                                transition={{ duration: 0.9, ease: "easeOut" }}
+                                viewport={{ once: true, amount: 0.5 }}
+                             >
                                 <div className="relative aspect-video rounded-xl shadow-2xl shadow-primary/20">
                                     <Image
                                         src="https://i.ibb.co/C07F81B/collaboration.jpg"
@@ -203,14 +214,26 @@ export default function PageContent() {
                                         className="rounded-xl"
                                     />
                                 </div>
-                            </AnimatedContent>
+                            </motion.div>
                         </div>
 
                         <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
-                            <AnimatedContent direction="right" className="space-y-4 text-lg text-muted-foreground md:order-2">
+                            <motion.div 
+                                initial={{ opacity: 0, x: 100 }}
+                                whileInView={{ opacity: 1, x: 0 }}
+                                transition={{ duration: 0.8, ease: "easeOut" }}
+                                viewport={{ once: true, amount: 0.5 }}
+                                className="space-y-4 text-lg text-muted-foreground md:order-2"
+                            >
                                 <p>Our mission is to provide an engaging platform where students can explore scientific principles, critical thinking, and problem-solving through hands-on experiences and competitive events. We believe in nurturing the next generation of innovators and leaders by creating an environment that is not only challenging but also supportive and fun.</p>
-                            </AnimatedContent>
-                             <AnimatedContent direction="left" className="md:order-1">
+                            </motion.div>
+                             <motion.div
+                                initial={{ opacity: 0, x: -100, scale: 0.9 }}
+                                whileInView={{ opacity: 1, x: 0, scale: 1 }}
+                                transition={{ duration: 0.9, ease: "easeOut" }}
+                                viewport={{ once: true, amount: 0.5 }}
+                                className="md:order-1"
+                             >
                                 <div className="relative aspect-video rounded-xl shadow-2xl shadow-primary/20">
                                      <Image
                                         src="https://i.ibb.co/q1zR2x9/abstract-tech.jpg"
@@ -221,13 +244,19 @@ export default function PageContent() {
                                         className="rounded-xl"
                                     />
                                 </div>
-                            </AnimatedContent>
+                            </motion.div>
                         </div>
                         
                         <div className="text-center">
-                            <AnimatedContent direction="up" className="space-y-4 text-lg text-muted-foreground max-w-3xl mx-auto">
+                            <motion.div
+                                initial={{ opacity: 0, y: 50 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.8, ease: "easeOut" }}
+                                viewport={{ once: true, amount: 0.8 }}
+                                className="space-y-4 text-lg text-muted-foreground max-w-3xl mx-auto"
+                            >
                                  <p>Join us in fostering the bright minds of tomorrow, where every experiment is a step towards discovery.</p>
-                            </AnimatedContent>
+                            </motion.div>
                         </div>
                     </div>
                 </div>
@@ -289,11 +318,25 @@ export default function PageContent() {
                     {loading ? (
                         <div className="flex justify-center items-center h-48"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>
                     ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 justify-items-center">
+                    <motion.div 
+                        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 justify-items-center"
+                        variants={{
+                            visible: { transition: { staggerChildren: 0.15 } }
+                        }}
+                        initial="hidden"
+                        whileInView="visible"
+                        viewport={{ once: true, amount: 0.2 }}
+                    >
                         {superpowers.map((superpower, i) => (
-                           <AnimatedContent key={superpower.id} delay={i * 0.15}>
-                            <TiltedCard
+                           <motion.div 
                                 key={superpower.id}
+                                variants={{
+                                    hidden: { opacity: 0, y: 50 * (i % 2 === 0 ? 1 : -1) },
+                                    visible: { opacity: 1, y: 0 }
+                                }}
+                                transition={{ duration: 0.8, ease: "easeOut" }}
+                            >
+                            <TiltedCard
                                 superpowerImage={superpower.mainImage}
                                 superpowerIcon={superpower.icon}
                                 superpowerTitle={superpower.title}
@@ -312,9 +355,9 @@ export default function PageContent() {
                                 </ul>
                                 }
                             />
-                            </AnimatedContent>
+                            </motion.div>
                         ))}
-                    </div>
+                    </motion.div>
                     )}
                 </div>
             </SectionWrapper>
