@@ -28,8 +28,12 @@ function BackgroundVisuals() {
                 className="absolute top-0 left-1/4 w-1/2 h-[200%] bg-gradient-to-b from-transparent via-accent/5 to-transparent"
             />
             <MagnetLines
-              className="absolute inset-0 opacity-20"
-              lineColor="hsl(var(--primary))"
+              className="absolute inset-0 opacity-40"
+              baseColor="rgba(168, 0, 255, 0.15)"
+              interactiveColor="rgba(74, 0, 255, 0.8)"
+              lineWidth="1px"
+              lineHeight="4vmin"
+              interactionRadius={250}
             />
         </div>
     );

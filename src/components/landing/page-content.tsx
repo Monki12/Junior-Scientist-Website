@@ -116,8 +116,16 @@ export default function PageContent() {
                             <p>At Junior Scientist, we are passionate about fostering curiosity and innovation in young minds. Our mission is to provide an engaging platform where students can explore scientific principles, critical thinking, and problem-solving through hands-on experiences and competitive events.</p>
                             <p>We believe in nurturing the next generation of innovators and leaders by creating an environment that is not only challenging but also supportive and fun.</p>
                         </motion.div>
-                         <motion.div initial={{ opacity: 0, scale: 0.9 }} whileInView={{ opacity: 1, scale: 1 }} transition={{ duration: 0.6, delay: 0.4 }} viewport={{ once: true }} className="relative aspect-video rounded-xl shadow-2xl shadow-primary/20">
-                            <Image src="https://placehold.co/600x400.png" alt="Abstract technology background" data-ai-hint="abstract tech" layout="fill" objectFit="cover" className="rounded-xl" />
+                         <motion.div initial={{ opacity: 0, scale: 0.9 }} whileInView={{ opacity: 1, scale: 1 }} transition={{ duration: 0.6, delay: 0.4 }} viewport={{ once: true }} className="grid grid-cols-2 gap-4">
+                            <div className="relative aspect-square rounded-xl shadow-2xl shadow-primary/20 col-span-2">
+                                <Image src="https://placehold.co/600x400.png" alt="Abstract data visualization" data-ai-hint="data visualization" fill style={{ objectFit: 'cover' }} className="rounded-xl" />
+                            </div>
+                            <div className="relative aspect-square rounded-xl shadow-2xl shadow-primary/20">
+                                <Image src="https://placehold.co/400x400.png" alt="Students collaborating on a science project" data-ai-hint="students collaborating" fill style={{ objectFit: 'cover' }} className="rounded-xl" />
+                            </div>
+                            <div className="relative aspect-square rounded-xl shadow-2xl shadow-primary/20">
+                                <Image src="https://placehold.co/400x400.png" alt="Glowing trophy for an award" data-ai-hint="glowing trophy" fill style={{ objectFit: 'cover' }} className="rounded-xl" />
+                            </div>
                         </motion.div>
                     </div>
                 </div>

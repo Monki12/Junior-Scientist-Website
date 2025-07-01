@@ -18,25 +18,37 @@ const Line = memo(function Line({
   mouseX,
   mouseY,
   baseAngle,
-  lineColor,
+  baseColor,
+  interactiveColor,
   lineWidth,
   lineHeight,
+  interactionRadius,
 }: {
   x: number;
   y: number;
   mouseX: number | null;
   mouseY: number | null;
   baseAngle: number;
-  lineColor: string;
+  baseColor: string;
+  interactiveColor: string;
   lineWidth: string;
   lineHeight: string;
+  interactionRadius: number;
 }) {
   const lineRef = useRef<HTMLDivElement>(null);
-  const [angle, setAngle] = useState(baseAngle);
+  const [style, setStyle] = useState<React.CSSProperties>({
+    transform: `translate(-50%, -50%) rotate(${baseAngle}deg) scale(1)`,
+    backgroundColor: baseColor,
+    boxShadow: 'none',
+  });
 
   useEffect(() => {
     if (mouseX === null || mouseY === null) {
-      setAngle(baseAngle);
+      setStyle({
+        transform: `translate(-50%, -50%) rotate(${baseAngle}deg) scale(1)`,
+        backgroundColor: baseColor,
+        boxShadow: 'none',
+      });
       return;
     }
 
@@ -44,10 +56,26 @@ const Line = memo(function Line({
     if (rect) {
       const lineX = rect.left + rect.width / 2;
       const lineY = rect.top + rect.height / 2;
-      const newAngle = calculateAngle(lineX, lineY, mouseX, mouseY);
-      setAngle(newAngle);
+      
+      const distance = Math.sqrt(Math.pow(lineX - mouseX, 2) + Math.pow(lineY - mouseY, 2));
+      const proximity = Math.max(0, 1 - distance / interactionRadius);
+
+      if (proximity > 0) {
+        const newAngle = calculateAngle(lineX, lineY, mouseX, mouseY);
+        setStyle({
+          transform: `translate(-50%, -50%) rotate(${newAngle}deg) scale(${1 + proximity * 0.5})`,
+          backgroundColor: interactiveColor,
+          boxShadow: `0 0 ${proximity * 15}px ${interactiveColor}`,
+        });
+      } else {
+         setStyle({
+          transform: `translate(-50%, -50%) rotate(${baseAngle}deg) scale(1)`,
+          backgroundColor: baseColor,
+          boxShadow: 'none',
+        });
+      }
     }
-  }, [mouseX, mouseY, baseAngle]);
+  }, [mouseX, mouseY, baseAngle, baseColor, interactiveColor, interactionRadius]);
 
   return (
     <div
@@ -58,11 +86,10 @@ const Line = memo(function Line({
         left: `${x}%`,
         width: lineHeight,
         height: lineWidth,
-        backgroundColor: lineColor,
-        transform: `translate(-50%, -50%) rotate(${angle}deg)`,
+        transition: 'transform 0.2s ease-out, background-color 0.2s ease-out, box-shadow 0.2s ease-out',
+        willChange: 'transform, background-color, box-shadow',
         transformOrigin: 'center',
-        transition: 'transform 0.2s ease-out',
-        willChange: 'transform',
+        ...style,
       }}
     />
   );
@@ -73,20 +100,24 @@ export default function MagnetLines({
   rows = 15,
   columns = 15,
   containerSize = '100%',
-  lineColor = '#efefef',
-  lineWidth = '0.15vmin',
+  baseColor = 'rgba(168, 0, 255, 0.15)', // Default subtle purple
+  interactiveColor = 'rgba(74, 0, 255, 0.8)', // Default electric blue
+  lineWidth = '1px',
   lineHeight = '4vmin',
   baseAngle = -20,
+  interactionRadius = 200,
   className,
   style,
 }: {
   rows?: number;
   columns?: number;
   containerSize?: string;
-  lineColor?: string;
+  baseColor?: string;
+  interactiveColor?: string;
   lineWidth?: string;
   lineHeight?: string;
   baseAngle?: number;
+  interactionRadius?: number;
   className?: string;
   style?: React.CSSProperties;
 }) {
@@ -149,9 +180,11 @@ export default function MagnetLines({
           mouseX={mousePosition.x}
           mouseY={mousePosition.y}
           baseAngle={baseAngle}
-          lineColor={lineColor}
+          baseColor={baseColor}
+          interactiveColor={interactiveColor}
           lineWidth={lineWidth}
           lineHeight={lineHeight}
+          interactionRadius={interactionRadius}
         />
       ))}
     </div>
