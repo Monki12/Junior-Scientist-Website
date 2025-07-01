@@ -58,7 +58,7 @@ export default function JuniorScientistHomePage() {
             transition={{ duration: 0.8, ease: "easeOut" }}
           >
             <Logo className="h-28 w-20 md:h-32 md:w-24 mx-auto mb-4" />
-            <h1 className="text-5xl md:text-7xl lg:text-8xl font-extrabold tracking-tight text-primary font-headline" style={{ textShadow: '0 0 15px hsla(var(--primary-foreground), 0.5), 0 0 25px hsla(var(--accent), 0.3)' }}>
+            <h1 className="text-5xl md:text-7xl lg:text-8xl font-extrabold tracking-tight text-primary font-headline" style={{ textShadow: '0 0 15px hsla(var(--primary), 0.5), 0 0 25px hsla(var(--accent), 0.3)' }}>
               JUNIOR SCIENTIST
             </h1>
             <p className="mt-6 text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">

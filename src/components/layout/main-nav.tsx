@@ -59,7 +59,7 @@ export default function MainNav() {
   );
 
   // Don't render the main nav on dashboard pages, as the new layout takes over
-  if (pathname.startsWith('/(dashboard)') || pathname.startsWith('/dashboard') || pathname.startsWith('/staff') || pathname.startsWith('/leaderboard')) {
+  if (pathname.startsWith('/dashboard') || pathname.startsWith('/staff') || pathname.startsWith('/leaderboard') || pathname.startsWith('/(dashboard)') || pathname.startsWith('/my-events') || pathname.startsWith('/my-registrations') || pathname.startsWith('/ocr-tool') || pathname.startsWith('/profile') || pathname.startsWith('/students') || pathname.startsWith('/tasks') ) {
       return null;
   }
   
@@ -80,24 +80,25 @@ export default function MainNav() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
       <div className="container flex h-16 items-center">
-        <Link href="/" className="flex items-center" aria-label="Junior Scientist Home">
+        <Link href="/" className="flex items-center mr-6" aria-label="Junior Scientist Home">
           <Logo className="h-12 w-8" />
         </Link>
         
-        <div className="ml-auto flex items-center gap-2">
-          <nav className="hidden md:flex items-center space-x-1 lg:space-x-2">
+        <nav className="hidden md:flex items-center space-x-1 lg:space-x-2">
             {publicNavLinks.map(link => (
                 <NavLinkItem key={link.href} href={link.href} label={link.label} Icon={link.icon} />
             ))}
-          </nav>
-
+        </nav>
+        
+        <div className="ml-auto flex items-center gap-2">
+          <LightBulbToggle />
+          
           <div className="hidden md:flex items-center gap-2">
-             <LightBulbToggle />
              {loading ? (
                <div className="h-9 w-9 animate-pulse rounded-full bg-muted"></div>
              ) : authUser ? (
                 <Button asChild>
-                    <Link href="/dashboard"><LayoutDashboard className="mr-2"/> Go to Dashboard</Link>
+                    <Link href="/dashboard"><LayoutDashboard className="mr-2"/> Dashboard</Link>
                 </Button>
              ) : (
                 <>
@@ -112,18 +113,18 @@ export default function MainNav() {
           </div>
           
           <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-            <SheetTrigger asChild className="md:hidden">
+            <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="h-9 w-9">
                 <Menu className="h-6 w-6" />
                 <span className="sr-only">Toggle menu</span>
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-[280px] p-0 flex flex-col bg-card">
-                <SheetHeader className="border-b p-4 flex flex-row justify-between items-center">
+                <SheetHeader className="border-b p-4">
                   <Link href="/" className="flex items-center" aria-label="Junior Scientist Home" onClick={() => setIsMobileMenuOpen(false)}>
                     <Logo className="h-12 w-8" />
+                    <span className="font-bold ml-2">Junior Scientist</span>
                   </Link>
-                  <LightBulbToggle />
                 </SheetHeader>
                 <nav className="flex-grow space-y-1 p-4 overflow-y-auto">
                   {publicNavLinks.map(link => (
@@ -133,7 +134,7 @@ export default function MainNav() {
                 <div className="border-t p-4 mt-auto">
                   {authUser ? (
                      <Button asChild className="w-full" onClick={() => setIsMobileMenuOpen(false)}>
-                        <Link href="/dashboard"><LayoutDashboard className="mr-2"/> Go to Dashboard</Link>
+                        <Link href="/dashboard"><LayoutDashboard className="mr-2"/> Dashboard</Link>
                     </Button>
                   ) : !loading && (
                     <div className="space-y-2">
