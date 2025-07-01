@@ -91,6 +91,40 @@ function AnimatedNumber({ to, suffix = '', prefix = '' }: { to: number, suffix?:
     return <p ref={ref} className="text-4xl lg:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary" style={{ filter: 'drop-shadow(0 0 10px hsl(var(--primary) / 0.5))' }} >{prefix}0{suffix}</p>;
 }
 
+
+// Helper component for animated content reveals on scroll
+const AnimatedContent = ({ children, direction = 'up', className }: { children: React.ReactNode, direction?: 'up' | 'left' | 'right', className?: string }) => {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, amount: 0.3 });
+
+  const variants = {
+    hidden: { 
+      opacity: 0, 
+      x: direction === 'left' ? -100 : direction === 'right' ? 100 : 0,
+      y: direction === 'up' ? 50 : 0,
+    },
+    visible: { 
+      opacity: 1, 
+      x: 0,
+      y: 0,
+    },
+  };
+
+  return (
+    <motion.div
+      ref={ref}
+      className={className}
+      variants={variants}
+      initial="hidden"
+      animate={isInView ? "visible" : "hidden"}
+      transition={{ duration: 0.8, ease: "easeOut" }}
+    >
+      {children}
+    </motion.div>
+  );
+};
+
+
 export default function PageContent() {
     const [events, setEvents] = useState<SubEvent[]>([]);
     const [loading, setLoading] = useState(true);
@@ -137,28 +171,59 @@ export default function PageContent() {
     return (
         <div className="space-y-24 md:space-y-32 bg-background z-10 relative w-full overflow-x-hidden">
             
-            <motion.section id="about-us" className="w-full py-12 md:py-20 scroll-mt-20" initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.2 }} variants={sectionVariants}>
+            <section id="about-us" className="w-full py-12 md:py-20 scroll-mt-20">
                 <div className="container mx-auto px-4">
-                    <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary">About Junior Scientist</h2>
-                    <div className="grid md:grid-cols-2 gap-12 items-center">
-                         <motion.div initial={{ opacity: 0, x: -50 }} whileInView={{ opacity: 1, x: 0 }} transition={{ duration: 0.6 }} viewport={{ once: true, amount: 0.3 }} className="space-y-4 text-lg text-muted-foreground">
-                            <p>At Junior Scientist, we are passionate about fostering curiosity and innovation in young minds. Our mission is to provide an engaging platform where students can explore scientific principles, critical thinking, and problem-solving through hands-on experiences and competitive events.</p>
-                            <p>We believe in nurturing the next generation of innovators and leaders by creating an environment that is not only challenging but also supportive and fun.</p>
-                        </motion.div>
-                         <motion.div initial={{ opacity: 0, x: 50 }} whileInView={{ opacity: 1, x: 0 }} transition={{ duration: 0.6 }} viewport={{ once: true, amount: 0.3 }} className="grid grid-cols-2 gap-4">
-                            <div className="relative aspect-square rounded-xl shadow-2xl shadow-primary/20 col-span-2">
-                                <Image src="https://placehold.co/600x400.png" alt="Abstract data visualization" data-ai-hint="data visualization" fill style={{ objectFit: 'cover' }} className="rounded-xl" />
-                            </div>
-                            <div className="relative aspect-square rounded-xl shadow-2xl shadow-primary/20">
-                                <Image src="https://placehold.co/400x400.png" alt="Students collaborating on a science project" data-ai-hint="students collaborating" fill style={{ objectFit: 'cover' }} className="rounded-xl" />
-                            </div>
-                            <div className="relative aspect-square rounded-xl shadow-2xl shadow-primary/20">
-                                <Image src="https://placehold.co/400x400.png" alt="Glowing trophy for an award" data-ai-hint="glowing trophy" fill style={{ objectFit: 'cover' }} className="rounded-xl" />
-                            </div>
-                        </motion.div>
+                    <AnimatedContent direction="up">
+                        <h2 className="text-3xl md:text-4xl font-bold text-center mb-16 bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary">
+                            About Junior Scientist
+                        </h2>
+                    </AnimatedContent>
+                    
+                    <div className="space-y-16 md:space-y-24">
+                        <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
+                            <AnimatedContent direction="left" className="space-y-4 text-lg text-muted-foreground">
+                                <p>At Junior Scientist, we are passionate about fostering curiosity and innovation in young minds.</p>
+                            </AnimatedContent>
+                            <AnimatedContent direction="right">
+                                <div className="relative aspect-video rounded-xl shadow-2xl shadow-primary/20">
+                                    <Image
+                                        src="https://i.ibb.co/C07F81B/collaboration.jpg"
+                                        alt="Students collaborating on a science project"
+                                        data-ai-hint="students collaborating"
+                                        fill
+                                        style={{ objectFit: 'cover' }}
+                                        className="rounded-xl"
+                                    />
+                                </div>
+                            </AnimatedContent>
+                        </div>
+
+                        <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
+                            <AnimatedContent direction="right" className="space-y-4 text-lg text-muted-foreground order-1 md:order-2">
+                                <p>Our mission is to provide an engaging platform where students can explore scientific principles, critical thinking, and problem-solving through hands-on experiences and competitive events. We believe in nurturing the next generation of innovators and leaders by creating an environment that is not only challenging but also supportive and fun.</p>
+                            </AnimatedContent>
+                             <AnimatedContent direction="left" className="order-2 md:order-1">
+                                <div className="relative aspect-video rounded-xl shadow-2xl shadow-primary/20">
+                                    <Image
+                                        src="https://i.ibb.co/q1zR2x9/abstract-tech.jpg"
+                                        alt="Abstract technology visualization"
+                                        data-ai-hint="abstract technology"
+                                        fill
+                                        style={{ objectFit: 'cover' }}
+                                        className="rounded-xl"
+                                    />
+                                </div>
+                            </AnimatedContent>
+                        </div>
+                        
+                        <div className="text-center">
+                            <AnimatedContent direction="up" className="space-y-4 text-lg text-muted-foreground max-w-3xl mx-auto">
+                                 <p>Join us in fostering the bright minds of tomorrow, where every experiment is a step towards discovery.</p>
+                            </AnimatedContent>
+                        </div>
                     </div>
                 </div>
-            </motion.section>
+            </section>
             
             <motion.section id="stats" className="w-full py-12 md:py-20 bg-card/50" initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.3 }} variants={sectionVariants}>
                 <div className="container mx-auto px-4">
