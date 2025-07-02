@@ -19,6 +19,10 @@ service cloud.firestore {
              : 'no_role';
     }
 
+    function isRole(role) {
+      return isSignedIn() && getUserRole(request.auth.uid) == role;
+    }
+
     function isRoleIn(roles) {
       return isSignedIn() && getUserRole(request.auth.uid) in roles;
     }
@@ -34,40 +38,53 @@ service cloud.firestore {
     function isOverallHeadOrAdmin() {
       return isRoleIn(['overall_head', 'admin']);
     }
-
-    // --- BOARD & TASK HELPER FUNCTIONS ---
-    function canManageBoards() {
-      return isRoleIn(['event_representative', 'overall_head', 'admin']);
-    }
-
+    
+    // --- NEW HELPER FUNCTIONS FOR BOARDS & TASKS ---
     function isMemberOfBoard(boardId) {
-      // Ensure the board document exists and the user's UID is in the memberUids list.
-      return isSignedIn() && exists(/databases/$(database)/documents/boards/$(boardId))
-             && request.auth.uid in get(/databases/$(database)/documents/boards/$(boardId)).data.memberUids;
+        return exists(/databases/$(database)/documents/boards/$(boardId)) &&
+               request.auth.uid in get(/databases/$(database)/documents/boards/$(boardId)).data.memberUids;
+    }
+
+    function canManageBoard(boardId) {
+        let board = get(/databases/$(database)/documents/boards/$(boardId)).data;
+        return isOverallHeadOrAdmin() || (
+            board.managerUids != null && request.auth.uid in board.managerUids
+        );
     }
     
-    // --- EVENT-SPECIFIC HELPER FUNCTIONS ---
-    function isManagerForEvent(eventId) {
-      return isSignedIn() && (
-        isOverallHeadOrAdmin() ||
-        (
-          getUserRole(request.auth.uid) == 'event_representative' &&
-          getUserData(request.auth.uid).assignedEventUids != null &&
-          eventId in getUserData(request.auth.uid).assignedEventUids
-        ) ||
-        (
-          getUserRole(request.auth.uid) == 'organizer' &&
-          getUserData(request.auth.uid).studentDataEventAccess != null &&
-          getUserData(request.auth.uid).studentDataEventAccess[eventId] == true
-        )
-      );
+    function isBoardCreator(board) {
+      return board.createdBy == request.auth.uid;
     }
     
+    function canCreateTasks() {
+      // In the new model, any board member can create tasks on that board.
+      // This function can be broader now. Let's tie it to board membership.
+      let boardId = request.resource.data.boardId;
+      return isMemberOfBoard(boardId);
+    }
+
     function isJoiningTeam() {
       let isMemberAdded = request.resource.data.memberUids.hasAny([request.auth.uid]);
       let isTeamSizeCorrect = request.resource.data.teamSize == resource.data.teamSize + 1;
       let onlyMembersAndSizeUpdated = request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberUids', 'teamSize', 'updatedAt']);
       return isStudent() && isMemberAdded && isTeamSizeCorrect && onlyMembersAndSizeUpdated;
+    }
+
+    function isManagerForEvent(eventId) {
+      let userData = getUserData(request.auth.uid);
+      return isSignedIn() && (
+        isOverallHeadOrAdmin() ||
+        (
+          getUserRole(request.auth.uid) == 'event_representative' &&
+          userData.assignedEventUids != null &&
+          eventId in userData.assignedEventUids
+        ) ||
+        (
+          getUserRole(request.auth.uid) == 'organizer' &&
+          userData.studentDataEventAccess != null &&
+          userData.studentDataEventAccess[eventId] == true
+        )
+      );
     }
 
 
@@ -81,32 +98,6 @@ service cloud.firestore {
       allow delete: if isOverallHeadOrAdmin();
     }
 
-    // New rules for Task Boards
-    match /boards/{boardId} {
-      allow read: if isMemberOfBoard(boardId);
-      allow create, update, delete: if canManageBoards();
-    }
-    
-    // Revamped rules for Tasks, now linked to Boards
-    match /tasks/{taskId} {
-      function getTaskBoardId(doc) {
-        return doc.data.boardId;
-      }
-      
-      // Collaborative rules: Any member of a board can read, create, and update tasks.
-      allow read, create, update: if isMemberOfBoard(getTaskBoardId(resource));
-
-      // Only board managers can delete tasks to prevent accidental data loss.
-      allow delete: if canManageBoards();
-
-      // Rules for subtasks nested within a task
-      match /subtasks/{subtaskId} {
-        // Any board member can read and write subtasks.
-        allow read, write: if isMemberOfBoard(getTaskBoardId(get(/databases/$(database)/documents/tasks/$(taskId))));
-      }
-    }
-    
-    // --- EXISTING RULES FOR OTHER COLLECTIONS ---
     match /subEvents/{eventId} {
       allow read: if true;
       allow write: if isOverallHeadOrAdmin();
@@ -119,7 +110,6 @@ service cloud.firestore {
       function getSubEventId(doc) {
         return doc.data.subEventId;
       }
-      
       allow read: if isStaff() || isOwner() || isManagerForEvent(getSubEventId(resource));
       allow create: if isStudent() && request.resource.data.userId == request.auth.uid;
       allow update: if isManagerForEvent(getSubEventId(request.resource)) || (isOwner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['registrationStatus']) && request.resource.data.registrationStatus == 'cancelled');
@@ -132,9 +122,46 @@ service cloud.firestore {
       allow update: if isOverallHeadOrAdmin() || (isSignedIn() && resource.data.teamLeaderId == request.auth.uid) || isJoiningTeam();
       allow delete: if isOverallHeadOrAdmin();
     }
+    
+    // --- NEW RULES FOR BOARDS & TASKS ---
+    match /boards/{boardId} {
+        allow read: if isMemberOfBoard(boardId);
+        allow create: if isOverallHeadOrAdmin(); // Only managers can create boards
+        allow update: if canManageBoard(boardId);
+        allow delete: if canManageBoard(boardId) && isBoardCreator(resource.data);
+    }
+
+    match /tasks/{taskId} {
+      function isAssignee() {
+        return isSignedIn() && request.auth.uid in resource.data.assignedToUserIds;
+      }
+      
+      function canSelfAssign(taskBefore, taskAfter) {
+          // Can assign to self if task was unassigned and user is member of board
+          return taskBefore.assignedToUserIds.size() == 0 &&
+                 taskAfter.assignedToUserIds.size() == 1 &&
+                 request.auth.uid in taskAfter.assignedToUserIds &&
+                 isMemberOfBoard(taskAfter.boardId);
+      }
+      
+      function canUpdateStatus(taskBefore, taskAfter) {
+          // Can update status if assignee
+          return isAssignee() && taskAfter.keys().hasOnly(['status', 'updatedAt']);
+      }
+      
+      allow read: if isMemberOfBoard(resource.data.boardId);
+      allow create: if canCreateTasks();
+      allow update: if canManageBoard(request.resource.data.boardId) || canSelfAssign(resource.data, request.resource.data) || canUpdateStatus(resource.data, request.resource.data);
+      allow delete: if canManageBoard(resource.data.boardId);
+      
+      match /subtasks/{subtaskId} {
+          allow read, write: if isMemberOfBoard(get(/databases/$(database)/documents/tasks/$(taskId)).data.boardId);
+      }
+    }
+
 
     match /notifications/{notificationId} {
-        allow read, write: if isSignedIn() && request.auth.uid == resource.data.userId;
+        allow read, update, delete, create: if isSignedIn() && request.auth.uid == resource.data.userId;
     }
     
     match /systemPreferences/columnDefinitions/studentData/{columnId} {
@@ -145,6 +172,9 @@ service cloud.firestore {
     match /users/{userId}/preferences/columnDefinitions/studentData/{columnId} {
         allow read, write: if isSignedIn() && request.auth.uid == userId;
     }
-    
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
   }
 }

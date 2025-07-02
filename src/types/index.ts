@@ -20,7 +20,10 @@ export interface Board {
   name: string;
   description?: string;
   memberUids: string[];
+  managerUids?: string[]; // UIDs of users who can manage this board (e.g., event_reps)
   createdAt: any;
+  createdBy: string;
+  updatedAt?: any;
 }
 
 export interface Subtask {
