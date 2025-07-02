@@ -69,7 +69,7 @@ const OverallHeadDashboard = () => {
     const staffQuery = query(collection(db, 'users'), where('role', 'in', ['admin', 'overall_head', 'event_representative', 'organizer']));
     const unsubStaff = onSnapshot(staffQuery, (snapshot) => {
         setStats(prev => ({...prev, staff: snapshot.size}));
-        const staffList = snapshot.docs.map(doc => doc.data() as UserProfileData);
+        const staffList = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }) as UserProfileData);
         const leaderboard = staffList.sort((a, b) => (b.credibilityScore || 0) - (a.credibilityScore || 0)).slice(0, 3);
         setTopStaff(leaderboard);
         if (!initialLoads.staff) { initialLoads.staff = true; checkAllLoaded(); }
