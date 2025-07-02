@@ -42,13 +42,10 @@ export default function TasksPage() {
     const unsubBoards = onSnapshot(boardsQuery, (snapshot) => {
       const userBoards = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Board));
       setBoards(userBoards);
-      if (userBoards.length > 0 && !currentBoard) {
-        // Automatically select the first board if none is selected
-        // selectBoard(userBoards[0]);
-      }
       setLoading(false);
     }, (error) => {
       console.error("Error fetching boards:", error);
+      toast({ title: "Error", description: "Could not fetch your boards.", variant: "destructive" });
       setLoading(false);
     });
 
@@ -62,11 +59,11 @@ export default function TasksPage() {
         unsubBoards();
         unsubUsers();
     };
-  }, [userProfile?.uid]);
+  }, [userProfile?.uid, toast]);
 
-  const selectBoard = (board: Board | null) => {
-    setCurrentBoard(board);
-    if (!board) {
+  // Fetch tasks and members for the currently selected board
+  useEffect(() => {
+    if (!currentBoard) {
       setTasks([]);
       setBoardUsers([]);
       return;
@@ -75,15 +72,15 @@ export default function TasksPage() {
     setLoadingBoardData(true);
     const unsubs: Unsubscribe[] = [];
 
-    const tasksQuery = query(collection(db, 'tasks'), where('boardId', '==', board.id));
+    const tasksQuery = query(collection(db, 'tasks'), where('boardId', '==', currentBoard.id));
     unsubs.push(onSnapshot(tasksQuery, (snapshot) => {
       const boardTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
       setTasks(boardTasks);
-      setLoadingBoardData(false); // Can set loading to false after tasks are fetched
+      setLoadingBoardData(false);
     }));
 
-    if (board.memberUids && board.memberUids.length > 0) {
-      const usersQuery = query(collection(db, 'users'), where('uid', 'in', board.memberUids));
+    if (currentBoard.memberUids && currentBoard.memberUids.length > 0) {
+      const usersQuery = query(collection(db, 'users'), where('uid', 'in', currentBoard.memberUids));
       unsubs.push(onSnapshot(usersQuery, (snapshot) => {
         const users = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfileData));
         setBoardUsers(users);
@@ -92,31 +89,35 @@ export default function TasksPage() {
         setBoardUsers([]);
     }
     
-    // Cleanup function to be called when board changes
     return () => unsubs.forEach(unsub => unsub());
-  };
-
-  useEffect(() => {
-    if (currentBoard) {
-      const cleanup = selectBoard(currentBoard);
-      return cleanup;
-    }
-  }, [currentBoard?.id]);
+  }, [currentBoard]);
 
 
   const handleCreateBoard = async () => {
     if (!newBoardName.trim() || !userProfile) return;
     try {
-        await addDoc(collection(db, 'boards'), {
+        const newBoardRef = await addDoc(collection(db, 'boards'), {
             name: newBoardName,
             memberUids: [userProfile.uid],
             managerUids: [userProfile.uid],
             createdAt: serverTimestamp(),
             createdBy: userProfile.uid,
         });
+        
         toast({ title: "Board Created", description: `Board "${newBoardName}" has been created.` });
         setNewBoardName('');
         setIsNewBoardModalOpen(false);
+        
+        // Automatically select the newly created board
+        setCurrentBoard({
+          id: newBoardRef.id,
+          name: newBoardName,
+          memberUids: [userProfile.uid],
+          managerUids: [userProfile.uid],
+          createdAt: new Date(),
+          createdBy: userProfile.uid
+        });
+
     } catch(e) {
         toast({ title: "Error", description: "Failed to create board.", variant: "destructive"});
     }
@@ -128,7 +129,7 @@ export default function TasksPage() {
   };
   
   const canManageCurrentBoard = userProfile && currentBoard && (currentBoard.managerUids?.includes(userProfile.uid) || ['admin', 'overall_head'].includes(userProfile.role));
-  const canCreateBoards = userProfile && ['admin', 'overall_head'].includes(userProfile.role);
+  const canCreateBoards = userProfile && ['admin', 'overall_head', 'event_representative'].includes(userProfile.role);
 
   return (
     <div className="flex h-[calc(100vh-8rem)] flex-col space-y-4">
@@ -138,6 +139,11 @@ export default function TasksPage() {
                 <ListChecks className="h-7 w-7" />
                 {currentBoard ? `Board: ${currentBoard.name}` : 'Team Boards'}
             </h1>
+            {currentBoard && (
+              <Button variant="link" size="sm" onClick={() => setCurrentBoard(null)} className="p-0 h-auto text-sm">
+                &larr; Back to board selection
+              </Button>
+            )}
         </div>
         <div className="flex items-center gap-2">
             {canManageCurrentBoard && (
@@ -164,7 +170,7 @@ export default function TasksPage() {
                  {boards.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         {boards.map(board => (
-                            <button key={board.id} onClick={() => selectBoard(board)} className="p-4 border rounded-lg text-left hover:border-primary transition-colors">
+                            <button key={board.id} onClick={() => setCurrentBoard(board)} className="p-4 border rounded-lg text-left hover:border-primary transition-colors">
                                 <h3 className="font-bold text-lg">{board.name}</h3>
                                 <p className="text-sm text-muted-foreground">{board.memberUids.length} members</p>
                             </button>
@@ -207,7 +213,7 @@ export default function TasksPage() {
         </DialogContent>
       </Dialog>
       
-      {isTaskModalOpen && (
+      {isTaskModalOpen && currentBoard && (
           <TaskDetailModal
             isOpen={isTaskModalOpen}
             onClose={() => { setIsTaskModalOpen(false); setEditingTask(null); }}
