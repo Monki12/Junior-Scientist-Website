@@ -1,11 +1,10 @@
 
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import type { Task, TaskPriority, TaskStatus, UserProfileData, SubEvent } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -121,7 +120,7 @@ export default function GlobalTasksPage() {
 
     setupListeners();
     return () => unsubs.forEach(unsub => unsub());
-  }, [userProfile, toast]);
+  }, [userProfile, toast, loadingData]);
 
   const handleOpenTaskModal = (task: Task | null) => {
     setEditingTask(task);
@@ -177,33 +176,62 @@ export default function GlobalTasksPage() {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
 
+    // Award points only when moving to 'Completed' from another status
     if (newStatus === 'Completed' && task.status !== 'Completed') {
-      try {
-        await runTransaction(db, async (transaction) => {
-          const taskDoc = await transaction.get(taskRef);
-          if (!taskDoc.exists() || taskDoc.data().status === 'Completed') {
-            throw new Error("Task is already completed or does not exist.");
-          }
-          
-          transaction.update(taskRef, { status: 'Completed', completedByUserId: userProfile.uid, completedAt: serverTimestamp() });
-          
-          if (task.assignedToUserIds && task.assignedToUserIds.length > 0) {
-            const pointsToAdd = task.pointsOnCompletion || 10;
-            for (const assigneeId of task.assignedToUserIds) {
-              const userRef = doc(db, "users", assigneeId);
-              transaction.update(userRef, { credibilityScore: increment(pointsToAdd) });
+        const pointsToAdd = task.pointsOnCompletion || 10;
+        try {
+            await runTransaction(db, async (transaction) => {
+                const taskDoc = await transaction.get(taskRef);
+                if (!taskDoc.exists() || taskDoc.data().status === 'Completed') {
+                    throw new Error("Task is already completed or does not exist.");
+                }
+
+                // Update the task status
+                transaction.update(taskRef, {
+                    status: 'Completed',
+                    completedByUserId: userProfile.uid,
+                    completedAt: serverTimestamp(),
+                    updatedAt: serverTimestamp(),
+                });
+
+                // Update credibility score for each assigned user
+                if (task.assignedToUserIds && task.assignedToUserIds.length > 0) {
+                    for (const assigneeId of task.assignedToUserIds) {
+                        const userRef = doc(db, "users", assigneeId);
+                        const userDoc = await transaction.get(userRef);
+                        if(userDoc.exists()) {
+                            const oldScore = userDoc.data().credibilityScore || 0;
+                            transaction.update(userRef, { credibilityScore: increment(pointsToAdd) });
+                            // Check for notifications outside transaction if it's complex
+                        }
+                    }
+                }
+            });
+
+            toast({ title: "Task Completed!", description: `${pointsToAdd} points awarded.` });
+
+            // Post-transaction logic (like notifications)
+            if (task.assignedToUserIds && task.assignedToUserIds.length > 0) {
+                 for (const assigneeId of task.assignedToUserIds) {
+                    const userRef = doc(db, "users", assigneeId);
+                    const userDoc = await getDoc(userRef);
+                    if (userDoc.exists()) {
+                        const oldScore = (userDoc.data().credibilityScore || 0) - pointsToAdd;
+                        const newScore = userDoc.data().credibilityScore || 0;
+                        await checkAndSendRankNotification(assigneeId, oldScore, newScore);
+                    }
+                 }
             }
-          }
-        });
-        toast({ title: "Task Completed!", description: `Credibility scores have been updated.` });
-      } catch (e: any) {
-        console.error("Transaction failed: ", e);
-        toast({ title: "Error", description: e.message || "Failed to update task and scores.", variant: "destructive" });
-      }
+
+        } catch (e: any) {
+            console.error("Transaction failed: ", e);
+            toast({ title: "Error", description: e.message || "Failed to update task and scores.", variant: "destructive" });
+        }
     } else {
-      await updateDoc(taskRef, { status: newStatus, updatedAt: serverTimestamp() });
+        // Handle regular status changes without score updates
+        await updateDoc(taskRef, { status: newStatus, updatedAt: serverTimestamp() });
     }
-  };
+};
 
   const handleDeleteTask = async () => {
     if (taskToDelete) {
@@ -223,34 +251,33 @@ export default function GlobalTasksPage() {
   const canCreateTasks = userProfile && ['admin', 'overall_head', 'event_representative'].includes(userProfile.role);
 
   return (
-    <div className="space-y-6">
-      <Card className="shadow-lg">
-        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <CardTitle className="text-2xl font-bold text-primary flex items-center">
-              <ListChecks className="mr-3 h-7 w-7" /> Task Board
-            </CardTitle>
-            <CardDescription>A collaborative board for all event-related tasks.</CardDescription>
-          </div>
-          {canCreateTasks && (
-            <Button onClick={() => handleOpenTaskModal(null)}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Add New Task
-            </Button>
-          )}
-        </CardHeader>
-        <CardContent>
-          {loadingData ? (
-            <div className="flex justify-center items-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
-          ) : (
-            <TaskBoard
-              tasks={tasks}
-              staff={allStaff}
-              onEditTask={handleOpenTaskModal}
-              onStatusChange={handleStatusChange}
-            />
-          )}
-        </CardContent>
-      </Card>
+    <div className="flex h-[calc(100vh-8rem)] flex-col space-y-4">
+      <header className="flex flex-shrink-0 flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-primary flex items-center">
+            <ListChecks className="mr-3 h-7 w-7" /> Task Board
+          </h1>
+          <p className="text-muted-foreground">A collaborative board for all event-related tasks.</p>
+        </div>
+        {canCreateTasks && (
+          <Button onClick={() => handleOpenTaskModal(null)}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Add New Task
+          </Button>
+        )}
+      </header>
+
+      <div className="flex-grow overflow-x-auto">
+        {loadingData ? (
+          <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+        ) : (
+          <TaskBoard
+            tasks={tasks}
+            staff={allStaff}
+            onEditTask={handleOpenTaskModal}
+            onStatusChange={handleStatusChange}
+          />
+        )}
+      </div>
 
       <Dialog open={isTaskFormDialogOpen} onOpenChange={setIsTaskFormDialogOpen}>
         <DialogContent className="sm:max-w-lg">
@@ -296,7 +323,7 @@ export default function GlobalTasksPage() {
                         <DropdownMenuCheckboxItem key={user.uid} checked={currentTaskForm.assignedToUserIds.includes(user.uid)} onCheckedChange={checked => {
                             const newAssigned = checked ? [...currentTaskForm.assignedToUserIds, user.uid] : currentTaskForm.assignedToUserIds.filter((uid:string) => uid !== user.uid);
                             setCurrentTaskForm({...currentTaskForm, assignedToUserIds: newAssigned});
-                        }}>{user.fullName} ({user.role})</DropdownMenuCheckboxItem>
+                        }}>{user.fullName} ({user.role?.replace(/_/g, ' ')})</DropdownMenuCheckboxItem>
                         ))}
                     </DropdownMenuContent>
                 </DropdownMenu>

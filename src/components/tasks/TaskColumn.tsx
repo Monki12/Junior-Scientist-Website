@@ -20,7 +20,7 @@ export default function TaskColumn({ id, title, tasks, staff, onEditTask }: Task
     <SortableContext id={id} items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
       <div
         ref={setNodeRef}
-        className="flex flex-col w-72 min-w-72 max-h-[calc(100vh-16rem)] bg-muted/50 rounded-lg"
+        className="flex flex-col w-72 min-w-72 h-full bg-muted/50 rounded-lg shadow-sm"
       >
         <div className="p-3 border-b sticky top-0 bg-muted/80 backdrop-blur-sm rounded-t-lg z-10">
           <h3 className="font-semibold text-foreground">{title} <span className="text-sm font-normal text-muted-foreground">({tasks.length})</span></h3>

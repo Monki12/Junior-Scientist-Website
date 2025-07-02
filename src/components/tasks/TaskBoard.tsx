@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import {
   DndContext,
   closestCorners,
@@ -11,9 +11,7 @@ import {
   useSensors,
   DragEndEvent,
 } from '@dnd-kit/core';
-import { sortableKeyboardCoordinates, arrayMove } from '@dnd-kit/sortable';
-import { doc, updateDoc, arrayUnion, arrayRemove, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { useToast } from '@/hooks/use-toast';
 import type { Task, UserProfileData, TaskStatus } from '@/types';
 import TaskColumn from './TaskColumn';
@@ -55,7 +53,6 @@ export default function TaskBoard({ tasks, staff, onEditTask, onStatusChange }: 
     if (!over) return;
     
     const activeId = String(active.id);
-    const overId = String(over.id);
     
     const activeTask = getTaskById(activeId);
     if (!activeTask) return;
@@ -64,7 +61,6 @@ export default function TaskBoard({ tasks, staff, onEditTask, onStatusChange }: 
     const activeContainerId = active.data.current?.sortable?.containerId || active.id;
 
     if (activeContainerId !== overContainerId) {
-      // It's a drop into a new column/status
       const newStatus = overContainerId as TaskStatus;
       if (statuses.includes(newStatus)) {
         try {
@@ -79,7 +75,7 @@ export default function TaskBoard({ tasks, staff, onEditTask, onStatusChange }: 
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-      <div className="flex gap-4 overflow-x-auto p-2">
+      <div className="inline-flex gap-4 h-full p-1">
         {statuses.map(status => (
           <TaskColumn
             key={status}
