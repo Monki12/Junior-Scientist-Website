@@ -1,7 +1,8 @@
 
 'use client';
 
-import { useDroppable, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { useDroppable } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import type { Task, UserProfileData } from '@/types';
 import TaskCard from './TaskCard';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
