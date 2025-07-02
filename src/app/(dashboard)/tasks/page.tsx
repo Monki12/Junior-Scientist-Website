@@ -236,8 +236,7 @@ export default function GlobalTasksPage() {
           const assigneeOldScores = new Map<string, number>();
           try {
             await runTransaction(db, async (transaction) => {
-              const assigneeRefs = task.assignedToUserIds.map(id => doc(db, "users", id));
-              const assigneeDocs = await Promise.all(assigneeRefs.map(ref => transaction.get(ref)));
+              const assigneeRefs = (task.assignedToUserIds || []).map(id => doc(db, "users", id));
               
               let assignerRef = null;
               if (task.assignedByUserId) {
@@ -259,6 +258,7 @@ export default function GlobalTasksPage() {
                   completedAt: serverTimestamp()
               });
               
+              const assigneeDocs = await Promise.all(assigneeRefs.map(ref => transaction.get(ref)));
               assigneeDocs.forEach((doc, index) => {
                 if (doc.exists()) {
                   const oldScore = doc.data().credibilityScore || 0;
@@ -388,7 +388,7 @@ export default function GlobalTasksPage() {
                     const isManager = userProfile?.role === 'admin' || userProfile?.role === 'overall_head' || (userProfile?.role === 'event_representative' && userProfile.assignedEventUids?.includes(task.subEventId || ''));
                     const isAssigner = userProfile?.uid === task.assignedByUserId;
                     const canEditFully = isManager || isAssigner;
-                    const isAssignee = task.assignedToUserIds.includes(userProfile?.uid || '');
+                    const isAssignee = task.assignedToUserIds?.includes(userProfile?.uid || '');
                     const canChangeStatus = canEditFully || isAssignee;
 
                     return (
@@ -508,3 +508,5 @@ export default function GlobalTasksPage() {
     </div>
   );
 }
+
+    
