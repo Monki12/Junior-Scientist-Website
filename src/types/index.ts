@@ -30,7 +30,7 @@ export interface Task {
   completedByUserId?: string | null; // UID of user who marked it complete
   completedAt?: any; // serverTimestamp or ISO string
   attachments?: { name: string, url: string }[];
-  subtasks?: { text: string, completed: boolean }[];
+  subtasks?: { id: string, text: string, completed: boolean, assignedTo?: string }[];
   createdAt: any; // serverTimestamp or ISO string
   updatedAt: any; // serverTimestamp or ISO string
 }
