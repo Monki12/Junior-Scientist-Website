@@ -1,114 +1,90 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Helper function to check if a user is an admin or overall_head
+    function isManager() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'overall_head'];
+    }
     
-    // Helper functions to check user roles
-    function isUserAuthenticated() {
-      return request.auth != null;
+    // Helper function to check if a user is part of a board/team
+    function isBoardMember(boardId) {
+      return request.auth.uid in get(/databases/$(database)/documents/boards/$(boardId)).data.memberUids;
     }
 
-    function getUserRole(uid) {
-      return get(/databases/$(database)/documents/users/$(uid)).data.role;
-    }
-
-    function isManager(uid) {
-      let role = getUserRole(uid);
-      return role == 'admin' || role == 'overall_head' || role == 'event_representative';
-    }
-
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    // --- Collection: users ---
+    // USER-RELATED RULES
     match /users/{userId} {
-      allow read: if isUserAuthenticated();
-      allow write: if isOwner(userId) || isManager(request.auth.uid);
-    }
-    
-    // --- Collection: subEvents ---
-    match /subEvents/{eventId} {
-      allow read: if true; // Publicly readable
-      allow write: if isManager(request.auth.uid);
-    }
-    
-    // --- Collection: event_registrations ---
-    match /event_registrations/{registrationId} {
-        allow read: if isUserAuthenticated();
-        allow create: if isOwner(request.resource.data.userId); // Users can create their own registration
-        allow update: if isManager(request.auth.uid) || isOwner(resource.data.userId); // Managers or the user can update
-        allow delete: if isManager(request.auth.uid); // Only managers can delete registrations
-    }
-    
-    // --- Collection: event_teams ---
-     match /event_teams/{teamId} {
-        allow read: if isUserAuthenticated();
-        allow create: if isOwner(request.resource.data.teamLeaderId); // Team leader creates the team
-        allow update: if isManager(request.auth.uid) || request.auth.uid in resource.data.memberUids; // Managers or team members can update
-        allow delete: if isManager(request.auth.uid);
+      allow read: if request.auth != null;
+      allow write: if request.auth.uid == userId; // Users can update their own profile
+      allow create: if request.auth.uid == userId; // Allow user creation during signup
     }
 
-    // --- Collection: notifications ---
+    // BOARD (TEAM) RULES
+    match /boards/{boardId} {
+      allow read: if request.auth != null && isBoardMember(boardId);
+      allow create, update, delete: if isManager();
+    }
+    
+    // NOTIFICATION RULES
     match /notifications/{notificationId} {
-      allow read, write: if isUserAuthenticated(); // Simple rule: any logged-in user can manage their notifications
+       allow read, update: if request.auth.uid == resource.data.userId;
+       allow create: if request.auth != null; // Can be created by server-side logic or other users
     }
 
-    // --- NEW RULES FOR TASK BOARD ---
+    // SUB-EVENT RULES
+    match /subEvents/{eventId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if isManager();
+    }
+
+    // EVENT REGISTRATION RULES
+    match /event_registrations/{registrationId} {
+      allow read: if request.auth.uid == resource.data.userId || isManager() || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'event_representative';
+      allow create: if request.auth.uid == request.resource.data.userId; // Users can register themselves
+      allow update: if isManager() || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'event_representative';
+    }
+
+    // EVENT TEAM RULES
+    match /event_teams/{teamId} {
+       allow read: if request.auth != null;
+       allow create: if request.auth.uid == request.resource.data.teamLeaderId;
+       allow update: if request.auth.uid in resource.data.memberUids;
+    }
+    
+    // GLOBAL STUDENT DATA COLUMNS (For Admins)
+    match /systemPreferences/columnDefinitions/studentData/{columnId} {
+        allow read: if request.auth != null;
+        allow write: if isManager();
+    }
+    
+    // USER-SPECIFIC PREFERENCES (e.g., custom columns for self)
+    match /users/{userId}/preferences/{doc=**} {
+        allow read, write: if request.auth.uid == userId;
+    }
+
+    // TASK MANAGEMENT RULES
     match /tasks/{taskId} {
-      allow read: if isUserAuthenticated();
+      // Any authenticated user who is a member of the board can read tasks
+      allow read: if request.auth != null && isBoardMember(resource.data.boardId);
 
-      // CREATE: Only managers can create tasks.
-      allow create: if isManager(request.auth.uid) &&
-                     request.resource.data.assignedByUserId == request.auth.uid &&
-                     request.resource.data.createdAt == request.time;
+      // Any member of the board can create a task
+      allow create: if request.auth != null && isBoardMember(request.resource.data.boardId);
 
-      // UPDATE: Complex logic based on role.
-      allow update: if isUserAuthenticated() &&
-                     request.resource.data.lastUpdatedAt == request.time &&
-                     (
-                       // Managers can update anything.
-                       isManager(request.auth.uid) ||
-                       
-                       // Assigned users can only update specific fields.
-                       (
-                         request.auth.uid in resource.data.assignedToUserIds &&
-                         (
-                            // 1. Can change the status.
-                            (
-                              request.resource.data.status != resource.data.status &&
-                              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'lastUpdatedAt', 'completedByUserId', 'completedAt'])
-                            ) ||
-                            // 2. Can update subtasks.
-                            (
-                              request.resource.data.subtasks != resource.data.subtasks &&
-                              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['subtasks', 'lastUpdatedAt'])
-                            )
-                         )
-                       ) ||
-                       
-                       // Any authenticated user can join or leave a task (modify 'assignedToUserIds').
-                       (
-                         request.resource.data.assignedToUserIds != resource.data.assignedToUserIds &&
-                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['assignedToUserIds', 'lastUpdatedAt'])
-                       )
-                     );
+      // Admins/Managers can update anything.
+      // Task assignees can also update (e.g., change status, add comments)
+      allow update: if isManager() || request.auth.uid in resource.data.assignedToUserIds;
+      
+      // Only admins or the original creator can delete a task
+      allow delete: if isManager() || request.auth.uid == resource.data.creatorId;
 
-      // DELETE: Only managers can delete tasks.
-      allow delete: if isManager(request.auth.uid);
-
-      // Sub-collection for Comments
-      match /comments/{commentId} {
-        allow read: if isUserAuthenticated();
+      // SUBTASK RULES
+      match /subtasks/{subtaskId} {
+        allow read: if request.auth != null && isBoardMember(get(/databases/$(database)/documents/tasks/$(taskId)).data.boardId);
         
-        // Anyone assigned to the task or a manager can create comments.
-        allow create: if isUserAuthenticated() &&
-                      (request.auth.uid in get(/databases/$(database)/documents/tasks/$(taskId)).data.assignedToUserIds || isManager(request.auth.uid)) &&
-                      request.resource.data.userId == request.auth.uid &&
-                      request.resource.data.createdAt == request.time;
-                      
-        // The comment owner or a manager can update/delete.
-        allow update, delete: if isUserAuthenticated() && (isOwner(resource.data.userId) || isManager(request.auth.uid));
+        // Anyone assigned to the parent task can create/update subtasks
+        allow create, update, delete: if request.auth.uid in get(/databases/$(database)/documents/tasks/$(taskId)).data.assignedToUserIds;
       }
     }
   }

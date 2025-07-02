@@ -15,24 +15,38 @@ export type EventStatus = 'Planning' | 'Active' | 'Completed' | 'Cancelled' | 'o
 export type RegistrationStatus = 'pending' | 'approved' | 'declined' | 'cancelled';
 export type TeamStatus = 'pending' | 'approved' | 'disqualified';
 
+export interface Board {
+  id: string;
+  name: string;
+  description?: string;
+  memberUids: string[];
+  createdAt: any;
+}
+
+export interface Subtask {
+  id: string;
+  text: string;
+  completed: boolean;
+  assignedTo?: string; // UID of a user from the parent task's assignedToUserIds
+}
 
 export interface Task {
   id: string;
+  boardId: string; // ID of the board it belongs to
   title: string;
   description?: string;
   assignedToUserIds: string[]; // UIDs of assigned users
-  assignedByUserId?: string; // UID of the user who assigned the task
-  subEventId?: string; // Explicit link to event
-  dueDate?: string; // ISO Date string
+  creatorId?: string; // UID of the user who created the task
+  dueDate?: string | null; // ISO Date string
   priority: TaskPriority;
   status: TaskStatus;
-  pointsOnCompletion?: number; // Points awarded for completion
-  completedByUserId?: string | null; // UID of user who marked it complete
+  pointsOnCompletion?: number;
+  completedByUserId?: string | null;
   completedAt?: any; // serverTimestamp or ISO string
   attachments?: { name: string, url: string }[];
-  subtasks?: { id: string, text: string, completed: boolean, assignedTo?: string }[];
-  createdAt: any; // serverTimestamp or ISO string
-  updatedAt: any; // serverTimestamp or ISO string
+  subtasks: Subtask[];
+  createdAt: any;
+  updatedAt: any;
 }
 
 export interface UserProfileData {
@@ -50,20 +64,20 @@ export interface UserProfileData {
   role: UserRole;
   photoURL?: string | null;
   department?: string | null; 
-  assignedEventUids?: string[]; // For Event Reps/Overall Heads
-  studentDataEventAccess?: Record<string, boolean>; // For Organizers
+  assignedEventUids?: string[];
+  studentDataEventAccess?: Record<string, boolean>;
   credibilityScore: number;
   points?: number; 
   phoneNumbers?: string[];
   additionalNumber?: string | null;
   createdAt?: any; 
   updatedAt?: any; 
-  // For dynamic columns
   customData?: Record<string, any>;
+  boardIds?: string[]; // IDs of boards the user is a member of
 }
 
 export interface SubEvent {
-  id: string; // Document ID
+  id: string;
   slug: string;
   title: string;
   superpowerCategory: string;
@@ -72,13 +86,13 @@ export interface SubEvent {
   mainImage: { src: string; alt: string; dataAiHint: string };
   galleryImages?: Array<{ src: string; alt: string; dataAiHint: string }>;
   registrationLink?: string;
-  deadline?: string | null; // ISO Date string
-  eventDate?: string | null; // ISO Date string
+  deadline?: string | null;
+  eventDate?: string | null;
   isTeamBased: boolean;
   minTeamMembers?: number;
   maxTeamMembers?: number;
-  eventReps: string[]; // UIDs of Event Representatives
-  organizerUids: string[]; // UIDs of Organizers
+  eventReps: string[];
+  organizerUids: string[];
   status?: EventStatus;
   venue?: string;
   registeredParticipantCount?: number;
@@ -113,58 +127,51 @@ export interface StudentData {
   email: string;
 }
 
-
-// For Firestore event_registrations collection
 export type EventRegistration = {
-  id?: string; // Document ID, optional as Firestore auto-generates
+  id?: string;
   userId: string;
   subEventId: string;
-  registeredAt: any; // Firestore Timestamp
+  registeredAt: any;
   registrationStatus: RegistrationStatus;
   isTeamRegistration: boolean;
   teamId: string | null;
   admitCardUrl: string | null;
   presentee: boolean;
   submittedDocuments: string[] | null;
-  lastUpdatedAt: any; // Firestore Timestamp
+  lastUpdatedAt: any;
   participantInfoSnapshot?: {
     fullName: string;
     email: string;
     schoolName: string;
   },
-  customData?: Record<string, any>; // For event-specific custom fields
+  customData?: Record<string, any>;
 };
 
-// For Firestore event_teams collection
 export type EventTeam = {
-  id?: string; // Document ID, optional
+  id?: string;
   eventId: string;
   teamName: string;
   teamLeaderId: string;
   memberUids: string[];
   teamSize: number;
   status: TeamStatus;
-  createdAt: any; // Firestore Timestamp
-  updatedAt: any; // Firestore Timestamp
+  createdAt: any;
+  updatedAt: any;
 };
 
-
-// Form data for creating a new team
 export type CreateTeamFormData = {
   teamName: string;
 };
 
-// Form data for joining an existing team
 export type JoinTeamFormData = {
   teamCodeOrName: string; 
 };
 
-
 export interface CustomColumnDefinition {
-  id: string; // e.g., 'custom_field_1'
-  name: string; // e.g., 'T-Shirt Size'
+  id: string;
+  name: string;
   dataType: 'text' | 'number' | 'checkbox' | 'date' | 'dropdown';
-  options?: string[]; // For 'dropdown' type
+  options?: string[];
   defaultValue?: any;
   description?: string;
   isSharedGlobally?: boolean;
@@ -174,22 +181,22 @@ export interface CustomColumnDefinition {
 }
 
 export interface UserColumnPreference {
-    id?: string; // Document ID in Firestore
-    userId: string | null; // UID of user or null if shared
-    subEventId: string | null; // Event ID or null if global
+    id?: string;
+    userId: string | null;
+    subEventId: string | null;
     dashboardArea: 'studentList' | 'taskList' | 'eventDetails' | 'userList';
-    columnsVisible: string[]; // Array of column IDs/keys
+    columnsVisible: string[];
     columnOrder: string[];
     columnWidths: Record<string, number>;
-    filtersApplied: ActiveDynamicFilter[]; // Using the new type for filters
+    filtersApplied: ActiveDynamicFilter[];
     isSharedAcrossEvent: boolean;
 }
 
 export interface ActiveDynamicFilter {
-  id: string; // Unique ID for the filter instance
-  columnId: string; // ID of the column to filter on
-  columnName: string; // Display name of the column
-  operator: 'contains' | 'equals' | 'gt' | 'lt' | 'in' | 'is'; // Filter operator
-  value: any; // The value to filter by
-  isCustom: boolean; // Whether it's a filter on a custom column
+  id: string;
+  columnId: string;
+  columnName: string;
+  operator: 'contains' | 'equals' | 'gt' | 'lt' | 'in' | 'is';
+  value: any;
+  isCustom: boolean;
 }

@@ -25,7 +25,8 @@ import {
   HelpCircle,
   ScanLine,
   Search,
-  Ticket
+  Ticket,
+  Users2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from './logo';
@@ -35,7 +36,6 @@ import { useToast } from '@/hooks/use-toast';
 const getNavLinksForRole = (role: string | undefined) => {
   const baseLinks = [
     { href: '/dashboard', label: 'Dashboard', icon: Home },
-    
   ];
 
   const studentLinks = [
@@ -44,33 +44,36 @@ const getNavLinksForRole = (role: string | undefined) => {
     { href: '/my-registrations', label: 'My Registrations', icon: Ticket },
   ];
 
+  const managerLinks = [
+    ...baseLinks,
+    { href: '/tasks', label: 'Task Board', icon: ClipboardList },
+    { href: '/my-events', label: 'All Events', icon: Calendar },
+    { href: '/staff', label: 'Manage Staff', icon: Users },
+    { href: '/students', label: 'Manage Students', icon: GraduationCap },
+    { href: '/teams/manage', label: 'Manage Teams', icon: Users2 },
+    { href: '/ocr-tool', label: 'OCR Scanner', icon: ScanLine },
+    { href: '/leaderboard', label: 'Leaderboard', icon: Trophy },
+  ];
+  
   const organizerLinks = [
     ...baseLinks,
-    { href: '/my-events', label: 'My Events', icon: Calendar },
     { href: '/tasks', label: 'Task Board', icon: ClipboardList },
+    { href: '/my-events', label: 'My Events', icon: Calendar },
+    { href: '/teams', label: 'My Teams', icon: Users2 },
   ];
 
   const repLinks = [
     ...baseLinks,
+    { href: '/tasks', label: 'Task Board', icon: ClipboardList },
     { href: '/my-events', label: 'My Events', icon: Calendar },
-    { href: '/staff', label: 'Event Staff', icon: Users },
+    { href: '/teams', label: 'My Teams', icon: Users2 },
     { href: '/students', label: 'Event Students', icon: GraduationCap },
-    { href: '/tasks', label: 'Task Board', icon: ClipboardList },
-  ];
-
-  const overallHeadLinks = [
-    ...baseLinks,
-    { href: '/my-events', label: 'All Events', icon: Calendar },
-    { href: '/staff', label: 'Manage Staff', icon: Users },
-    { href: '/students', label: 'Manage Students', icon: GraduationCap },
-    { href: '/tasks', label: 'Task Board', icon: ClipboardList },
-    { href: '/ocr-tool', label: 'OCR Scanner', icon: ScanLine },
   ];
 
   switch (role) {
     case 'admin':
     case 'overall_head':
-      return overallHeadLinks;
+      return managerLinks;
     case 'event_representative':
       return repLinks;
     case 'organizer':
@@ -108,7 +111,13 @@ export default function AppSidebar() {
   if (userProfile?.role === 'organizer' && userProfile.studentDataEventAccess && Object.values(userProfile.studentDataEventAccess).some(v => v === true)) {
     const studentDataLink = { href: '/students', label: 'Student Data', icon: GraduationCap };
     if (!navLinks.some(link => link.href === studentDataLink.href)) {
-      navLinks.splice(3, 0, studentDataLink);
+      // Insert after "My Events"
+      const myEventsIndex = navLinks.findIndex(link => link.href === '/my-events');
+      if (myEventsIndex !== -1) {
+          navLinks.splice(myEventsIndex + 1, 0, studentDataLink);
+      } else {
+          navLinks.push(studentDataLink);
+      }
     }
   }
 

@@ -2,15 +2,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import {
-  DndContext,
-  closestCorners,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-} from '@dnd-kit/core';
+import { DndContext, closestCorners, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { useToast } from '@/hooks/use-toast';
 import type { Task, UserProfileData, TaskStatus } from '@/types';
@@ -18,74 +10,94 @@ import TaskColumn from './TaskColumn';
 
 interface TaskBoardProps {
   tasks: Task[];
-  staff: UserProfileData[];
+  users: UserProfileData[];
+  viewMode: 'status' | 'user';
   onEditTask: (task: Task) => void;
   onStatusChange: (taskId: string, newStatus: TaskStatus) => void;
+  onTaskCreate: () => void;
 }
 
-const statuses: TaskStatus[] = ['Not Started', 'In Progress', 'Pending Review', 'Completed'];
+const statusColumns: TaskStatus[] = ['Not Started', 'In Progress', 'Pending Review', 'Completed'];
 
-export default function TaskBoard({ tasks, staff, onEditTask, onStatusChange }: TaskBoardProps) {
+export default function TaskBoard({ tasks, users, viewMode, onEditTask, onStatusChange, onTaskCreate }: TaskBoardProps) {
   const { toast } = useToast();
 
-  const tasksByStatus = useMemo(() => {
-    const grouped: Record<string, Task[]> = {};
-    statuses.forEach(status => grouped[status] = []);
-    tasks.forEach(task => {
-      if (task.status) {
-        grouped[task.status].push(task);
-      }
-    });
-    return grouped;
-  }, [tasks]);
+  const columns = useMemo(() => {
+    if (viewMode === 'user') {
+      return users.map(user => ({
+        id: user.uid,
+        title: user.fullName || user.displayName || 'Unnamed User',
+        tasks: tasks.filter(task => task.assignedToUserIds?.includes(user.uid)),
+      }));
+    }
+    
+    // Status View
+    const unassignedTasks = tasks.filter(task => !task.assignedToUserIds || task.assignedToUserIds.length === 0);
+    const statusBasedTasks = statusColumns.map(status => ({
+        id: status,
+        title: status,
+        tasks: tasks.filter(task => task.status === status),
+    }));
+
+    return [
+      { id: 'backlog', title: 'New Tasks (Backlog)', tasks: unassignedTasks },
+      ...statusBasedTasks
+    ];
+  }, [viewMode, tasks, users]);
+
 
   const sensors = useSensors(
     useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
-  
-  const getTaskById = (id: string) => tasks.find(task => task.id === id);
 
-  const handleDragEnd = async (event: DragEndEvent) => {
+  const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    if (!over) return;
+    if (!active || !over) return;
     
     const activeId = String(active.id);
-    
-    const activeTask = getTaskById(activeId);
-    if (!activeTask) return;
+    const overId = String(over.id);
 
-    const overContainerId = over.data.current?.sortable?.containerId || over.id;
-    const activeContainerId = active.data.current?.sortable?.containerId || active.id;
-
-    if (activeContainerId !== overContainerId) {
-      const newStatus = overContainerId as TaskStatus;
-      if (statuses.includes(newStatus)) {
-        try {
-          onStatusChange(activeId, newStatus);
-        } catch (error) {
-          console.error("Error updating task status:", error);
-          toast({ title: "Error", description: "Could not update task status.", variant: "destructive" });
+    // If a task is dropped on a column (not another task)
+    if (active.id !== over.id && columns.some(c => c.id === overId)) {
+        if (viewMode === 'status') {
+            const newStatus = overId as TaskStatus;
+            if (statusColumns.includes(newStatus)) {
+                onStatusChange(activeId, newStatus);
+            }
         }
-      }
+        // User view drag and drop for reassignment would be handled here
+        // For simplicity, we are focusing on status change for now.
     }
   };
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-      <div className="inline-flex gap-4 h-full p-1">
-        {statuses.map(status => (
-          <TaskColumn
-            key={status}
-            id={status}
-            title={status}
-            tasks={tasksByStatus[status]}
-            staff={staff}
-            onEditTask={onEditTask}
-          />
-        ))}
+      <div className="inline-flex h-full gap-4 p-1">
+        {viewMode === 'status' && (
+            <TaskColumn 
+                id="backlog"
+                title="Create a Task"
+                tasks={tasks.filter(t => t.status === 'Not Started' && (!t.assignedToUserIds || t.assignedToUserIds.length === 0))}
+                users={users}
+                onEditTask={onEditTask}
+                isBacklog={true}
+                onTaskCreate={onTaskCreate}
+            />
+        )}
+        {columns.map(col => {
+          if (viewMode === 'status' && col.id === 'backlog') return null; // Don't render backlog twice
+          return (
+            <TaskColumn
+              key={col.id}
+              id={col.id}
+              title={col.title}
+              tasks={col.tasks}
+              users={users}
+              onEditTask={onEditTask}
+            />
+          )
+        })}
       </div>
     </DndContext>
   );
