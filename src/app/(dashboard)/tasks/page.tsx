@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc, Unsubscribe, runTransaction, serverTimestamp, increment, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 const defaultTaskFormState: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'assignedToUserIds'> & { assignedToUserIds: string[] } = {
   title: '',
