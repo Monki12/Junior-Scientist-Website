@@ -4,88 +4,147 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if a user is an admin or overall_head
-    function isManager() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'overall_head'];
-    }
-    
-    // Helper function to check if a user is part of a board/team
-    function isBoardMember(boardId) {
-      return request.auth.uid in get(/databases/$(database)/documents/boards/$(boardId)).data.memberUids;
+    // --- HELPER FUNCTIONS ---
+    function isSignedIn() {
+      return request.auth != null;
     }
 
-    // USER-RELATED RULES
+    function getUserData(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data;
+    }
+
+    function getUserRole(userId) {
+      return exists(/databases/$(database)/documents/users/$(userId)) && getUserData(userId).role != null
+             ? getUserData(userId).role
+             : 'no_role';
+    }
+
+    function isRoleIn(roles) {
+      return isSignedIn() && getUserRole(request.auth.uid) in roles;
+    }
+
+    function isStudent() {
+      return isRoleIn(['student']);
+    }
+
+    function isStaff() {
+      return isRoleIn(['organizer', 'event_representative', 'overall_head', 'admin']);
+    }
+
+    function isOverallHeadOrAdmin() {
+      return isRoleIn(['overall_head', 'admin']);
+    }
+
+    // --- BOARD & TASK HELPER FUNCTIONS ---
+    function canManageBoards() {
+      return isRoleIn(['event_representative', 'overall_head', 'admin']);
+    }
+
+    function isMemberOfBoard(boardId) {
+      // Ensure the board document exists and the user's UID is in the memberUids list.
+      return isSignedIn() && exists(/databases/$(database)/documents/boards/$(boardId))
+             && request.auth.uid in get(/databases/$(database)/documents/boards/$(boardId)).data.memberUids;
+    }
+    
+    // --- EVENT-SPECIFIC HELPER FUNCTIONS ---
+    function isManagerForEvent(eventId) {
+      return isSignedIn() && (
+        isOverallHeadOrAdmin() ||
+        (
+          getUserRole(request.auth.uid) == 'event_representative' &&
+          getUserData(request.auth.uid).assignedEventUids != null &&
+          eventId in getUserData(request.auth.uid).assignedEventUids
+        ) ||
+        (
+          getUserRole(request.auth.uid) == 'organizer' &&
+          getUserData(request.auth.uid).studentDataEventAccess != null &&
+          getUserData(request.auth.uid).studentDataEventAccess[eventId] == true
+        )
+      );
+    }
+    
+    function isJoiningTeam() {
+      let isMemberAdded = request.resource.data.memberUids.hasAny([request.auth.uid]);
+      let isTeamSizeCorrect = request.resource.data.teamSize == resource.data.teamSize + 1;
+      let onlyMembersAndSizeUpdated = request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberUids', 'teamSize', 'updatedAt']);
+      return isStudent() && isMemberAdded && isTeamSizeCorrect && onlyMembersAndSizeUpdated;
+    }
+
+
+    // --- RULES FOR COLLECTIONS ---
+
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth.uid == userId; // Users can update their own profile
-      allow create: if request.auth.uid == userId; // Allow user creation during signup
+      allow list: if isStaff();
+      allow get: if isStaff() || (isSignedIn() && request.auth.uid == userId);
+      allow create: if (isSignedIn() && request.auth.uid == userId) || isOverallHeadOrAdmin();
+      allow update: if (isSignedIn() && request.auth.uid == userId) || isOverallHeadOrAdmin();
+      allow delete: if isOverallHeadOrAdmin();
     }
 
-    // BOARD (TEAM) RULES
+    // New rules for Task Boards
     match /boards/{boardId} {
-      allow read: if request.auth != null && isBoardMember(boardId);
-      allow create, update, delete: if isManager();
+      allow read: if isMemberOfBoard(boardId);
+      allow create, update, delete: if canManageBoards();
     }
     
-    // NOTIFICATION RULES
-    match /notifications/{notificationId} {
-       allow read, update: if request.auth.uid == resource.data.userId;
-       allow create: if request.auth != null; // Can be created by server-side logic or other users
-    }
-
-    // SUB-EVENT RULES
-    match /subEvents/{eventId} {
-      allow read: if request.auth != null;
-      allow create, update, delete: if isManager();
-    }
-
-    // EVENT REGISTRATION RULES
-    match /event_registrations/{registrationId} {
-      allow read: if request.auth.uid == resource.data.userId || isManager() || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'event_representative';
-      allow create: if request.auth.uid == request.resource.data.userId; // Users can register themselves
-      allow update: if isManager() || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'event_representative';
-    }
-
-    // EVENT TEAM RULES
-    match /event_teams/{teamId} {
-       allow read: if request.auth != null;
-       allow create: if request.auth.uid == request.resource.data.teamLeaderId;
-       allow update: if request.auth.uid in resource.data.memberUids;
-    }
-    
-    // GLOBAL STUDENT DATA COLUMNS (For Admins)
-    match /systemPreferences/columnDefinitions/studentData/{columnId} {
-        allow read: if request.auth != null;
-        allow write: if isManager();
-    }
-    
-    // USER-SPECIFIC PREFERENCES (e.g., custom columns for self)
-    match /users/{userId}/preferences/{doc=**} {
-        allow read, write: if request.auth.uid == userId;
-    }
-
-    // TASK MANAGEMENT RULES
+    // Revamped rules for Tasks, now linked to Boards
     match /tasks/{taskId} {
-      // Any authenticated user who is a member of the board can read tasks
-      allow read: if request.auth != null && isBoardMember(resource.data.boardId);
-
-      // Any member of the board can create a task
-      allow create: if request.auth != null && isBoardMember(request.resource.data.boardId);
-
-      // Admins/Managers can update anything.
-      // Task assignees can also update (e.g., change status, add comments)
-      allow update: if isManager() || request.auth.uid in resource.data.assignedToUserIds;
+      function getTaskBoardId(doc) {
+        return doc.data.boardId;
+      }
       
-      // Only admins or the original creator can delete a task
-      allow delete: if isManager() || request.auth.uid == resource.data.creatorId;
+      // Collaborative rules: Any member of a board can read, create, and update tasks.
+      allow read, create, update: if isMemberOfBoard(getTaskBoardId(resource));
 
-      // SUBTASK RULES
+      // Only board managers can delete tasks to prevent accidental data loss.
+      allow delete: if canManageBoards();
+
+      // Rules for subtasks nested within a task
       match /subtasks/{subtaskId} {
-        allow read: if request.auth != null && isBoardMember(get(/databases/$(database)/documents/tasks/$(taskId)).data.boardId);
-        
-        // Anyone assigned to the parent task can create/update subtasks
-        allow create, update, delete: if request.auth.uid in get(/databases/$(database)/documents/tasks/$(taskId)).data.assignedToUserIds;
+        // Any board member can read and write subtasks.
+        allow read, write: if isMemberOfBoard(getTaskBoardId(get(/databases/$(database)/documents/tasks/$(taskId))));
       }
     }
+    
+    // --- EXISTING RULES FOR OTHER COLLECTIONS ---
+    match /subEvents/{eventId} {
+      allow read: if true;
+      allow write: if isOverallHeadOrAdmin();
+    }
+
+    match /event_registrations/{registrationId} {
+      function isOwner() {
+        return isSignedIn() && resource.data.userId == request.auth.uid;
+      }
+      function getSubEventId(doc) {
+        return doc.data.subEventId;
+      }
+      
+      allow read: if isStaff() || isOwner() || isManagerForEvent(getSubEventId(resource));
+      allow create: if isStudent() && request.resource.data.userId == request.auth.uid;
+      allow update: if isManagerForEvent(getSubEventId(request.resource)) || (isOwner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['registrationStatus']) && request.resource.data.registrationStatus == 'cancelled');
+      allow delete: if isManagerForEvent(getSubEventId(resource));
+    }
+
+    match /event_teams/{teamId} {
+      allow read: if true;
+      allow create: if isStudent() && request.resource.data.teamLeaderId == request.auth.uid;
+      allow update: if isOverallHeadOrAdmin() || (isSignedIn() && resource.data.teamLeaderId == request.auth.uid) || isJoiningTeam();
+      allow delete: if isOverallHeadOrAdmin();
+    }
+
+    match /notifications/{notificationId} {
+        allow read, write: if isSignedIn() && request.auth.uid == resource.data.userId;
+    }
+    
+    match /systemPreferences/columnDefinitions/studentData/{columnId} {
+        allow read: if isStaff();
+        allow write: if isOverallHeadOrAdmin();
+    }
+    
+    match /users/{userId}/preferences/columnDefinitions/studentData/{columnId} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+    }
+    
   }
 }
