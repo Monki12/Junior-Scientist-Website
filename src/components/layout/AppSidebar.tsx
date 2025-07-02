@@ -47,8 +47,7 @@ const getNavLinksForRole = (role: string | undefined) => {
   const organizerLinks = [
     ...baseLinks,
     { href: '/my-events', label: 'My Events', icon: Calendar },
-    { href: '/tasks', label: 'My Tasks', icon: ClipboardList },
-    { href: '/leaderboard', label: 'Leaderboard', icon: Trophy },
+    { href: '/tasks', label: 'Tasks', icon: ClipboardList },
   ];
 
   const repLinks = [
@@ -57,7 +56,6 @@ const getNavLinksForRole = (role: string | undefined) => {
     { href: '/staff', label: 'Event Staff', icon: Users },
     { href: '/students', label: 'Event Students', icon: GraduationCap },
     { href: '/tasks', label: 'Event Tasks', icon: ClipboardList },
-    { href: '/leaderboard', label: 'Leaderboard', icon: Trophy },
   ];
 
   const overallHeadLinks = [
@@ -66,7 +64,6 @@ const getNavLinksForRole = (role: string | undefined) => {
     { href: '/staff', label: 'Manage Staff', icon: Users },
     { href: '/students', label: 'Manage Students', icon: GraduationCap },
     { href: '/tasks', label: 'Global Tasks', icon: ClipboardList },
-    { href: '/leaderboard', label: 'Leaderboard', icon: Trophy },
     { href: '/ocr-tool', label: 'OCR Scanner', icon: ScanLine },
   ];
 

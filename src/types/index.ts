@@ -6,7 +6,8 @@ export type UserRole =
   | 'organizer'
   | 'event_representative'
   | 'overall_head'
-  | 'admin';
+  | 'admin'
+  | 'test';
 
 export type TaskPriority = 'High' | 'Medium' | 'Low';
 export type TaskStatus = 'Not Started' | 'In Progress' | 'Pending Review' | 'Completed';
