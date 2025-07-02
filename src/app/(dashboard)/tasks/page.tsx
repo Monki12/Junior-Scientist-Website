@@ -108,7 +108,7 @@ export default function GlobalTasksPage() {
         unsubs.push(onSnapshot(tasksQuery, (snapshot) => {
           const tasksList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
           setTasks(tasksList);
-          if (loadingData) setLoadingData(false);
+          setLoadingData(false);
         }));
 
       } catch (error) {
@@ -120,7 +120,7 @@ export default function GlobalTasksPage() {
 
     setupListeners();
     return () => unsubs.forEach(unsub => unsub());
-  }, [userProfile, toast, loadingData]);
+  }, [userProfile, toast]);
 
   const handleOpenTaskModal = (task: Task | null) => {
     setEditingTask(task);
