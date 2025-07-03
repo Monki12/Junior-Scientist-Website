@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/use-auth';
 import type { Task, Board } from '@/types';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { Loader2, ListTodo, Filter, Inbox } from 'lucide-react';
+import { Loader2, ListTodo, Inbox } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import TaskDetailModal from '@/components/tasks/TaskDetailModal';
@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useRouter } from 'next/navigation';
 
 interface EnrichedTask extends Task {
   boardName?: string;
@@ -35,7 +36,8 @@ const statusColors: { [key: string]: string } = {
 
 
 export default function MyTasksPage() {
-  const { userProfile } = useAuth();
+  const { userProfile, loading: authLoading } = useAuth();
+  const router = useRouter();
   const { toast } = useToast();
   
   const [tasks, setTasks] = useState<EnrichedTask[]>([]);
@@ -49,7 +51,16 @@ export default function MyTasksPage() {
 
 
   useEffect(() => {
-    if (!userProfile?.uid) return;
+    if (!authLoading && userProfile && userProfile.role === 'student') {
+        toast({ title: 'Access Denied', description: 'This page is not available for students.', variant: 'destructive'});
+        router.push('/dashboard');
+        return;
+    }
+      
+    if (!userProfile?.uid) {
+        if (!authLoading) setLoading(false);
+        return;
+    };
 
     setLoading(true);
     let unsubTasks: () => void;
@@ -91,7 +102,7 @@ export default function MyTasksPage() {
       if (unsubBoards) unsubBoards();
     };
 
-  }, [userProfile?.uid, toast]);
+  }, [userProfile, authLoading, toast, router]);
 
   const filteredTasks = tasks.filter(task => {
     const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
@@ -99,11 +110,19 @@ export default function MyTasksPage() {
     return matchesStatus && matchesBoard;
   });
   
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
         <p className="ml-4">Loading your tasks...</p>
+      </div>
+    );
+  }
+
+  if (!userProfile || userProfile.role === 'student') {
+    return (
+       <div className="flex h-full w-full items-center justify-center">
+         <p>Redirecting...</p>
       </div>
     );
   }

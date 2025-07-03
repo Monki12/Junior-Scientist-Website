@@ -27,7 +27,11 @@ import {
   Search,
   Ticket,
   Users2,
-  ListTodo
+  ListTodo,
+  CheckCircle,
+  PlusCircle,
+  FileCog,
+  Settings,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from './logo';
@@ -43,21 +47,20 @@ const getNavLinksForRole = (role: string | undefined) => {
     ...baseLinks,
     { href: '/events', label: 'Explore Events', icon: Search },
     { href: '/my-registrations', label: 'My Registrations', icon: Ticket },
-    { href: '/my-tasks', label: 'My Tasks', icon: ListTodo },
   ];
 
   const managerLinks = [
     ...baseLinks,
-    { href: '/tasks', label: 'Team Boards', icon: ClipboardList },
-    { href: '/my-tasks', label: 'My Tasks', icon: ListTodo },
+    { href: '/my-tasks', label: 'My Tasks', icon: CheckCircle },
+    { href: '/tasks', label: 'Task Boards', icon: ClipboardList },
     { href: '/my-events', label: 'All Events', icon: Calendar },
     { href: '/staff', label: 'Manage Staff', icon: Users },
     { href: '/students', label: 'Manage Students', icon: GraduationCap },
     {
       group: 'Teams',
       links: [
-        { href: '/teams', label: 'My Teams', icon: Users2 },
-        { href: '/teams/manage', label: 'Manage Teams', icon: Users2 },
+        { href: '/teams', label: 'My Boards', icon: Users2 },
+        { href: '/teams/manage', label: 'Manage Boards', icon: Settings },
       ]
     },
     { href: '/ocr-tool', label: 'OCR Scanner', icon: ScanLine },
@@ -66,18 +69,18 @@ const getNavLinksForRole = (role: string | undefined) => {
   
   const organizerLinks = [
     ...baseLinks,
-    { href: '/tasks', label: 'Team Boards', icon: ClipboardList },
-    { href: '/my-tasks', label: 'My Tasks', icon: ListTodo },
+    { href: '/my-tasks', label: 'My Tasks', icon: CheckCircle },
+    { href: '/tasks', label: 'Task Boards', icon: ClipboardList },
     { href: '/my-events', label: 'My Events', icon: Calendar },
-    { href: '/teams', label: 'My Teams', icon: Users2 },
+    { href: '/teams', label: 'My Boards', icon: Users2 },
   ];
 
   const repLinks = [
     ...baseLinks,
-    { href: '/tasks', label: 'Team Boards', icon: ClipboardList },
-    { href: '/my-tasks', label: 'My Tasks', icon: ListTodo },
+    { href: '/my-tasks', label: 'My Tasks', icon: CheckCircle },
+    { href: '/tasks', label: 'Task Boards', icon: ClipboardList },
     { href: '/my-events', label: 'My Events', icon: Calendar },
-    { href: '/teams', label: 'My Teams', icon: Users2 },
+    { href: '/teams', label: 'My Boards', icon: Users2 },
     { href: '/students', label: 'Event Students', icon: GraduationCap },
   ];
 
