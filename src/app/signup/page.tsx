@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import type { SignUpFormData, UserProfileData } from '@/types';
-import { UserPlus, Loader2, LogIn, School as SchoolIconLucide } from 'lucide-react';
+import { UserPlus, Loader2, LogIn, School as SchoolIconLucide, Eye, EyeOff } from 'lucide-react';
 
 import { auth, db } from '@/lib/firebase';
 import { createUserWithEmailAndPassword, type AuthError } from 'firebase/auth';
@@ -33,6 +33,8 @@ export default function SignUpPage() {
   const { toast } = useToast();
   const { authUser, loading: authLoading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [formData, setFormData] = useState<SignUpFormData>({
     fullName: '',
@@ -60,6 +62,9 @@ export default function SignUpPage() {
   const handleSelectChange = (name: keyof SignUpFormData, value: string) => {
     setFormData({ ...formData, [name]: value });
   };
+  
+  const togglePasswordVisibility = () => setShowPassword(!showPassword);
+  const toggleConfirmPasswordVisibility = () => setShowConfirmPassword(!showConfirmPassword);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -202,11 +207,39 @@ export default function SignUpPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="password">Password <span className="text-destructive">*</span></Label>
-                <Input id="password" type="password" placeholder="•••••••• (min. 6 characters)" value={formData.password} onChange={handleChange} required disabled={isLoading} />
+                <div className="relative">
+                  <Input 
+                    id="password" 
+                    type={showPassword ? 'text' : 'password'} 
+                    placeholder="•••••••• (min. 6 characters)" 
+                    value={formData.password} 
+                    onChange={handleChange} 
+                    required 
+                    disabled={isLoading}
+                    className="pr-10"
+                  />
+                  <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground" onClick={togglePasswordVisibility} tabIndex={-1}>
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
               </div>
               <div>
                 <Label htmlFor="confirmPassword">Confirm Password <span className="text-destructive">*</span></Label>
-                <Input id="confirmPassword" type="password" placeholder="••••••••" value={formData.confirmPassword} onChange={handleChange} required disabled={isLoading} />
+                 <div className="relative">
+                  <Input 
+                    id="confirmPassword" 
+                    type={showConfirmPassword ? 'text' : 'password'} 
+                    placeholder="••••••••" 
+                    value={formData.confirmPassword} 
+                    onChange={handleChange} 
+                    required 
+                    disabled={isLoading} 
+                    className="pr-10"
+                  />
+                  <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground" onClick={toggleConfirmPasswordVisibility} tabIndex={-1}>
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
               </div>
             </div>
              <div>

@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { organizerSignupSchema, type OrganizerSignupFormData } from '@/schemas/organizerSignupSchema';
 
 // Reconstruct Firebase config to initialize a temporary app instance.
@@ -37,6 +37,7 @@ interface CreateOrganizerFormProps {
 export default function CreateOrganizerForm({ currentAdminRole, onSuccess }: CreateOrganizerFormProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<OrganizerSignupFormData>({
     resolver: zodResolver(organizerSignupSchema),
@@ -55,6 +56,8 @@ export default function CreateOrganizerForm({ currentAdminRole, onSuccess }: Cre
 
   const { handleSubmit, register, formState: { errors }, control, watch, setError } = form;
   const selectedRole = watch('role');
+  
+  const togglePasswordVisibility = () => setShowPassword(!showPassword);
 
   const onSubmit = async (data: OrganizerSignupFormData) => {
     setIsSubmitting(true);
@@ -165,7 +168,18 @@ export default function CreateOrganizerForm({ currentAdminRole, onSuccess }: Cre
         </div>
         <div>
           <Label htmlFor="password">Password (min 8 chars, A-Z, a-z, 0-9, special)</Label>
-          <Input id="password" type="password" {...register('password')} disabled={isSubmitting} />
+          <div className="relative">
+            <Input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              {...register('password')}
+              disabled={isSubmitting}
+              className="pr-10"
+            />
+            <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground" onClick={togglePasswordVisibility} tabIndex={-1}>
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </Button>
+          </div>
           {errors.password && <p className="text-destructive text-sm mt-1">{errors.password.message}</p>}
         </div>
         <div>

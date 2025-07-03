@@ -2,7 +2,7 @@
 
 'use client';
 
-import { type User as FirebaseUser, onAuthStateChanged, signInWithEmailAndPassword, type AuthError } from 'firebase/auth';
+import { type User as FirebaseUser, onAuthStateChanged, signInWithEmailAndPassword, sendPasswordResetEmail as firebaseSendPasswordResetEmail, type AuthError } from 'firebase/auth';
 import { createContext, useState, useEffect, ReactNode } from 'react';
 import type { LoginFormData, UserProfileData } from '@/types';
 import { auth, db } from '@/lib/firebase'; 
@@ -15,6 +15,7 @@ interface AuthContextType {
   logIn: (formData: LoginFormData) => Promise<FirebaseUser | AuthError>;
   logOut: () => Promise<void>;
   setUserProfile: React.Dispatch<React.SetStateAction<UserProfileData | null>>;
+  sendPasswordResetEmail: (email: string) => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -97,6 +98,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await auth.signOut();
   };
 
+  const sendPasswordResetEmail = async (email: string): Promise<void> => {
+    return firebaseSendPasswordResetEmail(auth, email);
+  };
+
   const value = {
     authUser,
     userProfile,
@@ -104,6 +109,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     logIn,
     logOut,
     setUserProfile,
+    sendPasswordResetEmail,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
