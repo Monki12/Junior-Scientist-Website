@@ -5,7 +5,7 @@ import React, { useRef, useState, useEffect } from "react";
 import { motion, useMotionValue, useSpring } from "framer-motion";
 import Link from 'next/link';
 
-import "./TiltedCard.css";
+import "./TiltedFlipCard.css";
 
 const springValues = {
   damping: 30,
@@ -148,11 +148,13 @@ export default function TiltedFlipCard({
         {/* Front Face */}
         <div className="tilted-card-face tilted-card-face-front">
           <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-20 dark:opacity-100`}></div>
-          <div className="relative z-10 flex flex-col items-center justify-center h-full">
-            <img src={icon} alt={`${title} icon`} className="superpower-icon" />
+          <div className="relative z-10 flex flex-col items-center justify-start h-full pt-6">
+            <div className="card-icon-wrapper">
+              <img src={icon} alt={`${title} icon`} />
+            </div>
             <h3 className="superpower-title-front">{title}</h3>
             <p className="superpower-description-front">{description}</p>
-            <span className="flip-hint mt-auto">Click to see events</span>
+            <span className="click-to-action">Click to see events</span>
           </div>
         </div>
 
@@ -174,7 +176,7 @@ export default function TiltedFlipCard({
                   </ul>
                 ) : <p>No events yet. Check back soon!</p> }
               </div>
-              <span className="flip-back-hint mt-auto">Click to flip back</span>
+              <span className="click-to-action-back mt-auto">Click to flip back</span>
           </div>
         </div>
       </motion.div>

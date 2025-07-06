@@ -372,6 +372,8 @@ export default function PageContent() {
                                         link: `/events/${event.slug}`
                                     }))
                                 }
+                                tiltAmplitude={20}
+                                scaleOnHover={1.05}
                             />
                             </motion.div>
                         ))}
