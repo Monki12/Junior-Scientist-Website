@@ -66,40 +66,32 @@ export default {
           border: 'hsl(var(--border))',
           ring: 'hsl(var(--ring))',
         },
-        // --- NEW ENHANCED CARD BACKGROUNDS ---
-        // Light Mode Card Backgrounds
-        'card-thinker-light': '#D4CCF9', // Slightly richer Lavender
-        'card-brainiac-light': '#CCEBF9', // Soft Teal/Aqua
-        'card-strategist-light': '#F9E0CC', // Warm Coral/Peach
-        'card-innovator-light': '#F9CCE6', // Vibrant Light Pink
+        // --- NEW ENHANCED CARD BACKGROUNDS based on your new mapping ---
+        // Light Mode Card Backgrounds (Derived from image_430ea4.png for light version)
+        'card-strategist-light': '#D0E0FF', // Soft light blue (Honolulu Blue adapted)
+        'card-brainiac-light': '#E9DFFF',   // Soft light lavender (Lavender floral adapted)
+        'card-thinker-light': '#E0C8F5',    // Softer light purple (Amaranth purple adapted)
+        'card-innovator-light': '#FFE8D9',  // Soft light coral (Coral adapted)
 
-        // Dark Mode Card Backgrounds (Subtle Tints)
-        'card-thinker-dark': '#2D3242', // Bluish Dark Grey
-        'card-brainiac-dark': '#2D3A3B', // Greenish Dark Grey
-        'card-strategist-dark': '#323030', // Warmer Dark Grey
-        'card-innovator-dark': '#2F2E3A', // Purplish Dark Grey
-        'card-dark-bg': '#2B303D',
+        // Dark Mode Card Backgrounds (Subtle Tints aligning with primary colors for depth)
+        // These are designed to be distinct but not overpowering against your dark theme.
+        'card-strategist-dark': '#2E354A', // Dark blue-grey (matches Honolulu Blue)
+        'card-brainiac-dark': '#322E3A',   // Dark purplish-grey (matches Lavender floral)
+        'card-thinker-dark': '#342C3F',    // Darker purple-grey (matches Amaranth purple)
+        'card-innovator-dark': '#352E2B',  // Dark brownish-grey (matches Coral)
 
-        // --- ICON FILL COLORS (Adjusted for Brainiac in Light Mode) ---
-        'icon-thinker-light': '#6A6AF0',
-        'icon-brainiac-light': '#ADD8E6', // Changed for distinction
-        'icon-strategist-light': '#FFD700',
-        'icon-innovator-light': '#FF69B4',
-
-        'icon-thinker-dark': '#6A6AF0',
-        'icon-brainiac-dark': '#AFE152',
-        'icon-strategist-dark': '#F0AD4E',
-        'icon-innovator-dark': '#EA5C9F',
-
-        // --- EXISTING TEXT COLORS ---
+        // --- ICON FILL COLORS (Maintained for vibrancy and glow) ---
+        // These are referenced via CSS variables in globals.css now
+        
+        // --- TEXT COLORS (Keep these as they are or adjust for new contrast) ---
         'text-dark-primary': '#FFFFFF',
         'text-dark-secondary': '#C0C0C0',
         'text-light-primary': '#333333',
         'text-light-secondary': '#666666',
         'event-item-dark': '#E0E0E0',
         'event-item-light': '#444444',
-        'event-link-hover-dark': '#8BC34A',
-        'event-link-hover-light': '#3F51B5',
+        'event-link-hover-dark': '#6ECFF6', // Lighter blue for dark mode hover
+        'event-link-hover-light': '#0471A6', // Darker blue for light mode hover
       },
       borderRadius: {
         lg: 'var(--radius)',

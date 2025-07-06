@@ -4,11 +4,11 @@ import React, { useRef, useState } from 'react';
 import { motion, useMotionValue, useSpring } from 'framer-motion';
 import Link from 'next/link';
 
-// Spring values for smooth animations
+// Spring values for a quicker, more responsive animation
 const springConfig = {
-  damping: 20, // Reduced damping for quicker stop
-  stiffness: 250, // Increased stiffness for faster movement
-  mass: 1, // Reduced mass for lighter, more agile feel
+  damping: 20,
+  stiffness: 250,
+  mass: 1,
 };
 
 interface TiltedFlipCardProps {
@@ -27,7 +27,7 @@ const getCategoryStyles = (category: string, themeMode: 'light' | 'dark') => {
   const styles: {
     bgColor: string;
     iconFill: string;
-    iconFilter?: string; // For dark mode glow
+    iconFilter?: string;
   } = {
     bgColor: '',
     iconFill: '',
@@ -36,50 +36,49 @@ const getCategoryStyles = (category: string, themeMode: 'light' | 'dark') => {
   if (themeMode === 'light') {
     switch (category) {
       case 'thinker':
-        styles.bgColor = 'bg-card-thinker-light';
+        styles.bgColor = 'bg-card-thinker-light'; // Purple
         styles.iconFill = 'var(--icon-thinker-light)';
         break;
       case 'brainiac':
-        styles.bgColor = 'bg-card-brainiac-light';
+        styles.bgColor = 'bg-card-brainiac-light'; // Lavender
         styles.iconFill = 'var(--icon-brainiac-light)';
         break;
       case 'strategist':
-        styles.bgColor = 'bg-card-strategist-light';
+        styles.bgColor = 'bg-card-strategist-light'; // Blue
         styles.iconFill = 'var(--icon-strategist-light)';
         break;
       case 'innovator':
-        styles.bgColor = 'bg-card-innovator-light';
+        styles.bgColor = 'bg-card-innovator-light'; // Coral
         styles.iconFill = 'var(--icon-innovator-light)';
         break;
       default:
         styles.bgColor = 'bg-white';
         styles.iconFill = '#000000';
     }
-  } else {
-    // Dark mode
+  } else { // Dark mode
     switch (category) {
       case 'thinker':
-        styles.bgColor = 'bg-card-thinker-dark';
+        styles.bgColor = 'bg-card-thinker-dark'; // Dark Purple-grey
         styles.iconFill = 'var(--icon-thinker-dark)';
-        styles.iconFilter = 'drop-shadow(0 0 8px #6A6AF070)';
+        styles.iconFilter = 'drop-shadow(0 0 8px #B6244F70)'; // Amaranth Purple glow
         break;
       case 'brainiac':
-        styles.bgColor = 'bg-card-brainiac-dark';
+        styles.bgColor = 'bg-card-brainiac-dark'; // Dark Lavender-grey
         styles.iconFill = 'var(--icon-brainiac-dark)';
-        styles.iconFilter = 'drop-shadow(0 0 8px #AFE15270)';
+        styles.iconFilter = 'drop-shadow(0 0 8px #C287E870)'; // Lavender glow
         break;
       case 'strategist':
-        styles.bgColor = 'bg-card-strategist-dark';
+        styles.bgColor = 'bg-card-strategist-dark'; // Dark Blue-grey
         styles.iconFill = 'var(--icon-strategist-dark)';
-        styles.iconFilter = 'drop-shadow(0 0 8px #F0AD4E70)';
+        styles.iconFilter = 'drop-shadow(0 0 8px #0471A670)'; // Honolulu Blue glow
         break;
       case 'innovator':
-        styles.bgColor = 'bg-card-innovator-dark';
+        styles.bgColor = 'bg-card-innovator-dark'; // Dark Coral-grey
         styles.iconFill = 'var(--icon-innovator-dark)';
-        styles.iconFilter = 'drop-shadow(0 0 8px #EA5C9F70)';
+        styles.iconFilter = 'drop-shadow(0 0 8px #FF855270)'; // Coral glow
         break;
       default:
-        styles.bgColor = 'bg-card-dark-bg';
+        styles.bgColor = 'bg-gray-800'; // Fallback
         styles.iconFill = '#FFFFFF';
         styles.iconFilter = 'none';
     }
@@ -98,13 +97,11 @@ const TiltedFlipCard = ({
   const [isFlipped, setIsFlipped] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
-  const x = useMotionValue(0);
-  const y = useMotionValue(0);
   const rotateX = useSpring(0, springConfig);
   const rotateY = useSpring(0, springConfig);
   const scale = useSpring(1, springConfig);
 
-  const rotateAmplitude = 18;
+  const rotateAmplitude = 18; // Increased for more pronounced tilt
   const scaleOnHover = 1.03;
 
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -153,13 +150,12 @@ const TiltedFlipCard = ({
     themeMode === 'light'
       ? 'hover:text-event-link-hover-light'
       : 'hover:text-event-link-hover-dark';
-
   const iconBgColor = themeMode === 'light' ? 'bg-white/80' : 'bg-white/5';
   const iconShadow = themeMode === 'light' ? 'shadow-md' : 'shadow-lg';
   const cardShadow = themeMode === 'light' ? 'shadow-md' : 'shadow-lg';
 
   return (
-    <div className="w-full max-w-sm sm:w-[314px] h-[376px] mx-auto sm:mx-4 [perspective:1000px]">
+    <div className="w-full max-w-sm sm:w-80 h-96 mx-auto sm:mx-4 [perspective:1000px]">
       <motion.div
         ref={cardRef}
         className={`relative w-full h-full [transform-style:preserve-3d] cursor-pointer rounded-2xl ${cardShadow}`}
@@ -175,7 +171,7 @@ const TiltedFlipCard = ({
         <motion.div
           className="relative w-full h-full [transform-style:preserve-3d]"
           animate={{ rotateY: isFlipped ? 180 : 0 }}
-          transition={{ duration: 0.6, ease: 'easeInOut' }}
+          transition={{ duration: 0.5, ease: 'easeInOut' }}
         >
           {/* Front of card */}
           <div
@@ -214,26 +210,30 @@ const TiltedFlipCard = ({
               Related Events
             </h3>
             <div className="space-y-4 flex-1 flex flex-col justify-center">
-              {events.map((event, index) => (
-                <motion.div
-                  key={index}
-                  className={`p-4 rounded-lg border transition-all duration-300 ${
-                    themeMode === 'light'
-                      ? 'bg-gray-100 border-gray-300 hover:border-gray-500'
-                      : 'bg-white/10 border-white/20 hover:border-white/50'
-                  }`}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <Link
-                    href={event.link}
-                    className={`font-medium block ${eventItemColor} ${eventLinkHoverColor}`}
-                    onClick={(e) => e.stopPropagation()}
+              {events.length > 0 ? (
+                events.map((event, index) => (
+                  <motion.div
+                    key={index}
+                    className={`p-4 rounded-lg border transition-all duration-300 ${
+                      themeMode === 'light'
+                        ? 'bg-gray-100 border-gray-300 hover:border-gray-500'
+                        : 'bg-white/10 border-white/20 hover:border-white/50'
+                    }`}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                   >
-                    {event.name}
-                  </Link>
-                </motion.div>
-              ))}
+                    <Link
+                      href={event.link}
+                      className={`font-medium block ${eventItemColor} ${eventLinkHoverColor}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {event.name}
+                    </Link>
+                  </motion.div>
+                ))
+              ) : (
+                <p className={descriptionColor}>No events listed yet.</p>
+              )}
             </div>
             <div className={`text-sm text-center mt-6 ${clickActionColor}`}>
               Click to flip back

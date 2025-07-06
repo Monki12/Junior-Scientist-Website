@@ -28,10 +28,10 @@
     --radius: 0.8rem;
     
     /* Light Mode Icon Colors */
-    --icon-thinker-light: #6A6AF0;
-    --icon-brainiac-light: #ADD8E6;
-    --icon-strategist-light: #FFD700;
-    --icon-innovator-light: #FF69B4;
+    --icon-strategist-light: #0471A6; /* Honolulu Blue */
+    --icon-brainiac-light: #C287E8;   /* Lavender (floral) */
+    --icon-thinker-light: #B6244F;    /* Amaranth purple */
+    --icon-innovator-light: #FF8552;  /* Coral */
   }
 
   .dark {
@@ -58,10 +58,10 @@
     --radius: 0.8rem;
 
     /* Dark Mode Icon Colors */
-    --icon-thinker-dark: #6A6AF0;
-    --icon-brainiac-dark: #AFE152;
-    --icon-strategist-dark: #F0AD4E;
-    --icon-innovator-dark: #EA5C9F;
+    --icon-strategist-dark: #0471A6;
+    --icon-brainiac-dark: #C287E8;
+    --icon-thinker-dark: #B6244F;
+    --icon-innovator-dark: #FF8552;
   }
 }
 

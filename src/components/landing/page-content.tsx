@@ -118,28 +118,24 @@ export default function PageContent() {
     
     const superpowers = [
       {
-        id: 1,
         category: 'thinker' as const,
         iconSrc: 'https://img.icons8.com/fluency/96/brain.png',
         title: "The Thinker",
         description: "Excel in debating, global affairs, and public speaking? Born diplomat!",
       },
       {
-        id: 2,
         category: 'brainiac' as const,
         iconSrc: 'https://img.icons8.com/fluency/96/puzzle.png',
         title: "The Brainiac",
         description: "Obsessed with facts, quizzes, and science puzzles? You see the patterns others miss.",
       },
       {
-        id: 3,
         category: 'strategist' as const,
         iconSrc: 'https://img.icons8.com/fluency/96/rocket.png',
         title: "The Strategist",
         description: "Enjoy solving math riddles and cracking logic games? Master of numbers and patterns.",
       },
       {
-        id: 4,
         category: 'innovator' as const,
         iconSrc: 'https://img.icons8.com/fluency/96/light-on.png',
         title: "The Innovator",
@@ -296,7 +292,7 @@ export default function PageContent() {
                     <div className="flex flex-wrap justify-center items-stretch gap-y-8 gap-x-4 px-4 mx-auto max-w-screen-xl lg:max-w-[1400px]">
                         {superpowers.map((superpower) => (
                             <TiltedFlipCard
-                                key={superpower.id}
+                                key={superpower.category}
                                 category={superpower.category}
                                 iconSrc={superpower.iconSrc}
                                 title={superpower.title}
