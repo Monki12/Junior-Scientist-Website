@@ -1,4 +1,3 @@
-
 import type {Config} from 'tailwindcss';
 
 export default {
@@ -67,12 +66,32 @@ export default {
           border: 'hsl(var(--border))',
           ring: 'hsl(var(--ring))',
         },
-        // Custom Card & Icon Colors
-        'card-thinker-light': '#E0E0FB',
-        'card-brainiac-light': '#E0FBE0',
-        'card-strategist-light': '#FBE0E0',
-        'card-innovator-light': '#FBE0FB',
+        // --- NEW ENHANCED CARD BACKGROUNDS ---
+        // Light Mode Card Backgrounds
+        'card-thinker-light': '#D4CCF9', // Slightly richer Lavender
+        'card-brainiac-light': '#CCEBF9', // Soft Teal/Aqua
+        'card-strategist-light': '#F9E0CC', // Warm Coral/Peach
+        'card-innovator-light': '#F9CCE6', // Vibrant Light Pink
+
+        // Dark Mode Card Backgrounds (Subtle Tints)
+        'card-thinker-dark': '#2D3242', // Bluish Dark Grey
+        'card-brainiac-dark': '#2D3A3B', // Greenish Dark Grey
+        'card-strategist-dark': '#323030', // Warmer Dark Grey
+        'card-innovator-dark': '#2F2E3A', // Purplish Dark Grey
         'card-dark-bg': '#2B303D',
+
+        // --- ICON FILL COLORS (Adjusted for Brainiac in Light Mode) ---
+        'icon-thinker-light': '#6A6AF0',
+        'icon-brainiac-light': '#ADD8E6', // Changed for distinction
+        'icon-strategist-light': '#FFD700',
+        'icon-innovator-light': '#FF69B4',
+
+        'icon-thinker-dark': '#6A6AF0',
+        'icon-brainiac-dark': '#AFE152',
+        'icon-strategist-dark': '#F0AD4E',
+        'icon-innovator-dark': '#EA5C9F',
+
+        // --- EXISTING TEXT COLORS ---
         'text-dark-primary': '#FFFFFF',
         'text-dark-secondary': '#C0C0C0',
         'text-light-primary': '#333333',

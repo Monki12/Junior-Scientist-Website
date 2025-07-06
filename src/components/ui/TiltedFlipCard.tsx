@@ -23,10 +23,7 @@ interface TiltedFlipCardProps {
   themeMode: 'light' | 'dark';
 }
 
-const getCategoryStyles = (
-  category: string,
-  themeMode: 'light' | 'dark'
-) => {
+const getCategoryStyles = (category: string, themeMode: 'light' | 'dark') => {
   const styles: {
     bgColor: string;
     iconFill: string;
@@ -39,8 +36,8 @@ const getCategoryStyles = (
   if (themeMode === 'light') {
     switch (category) {
       case 'thinker':
-        styles.bgColor = 'bg-card-thinker-light'; // Use Tailwind class
-        styles.iconFill = 'var(--icon-thinker-light)'; // Use CSS variable for SVG fill
+        styles.bgColor = 'bg-card-thinker-light';
+        styles.iconFill = 'var(--icon-thinker-light)';
         break;
       case 'brainiac':
         styles.bgColor = 'bg-card-brainiac-light';
@@ -60,25 +57,29 @@ const getCategoryStyles = (
     }
   } else {
     // Dark mode
-    styles.bgColor = 'bg-card-dark-bg'; // Consistent dark background
     switch (category) {
       case 'thinker':
+        styles.bgColor = 'bg-card-thinker-dark';
         styles.iconFill = 'var(--icon-thinker-dark)';
-        styles.iconFilter = 'drop-shadow(0 0 8px #6A6AF070)'; // Blue glow
+        styles.iconFilter = 'drop-shadow(0 0 8px #6A6AF070)';
         break;
       case 'brainiac':
+        styles.bgColor = 'bg-card-brainiac-dark';
         styles.iconFill = 'var(--icon-brainiac-dark)';
-        styles.iconFilter = 'drop-shadow(0 0 8px #AFE15270)'; // Green glow
+        styles.iconFilter = 'drop-shadow(0 0 8px #AFE15270)';
         break;
       case 'strategist':
+        styles.bgColor = 'bg-card-strategist-dark';
         styles.iconFill = 'var(--icon-strategist-dark)';
-        styles.iconFilter = 'drop-shadow(0 0 8px #F0AD4E70)'; // Orange glow
+        styles.iconFilter = 'drop-shadow(0 0 8px #F0AD4E70)';
         break;
       case 'innovator':
+        styles.bgColor = 'bg-card-innovator-dark';
         styles.iconFill = 'var(--icon-innovator-dark)';
-        styles.iconFilter = 'drop-shadow(0 0 8px #EA5C9F70)'; // Pink glow
+        styles.iconFilter = 'drop-shadow(0 0 8px #EA5C9F70)';
         break;
       default:
+        styles.bgColor = 'bg-card-dark-bg';
         styles.iconFill = '#FFFFFF';
         styles.iconFilter = 'none';
     }
@@ -97,35 +98,31 @@ const TiltedFlipCard = ({
   const [isFlipped, setIsFlipped] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
-  // Framer Motion values for tilt effect
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const rotateX = useSpring(0, springConfig);
   const rotateY = useSpring(0, springConfig);
   const scale = useSpring(1, springConfig);
 
-  // Constants for tilt amplitude
-  const rotateAmplitude = 18; // Increased from 10/15 to 18 for a more noticeable tilt. Experiment with 15-25.
-  const scaleOnHover = 1.03; // Slight scale, adjust as desired.
+  const rotateAmplitude = 18;
+  const scaleOnHover = 1.03;
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!cardRef.current) return;
 
     const rect = cardRef.current.getBoundingClientRect();
-    const offsetX = e.clientX - rect.left - rect.width / 2; // X distance from center
-    const offsetY = e.clientY - rect.top - rect.height / 2; // Y distance from center
+    const offsetX = e.clientX - rect.left - rect.width / 2;
+    const offsetY = e.clientY - rect.top - rect.height / 2;
 
-    // Calculate rotation based on mouse position relative to card center
     const rotationX = (offsetY / (rect.height / 2)) * -rotateAmplitude;
     const rotationY = (offsetX / (rect.width / 2)) * rotateAmplitude;
 
     rotateX.set(rotationX);
     rotateY.set(rotationY);
-    scale.set(scaleOnHover); // Scale up on hover
+    scale.set(scaleOnHover);
   };
 
   const handleMouseLeave = () => {
-    // Reset all motion values to their initial state (flat, no scale)
     rotateX.set(0);
     rotateY.set(0);
     scale.set(1);
@@ -135,13 +132,11 @@ const TiltedFlipCard = ({
     setIsFlipped(!isFlipped);
   };
 
-  // Get dynamic styles based on category and themeMode
   const { bgColor, iconFill, iconFilter } = getCategoryStyles(
     category,
     themeMode
   );
 
-  // Determine text colors based on theme, as before
   const titleColor =
     themeMode === 'light'
       ? 'text-text-light-primary'
@@ -159,7 +154,6 @@ const TiltedFlipCard = ({
       ? 'hover:text-event-link-hover-light'
       : 'hover:text-event-link-hover-dark';
 
-  // Icon Wrapper and Shadows
   const iconBgColor = themeMode === 'light' ? 'bg-white/80' : 'bg-white/5';
   const iconShadow = themeMode === 'light' ? 'shadow-md' : 'shadow-lg';
   const cardShadow = themeMode === 'light' ? 'shadow-md' : 'shadow-lg';
@@ -178,7 +172,6 @@ const TiltedFlipCard = ({
         onMouseLeave={handleMouseLeave}
         onClick={handleFlip}
       >
-        {/* Inner container for the actual flip effect */}
         <motion.div
           className="relative w-full h-full [transform-style:preserve-3d]"
           animate={{ rotateY: isFlipped ? 180 : 0 }}
