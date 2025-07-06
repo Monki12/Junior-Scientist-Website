@@ -11,6 +11,7 @@ import { db } from '@/lib/firebase';
 import type { SubEvent } from '@/types';
 import { motion, useInView, animate, useScroll, useTransform } from 'framer-motion';
 import TiltedFlipCard from '@/components/ui/TiltedFlipCard';
+import { useTheme } from 'next-themes';
 
 interface AnimatedNumberProps {
   to: number;
@@ -73,26 +74,26 @@ function GallerySection() {
     const galleryRef = useRef<HTMLDivElement>(null);
     const { scrollYProgress } = useScroll({
       target: galleryRef,
-      offset: ['start end', 'end start'],
+      offset: ["start end", "end start"]
     });
 
-    const x = useTransform(scrollYProgress, [0, 1], ['-5%', '5%']);
+    const x = useTransform(scrollYProgress, [0, 1], ["10%", "-20%"]);
 
     const galleryImages = [
         { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Science_fair_project.jpg/1280px-Science_fair_project.jpg', alt: 'Science fair project', dataAiHint: 'science fair' },
         { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Girl_uses_a_microscope_at_a_science_camp.jpg/1280px-Girl_uses_a_microscope_at_a_science_camp.jpg', alt: 'Girl uses a microscope', dataAiHint: 'student microscope' },
+        { src: 'https://www.publicdomainpictures.net/pictures/320000/velka/science-background-with-test-tubes.jpg', alt: 'chemistry experiment', dataAiHint: 'student experiment' },
         { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Robot_at_a_STEM_camp.jpg/1280px-Robot_at_a_STEM_camp.jpg', alt: 'Robot at a STEM camp', dataAiHint: 'student robot' },
         { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/Computer_programming_class_for_kids.jpg/1280px-Computer_programming_class_for_kids.jpg', alt: 'Kids coding class', dataAiHint: 'students coding' },
-        { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Students_doing_an_experiment.jpg/1280px-Students_doing_an_experiment.jpg', alt: 'chemistry experiment', dataAiHint: 'student experiment' },
     ];
 
     return (
-        <section ref={galleryRef} className="gallery-section">
-            <AnimatedContent>
+        <section ref={galleryRef} className="gallery-section h-[100vh] relative overflow-hidden">
+             <AnimatedContent>
                 <h2 className="text-3xl md:text-4xl font-bold text-center mb-2 text-foreground">Moments of Brilliance</h2>
                 <p className="text-lg text-muted-foreground text-center mt-2 max-w-xl mx-auto mb-16">Explore our vibrant community in action.</p>
             </AnimatedContent>
-            <motion.div style={{ x }} className="gallery-strip">
+            <motion.div style={{ x }} className="gallery-strip absolute top-1/2 left-0 -translate-y-1/2 flex items-center gap-10 will-change-transform">
                {galleryImages.map((image, index) => (
                  <motion.div key={index} className="gallery-item"
                     initial={{ opacity: 0, y: 100 }}
@@ -104,7 +105,7 @@ function GallerySection() {
                  </motion.div>
                ))}
             </motion.div>
-             <div className="scroll-hint">Scroll to explore more moments</div>
+             <div className="scroll-hint absolute bottom-8 text-muted-foreground">Scroll to explore more moments</div>
         </section>
     )
 }
@@ -112,11 +113,12 @@ function GallerySection() {
 export default function PageContent() {
     const [events, setEvents] = useState<SubEvent[]>([]);
     const [loading, setLoading] = useState(true);
+    const { theme } = useTheme();
     
     const superpowers = [
       {
         id: 1,
-        cardClassName: 'thinker-card',
+        className: 'thinker-card',
         icon: 'https://img.icons8.com/fluency/96/brain.png',
         iconClassName: 'icon-thinker',
         title: "The Thinker",
@@ -124,7 +126,7 @@ export default function PageContent() {
       },
       {
         id: 2,
-        cardClassName: 'brainiac-card',
+        className: 'brainiac-card',
         icon: 'https://img.icons8.com/fluency/96/puzzle.png',
         iconClassName: 'icon-brainiac',
         title: "The Brainiac",
@@ -132,7 +134,7 @@ export default function PageContent() {
       },
       {
         id: 3,
-        cardClassName: 'strategist-card',
+        className: 'strategist-card',
         icon: 'https://img.icons8.com/fluency/96/rocket.png',
         iconClassName: 'icon-strategist',
         title: "The Strategist",
@@ -140,7 +142,7 @@ export default function PageContent() {
       },
       {
         id: 4,
-        cardClassName: 'innovator-card',
+        className: 'innovator-card',
         icon: 'https://img.icons8.com/fluency/96/light-on.png',
         iconClassName: 'icon-innovator',
         title: "The Innovator",
@@ -285,7 +287,7 @@ export default function PageContent() {
                 </div>
             </section>
 
-            <section id="superpowers" className="w-full py-12 md:py-20 superpower-section">
+             <section id="superpowers" className="w-full py-12 md:py-20 superpower-section">
                 <div className="container mx-auto px-4">
                     <AnimatedContent>
                       <h2 className="text-center font-headline text-foreground section-title" style={{ fontSize: 'clamp(2.5rem, 6vw, 4rem)', fontWeight: 800 }}>What's Your Superpower?</h2>
@@ -294,7 +296,7 @@ export default function PageContent() {
                     {loading ? (
                         <div className="flex justify-center items-center h-48"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>
                     ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 justify-items-center superpower-cards-container">
+                    <div className="superpower-cards-container">
                         {superpowers.map((superpower, i) => (
                            <motion.div 
                                 key={superpower.id}
@@ -304,7 +306,7 @@ export default function PageContent() {
                                 viewport={{ once: true, amount: 0.2 }}
                             >
                             <TiltedFlipCard
-                                className={superpower.cardClassName}
+                                className={`${superpower.className} ${theme === 'light' ? 'light' : 'dark'}`}
                                 icon={superpower.icon}
                                 iconClassName={superpower.iconClassName}
                                 title={superpower.title}
