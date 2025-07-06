@@ -1,3 +1,4 @@
+
 import type {Config} from 'tailwindcss';
 
 export default {
@@ -66,32 +67,39 @@ export default {
           border: 'hsl(var(--border))',
           ring: 'hsl(var(--ring))',
         },
-        // --- NEW ENHANCED CARD BACKGROUNDS based on your new mapping ---
-        // Light Mode Card Backgrounds (Derived from image_430ea4.png for light version)
-        'card-strategist-light': '#D0E0FF', // Soft light blue (Honolulu Blue adapted)
-        'card-brainiac-light': '#E9DFFF',   // Soft light lavender (Lavender floral adapted)
-        'card-thinker-light': '#E0C8F5',    // Softer light purple (Amaranth purple adapted)
-        'card-innovator-light': '#FFE8D9',  // Soft light coral (Coral adapted)
+        // --- NEW ENHANCED CARD BACKGROUNDS ---
+        // Light Mode Card Backgrounds
+        'card-thinker-light': '#B6244F', // Amaranth purple
+        'card-brainiac-light': '#D4CCF9', // Richer Lavender
+        'card-strategist-light': '#CCEBF9', // Soft Teal/Aqua
+        'card-innovator-light': '#F9E0CC', // Warm Coral/Peach
 
-        // Dark Mode Card Backgrounds (Subtle Tints aligning with primary colors for depth)
-        // These are designed to be distinct but not overpowering against your dark theme.
-        'card-strategist-dark': '#2E354A', // Dark blue-grey (matches Honolulu Blue)
-        'card-brainiac-dark': '#322E3A',   // Dark purplish-grey (matches Lavender floral)
-        'card-thinker-dark': '#342C3F',    // Darker purple-grey (matches Amaranth purple)
-        'card-innovator-dark': '#352E2B',  // Dark brownish-grey (matches Coral)
+        // Dark Mode Card Backgrounds (Subtle Tints)
+        'card-thinker-dark': '#2F2E3A', // Purplish Dark Grey for Thinker
+        'card-brainiac-dark': '#322E3A', // Purplish Dark Grey for Brainiac
+        'card-strategist-dark': '#2D354A', // Bluish Dark Grey
+        'card-innovator-dark': '#352E2B', // Dark brownish-grey (matches Coral)
 
-        // --- ICON FILL COLORS (Maintained for vibrancy and glow) ---
-        // These are referenced via CSS variables in globals.css now
-        
-        // --- TEXT COLORS (Keep these as they are or adjust for new contrast) ---
+        // --- ICON FILL COLORS ---
+        'icon-thinker-light': '#FFFFFF', // White for the new dark bg
+        'icon-brainiac-light': '#C287E8', // Lavender (floral)
+        'icon-strategist-light': '#0471A6', // Honolulu Blue
+        'icon-innovator-light': '#FF8552', // Coral
+
+        'icon-thinker-dark': '#B6244F', // Amaranth purple
+        'icon-brainiac-dark': '#C287E8', // Lavender (floral)
+        'icon-strategist-dark': '#0471A6',
+        'icon-innovator-dark': '#FF8552',
+
+        // --- TEXT COLORS ---
         'text-dark-primary': '#FFFFFF',
         'text-dark-secondary': '#C0C0C0',
         'text-light-primary': '#333333',
         'text-light-secondary': '#666666',
         'event-item-dark': '#E0E0E0',
         'event-item-light': '#444444',
-        'event-link-hover-dark': '#6ECFF6', // Lighter blue for dark mode hover
-        'event-link-hover-light': '#0471A6', // Darker blue for light mode hover
+        'event-link-hover-dark': '#6ECFF6',
+        'event-link-hover-light': '#0471A6',
       },
       borderRadius: {
         lg: 'var(--radius)',
@@ -133,7 +141,7 @@ export default {
       boxShadow: {
         soft: '0 4px 15px -1px hsl(var(--primary) / 0.1), 0 2px 8px -1px hsl(var(--primary) / 0.08)',
         'md-soft': '0 10px 25px -3px hsl(var(--primary) / 0.1), 0 4px 10px -2px hsl(var(--primary) / 0.05)',
-      }
+      },
     },
   },
   plugins: [require('tailwindcss-animate')],

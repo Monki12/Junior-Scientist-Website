@@ -1,3 +1,4 @@
+
 @import 'react-quill/dist/quill.snow.css';
 @tailwind base;
 @tailwind components;
@@ -28,10 +29,10 @@
     --radius: 0.8rem;
     
     /* Light Mode Icon Colors */
-    --icon-strategist-light: #0471A6; /* Honolulu Blue */
-    --icon-brainiac-light: #C287E8;   /* Lavender (floral) */
-    --icon-thinker-light: #B6244F;    /* Amaranth purple */
-    --icon-innovator-light: #FF8552;  /* Coral */
+    --icon-strategist-light: #0471A6;
+    --icon-brainiac-light: #C287E8;
+    --icon-thinker-light: #FFFFFF; /* White for new dark bg */
+    --icon-innovator-light: #FF8552;
   }
 
   .dark {
