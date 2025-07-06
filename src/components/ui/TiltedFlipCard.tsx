@@ -4,6 +4,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import { motion, useMotionValue, useSpring } from "framer-motion";
 import Link from 'next/link';
+import { cn } from "@/lib/utils";
 
 import "./TiltedFlipCard.css";
 
@@ -14,24 +15,22 @@ const springValues = {
 };
 
 interface TiltedFlipCardProps {
-    id: number;
+    className?: string;
     icon: string;
     title: string;
     description: string;
-    gradient: string;
     events: Array<{ name: string; link: string; }>;
     tiltAmplitude?: number;
     scaleOnHover?: number;
 }
 
 export default function TiltedFlipCard({
-  id,
+  className,
   icon,
   title,
   description,
-  gradient,
   events,
-  tiltAmplitude = 10,
+  tiltAmplitude = 15,
   scaleOnHover = 1.05,
 }: TiltedFlipCardProps) {
   const ref = useRef<HTMLElement>(null);
@@ -48,22 +47,6 @@ export default function TiltedFlipCard({
     mass: 1.5,
   });
   
-  const [glowColor, setGlowColor] = useState('transparent');
-
-  useEffect(() => {
-    // Extract color from gradient for the glow
-    const colorMatch = gradient.match(/from-\[(#[0-9a-fA-F]{6})\]/);
-    if (colorMatch && colorMatch[1]) {
-        const hex = colorMatch[1];
-        // Convert hex to rgba for glow
-        const r = parseInt(hex.slice(1, 3), 16);
-        const g = parseInt(hex.slice(3, 5), 16);
-        const b = parseInt(hex.slice(5, 7), 16);
-        setGlowColor(`rgba(${r}, ${g}, ${b}, 0.4)`);
-    }
-
-  }, [gradient]);
-
   useEffect(() => {
     if (isFlipped) {
       rotateX.set(0);
@@ -119,7 +102,7 @@ export default function TiltedFlipCard({
   return (
     <motion.figure
       ref={ref}
-      className="tilted-card-figure"
+      className={cn("tilted-card-figure", className)}
       onMouseMove={handleMouseMove}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
@@ -136,9 +119,8 @@ export default function TiltedFlipCard({
         rotateY: springValues,
       }}
     >
-      <div className="card-glow" style={{'--glow-color': glowColor} as React.CSSProperties}></div>
       <motion.div
-        className="tilted-card-flipper"
+        className={cn("tilted-card-flipper", isFlipped && "flipped")}
         style={{
           rotateY: flipRotation,
           transformStyle: "preserve-3d",
@@ -147,37 +129,29 @@ export default function TiltedFlipCard({
       >
         {/* Front Face */}
         <div className="tilted-card-face tilted-card-face-front">
-          <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-20 dark:opacity-100`}></div>
-          <div className="relative z-10 flex flex-col items-center justify-start h-full pt-6">
             <div className="card-icon-wrapper">
               <img src={icon} alt={`${title} icon`} />
             </div>
             <h3 className="superpower-title-front">{title}</h3>
             <p className="superpower-description-front">{description}</p>
             <span className="click-to-action">Click to see events</span>
-          </div>
         </div>
 
         {/* Back Face */}
-        <div
-          className="tilted-card-face tilted-card-face-back"
-        >
-          <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-20 dark:opacity-100`}></div>
-          <div className="relative z-10 flex flex-col items-center justify-center h-full">
-              <h4 className="superpower-back-title">Related Events:</h4>
-              <div className="superpower-back-content">
-                {events.length > 0 ? (
-                  <ul>
-                    {events.map((event, index) => (
-                      <li key={index}>
-                        <Link href={event.link} onClick={(e) => e.stopPropagation()}>{event.name}</Link>
-                      </li>
-                    ))}
-                  </ul>
-                ) : <p>No events yet. Check back soon!</p> }
-              </div>
-              <span className="click-to-action-back mt-auto">Click to flip back</span>
+        <div className="tilted-card-face tilted-card-face-back">
+          <h4 className="related-events-title">Related Events:</h4>
+          <div className="event-list">
+            {events.length > 0 ? (
+                <>
+                {events.map((event, index) => (
+                    <p key={index} className="event-item">
+                    <Link href={event.link} onClick={(e) => e.stopPropagation()}>{event.name}</Link>
+                    </p>
+                ))}
+                </>
+            ) : <p className="event-item">No events yet. Check back soon!</p> }
           </div>
+          <span className="click-to-action-back mt-auto">Click to flip back</span>
         </div>
       </motion.div>
     </motion.figure>

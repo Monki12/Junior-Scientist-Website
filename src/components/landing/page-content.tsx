@@ -139,28 +139,28 @@ export default function PageContent() {
       {
         id: 1,
         icon: 'https://img.icons8.com/ios-filled/100/7A87E5/speech-bubble--v1.png',
-        gradient: 'from-[#7A87E5] to-[#A2B2FF]',
+        cardClassName: 'thinker-card',
         title: "The Thinker",
         description: "Excel in debating, global affairs, and public speaking? Born diplomat!",
       },
       {
         id: 2,
         icon: 'https://img.icons8.com/ios-filled/100/AFE152/brain.png',
-        gradient: 'from-[#AFE152] to-[#D4FF7D]',
+        cardClassName: 'brainiac-card',
         title: "The Brainiac",
         description: "Obsessed with facts, quizzes, and science puzzles? You see the patterns others miss.",
       },
       {
         id: 3,
         icon: 'https://img.icons8.com/ios-filled/100/F0AD4E/gears.png',
-        gradient: 'from-[#F0AD4E] to-[#FFD58A]',
+        cardClassName: 'strategist-card',
         title: "The Strategist",
         description: "Enjoy solving math riddles and cracking logic games? Master of numbers and patterns.",
       },
       {
         id: 4,
         icon: 'https://img.icons8.com/ios-filled/100/EA5C9F/rocket.png',
-        gradient: 'from-[#EA5C9F] to-[#FF8DC7]',
+        cardClassName: 'innovator-card',
         title: "The Innovator",
         description: "Love to design, build, and bring new ideas to life? Future tech pioneer!",
       },
@@ -338,17 +338,17 @@ export default function PageContent() {
                 </div>
             </section>
 
-            <section id="superpowers" className="w-full py-12 md:py-20">
+            <section id="superpowers" className="w-full py-12 md:py-20 superpower-section">
                 <div className="container mx-auto px-4">
                     <AnimatedContent>
-                      <h2 className="text-center font-headline text-foreground" style={{ fontSize: 'clamp(2.5rem, 6vw, 4rem)', fontWeight: 800 }}>What's Your Superpower?</h2>
-                      <p className="text-lg text-muted-foreground text-center mt-2 max-w-xl mx-auto mb-16">Discover events tailored to your unique interests and unlock your true potential.</p>
+                      <h2 className="text-center font-headline text-foreground section-title" style={{ fontSize: 'clamp(2.5rem, 6vw, 4rem)', fontWeight: 800 }}>What's Your Superpower?</h2>
+                      <p className="text-lg text-muted-foreground text-center mt-2 max-w-xl mx-auto mb-16 section-subtitle">Discover events tailored to your unique interests and unlock your true potential.</p>
                     </AnimatedContent>
                     {loading ? (
                         <div className="flex justify-center items-center h-48"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>
                     ) : (
                     <div 
-                        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 justify-items-center"
+                        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 justify-items-center superpower-cards-container"
                     >
                         {superpowers.map((superpower, i) => (
                            <motion.div 
@@ -359,11 +359,10 @@ export default function PageContent() {
                                 viewport={{ once: true, amount: 0.2 }}
                             >
                             <TiltedFlipCard
-                                id={superpower.id}
+                                className={superpower.cardClassName}
                                 icon={superpower.icon}
                                 title={superpower.title}
                                 description={superpower.description}
-                                gradient={superpower.gradient}
                                 events={
                                     events
                                     .filter(e => e.superpowerCategory === superpower.title)
@@ -372,8 +371,6 @@ export default function PageContent() {
                                         link: `/events/${event.slug}`
                                     }))
                                 }
-                                tiltAmplitude={20}
-                                scaleOnHover={1.05}
                             />
                             </motion.div>
                         ))}
