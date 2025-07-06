@@ -26,6 +26,12 @@
     --input: 204 14% 83%;
     --ring: 175 100% 37%;
     --radius: 0.8rem;
+    
+    /* Light Mode Icon Colors */
+    --icon-thinker-light: #6A6AF0;
+    --icon-brainiac-light: #FFD700;
+    --icon-strategist-light: #FFD700;
+    --icon-innovator-light: #FF69B4;
   }
 
   .dark {
@@ -50,6 +56,12 @@
     --input: 214 19% 30%;
     --ring: 175 64% 53%;
     --radius: 0.8rem;
+
+    /* Dark Mode Icon Colors */
+    --icon-thinker-dark: #6A6AF0;
+    --icon-brainiac-dark: #AFE152;
+    --icon-strategist-dark: #F0AD4E;
+    --icon-innovator-dark: #EA5C9F;
   }
 }
 

@@ -293,16 +293,10 @@ export default function PageContent() {
                     {loading ? (
                         <div className="flex justify-center items-center h-48"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>
                     ) : (
-                    <div className="flex justify-center items-stretch flex-wrap md:flex-nowrap gap-4 md:gap-6 lg:gap-8 xl:gap-10 mx-auto max-w-[1400px]">
-                        {superpowers.map((superpower, i) => (
-                           <motion.div 
-                                key={superpower.id}
-                                initial={{ opacity: 0, y: 50 * (i % 2 === 0 ? 1 : -1) }}
-                                whileInView={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.8, delay: i * 0.1, ease: 'easeOut' }}
-                                viewport={{ once: true, amount: 0.2 }}
-                            >
+                    <div className="flex flex-wrap justify-center items-stretch gap-y-8 gap-x-4 px-4 mx-auto max-w-screen-xl lg:max-w-[1400px]">
+                        {superpowers.map((superpower) => (
                             <TiltedFlipCard
+                                key={superpower.id}
                                 category={superpower.category}
                                 iconSrc={superpower.iconSrc}
                                 title={superpower.title}
@@ -317,7 +311,6 @@ export default function PageContent() {
                                 }
                                 themeMode={theme === 'dark' ? 'dark' : 'light'}
                             />
-                            </motion.div>
                         ))}
                     </div>
                     )}

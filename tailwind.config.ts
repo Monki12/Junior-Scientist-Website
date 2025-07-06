@@ -67,23 +67,20 @@ export default {
           border: 'hsl(var(--border))',
           ring: 'hsl(var(--ring))',
         },
-        // Light Mode Card Backgrounds
+        // Custom Card & Icon Colors
         'card-thinker-light': '#E0E0FB',
         'card-brainiac-light': '#E0FBE0',
         'card-strategist-light': '#FBE0E0',
         'card-innovator-light': '#FBE0FB',
-        // Dark Mode Card Background
-        'card-dark': '#2B303D',
-        // Icon Fill Colors
-        'icon-thinker': '#6A6AF0',
-        'icon-brainiac': '#AFE152',
-        'icon-strategist': '#F0AD4E',
-        'icon-innovator': '#EA5C9F',
-        // Text colors for custom cards
+        'card-dark-bg': '#2B303D',
         'text-dark-primary': '#FFFFFF',
         'text-dark-secondary': '#C0C0C0',
         'text-light-primary': '#333333',
         'text-light-secondary': '#666666',
+        'event-item-dark': '#E0E0E0',
+        'event-item-light': '#444444',
+        'event-link-hover-dark': '#8BC34A',
+        'event-link-hover-light': '#3F51B5',
       },
       borderRadius: {
         lg: 'var(--radius)',

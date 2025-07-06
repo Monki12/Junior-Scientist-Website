@@ -5,11 +5,10 @@ import React, { useRef, useState } from 'react';
 import { motion, useMotionValue, useSpring } from 'framer-motion';
 import Link from 'next/link';
 
-// Spring values for smooth, quick animations
 const springConfig = {
-  damping: 20,
-  stiffness: 250,
-  mass: 1,
+  damping: 20,    // Reduced damping for quicker stop
+  stiffness: 250, // Increased stiffness for faster movement
+  mass: 1,        // Reduced mass for lighter, more agile feel
 };
 
 interface TiltedFlipCardProps {
@@ -27,57 +26,51 @@ interface TiltedFlipCardProps {
 const getCategoryStyles = (category: string, themeMode: 'light' | 'dark') => {
   const styles: {
     bgColor: string;
-    iconFill: string;
-    iconFilter?: string;
+    iconStyle: React.CSSProperties;
   } = {
     bgColor: '',
-    iconFill: '',
+    iconStyle: {},
   };
 
   if (themeMode === 'light') {
     switch (category) {
       case 'thinker':
         styles.bgColor = 'bg-card-thinker-light';
-        styles.iconFill = '#6A6AF0';
+        styles.iconStyle = { fill: 'var(--icon-thinker-light)' };
         break;
       case 'brainiac':
         styles.bgColor = 'bg-card-brainiac-light';
-        styles.iconFill = '#ADD8E6';
+        styles.iconStyle = { fill: 'var(--icon-brainiac-light)' };
         break;
       case 'strategist':
         styles.bgColor = 'bg-card-strategist-light';
-        styles.iconFill = '#FFD700';
+        styles.iconStyle = { fill: 'var(--icon-strategist-light)' };
         break;
       case 'innovator':
         styles.bgColor = 'bg-card-innovator-light';
-        styles.iconFill = '#FF69B4';
+        styles.iconStyle = { fill: 'var(--icon-innovator-light)' };
         break;
       default:
         styles.bgColor = 'bg-white';
-        styles.iconFill = '#000000';
+        styles.iconStyle = { fill: '#000000' };
     }
   } else { // Dark mode
-    styles.bgColor = 'bg-card-dark';
+    styles.bgColor = 'bg-card-dark-bg'; // Consistent dark background
     switch (category) {
       case 'thinker':
-        styles.iconFill = '#6A6AF0';
-        styles.iconFilter = 'drop-shadow(0 0 8px rgba(106, 106, 240, 0.7))';
+        styles.iconStyle = { fill: 'var(--icon-thinker-dark)', filter: 'drop-shadow(0 0 8px #6A6AF070)' };
         break;
       case 'brainiac':
-        styles.iconFill = '#AFE152';
-        styles.iconFilter = 'drop-shadow(0 0 8px rgba(175, 225, 82, 0.7))';
+        styles.iconStyle = { fill: 'var(--icon-brainiac-dark)', filter: 'drop-shadow(0 0 8px #AFE15270)' };
         break;
       case 'strategist':
-        styles.iconFill = '#F0AD4E';
-        styles.iconFilter = 'drop-shadow(0 0 8px rgba(240, 173, 78, 0.7))';
+        styles.iconStyle = { fill: 'var(--icon-strategist-dark)', filter: 'drop-shadow(0 0 8px #F0AD4E70)' };
         break;
       case 'innovator':
-        styles.iconFill = '#EA5C9F';
-        styles.iconFilter = 'drop-shadow(0 0 8px rgba(234, 92, 159, 0.7))';
+        styles.iconStyle = { fill: 'var(--icon-innovator-dark)', filter: 'drop-shadow(0 0 8px #EA5C9F70)' };
         break;
       default:
-        styles.iconFill = '#FFFFFF';
-        styles.iconFilter = 'none';
+        styles.iconStyle = { fill: '#FFFFFF', filter: 'none' };
     }
   }
   return styles;
@@ -98,7 +91,7 @@ const TiltedFlipCard = ({
   const rotateY = useSpring(0, springConfig);
   const scale = useSpring(1, springConfig);
 
-  const rotateAmplitude = 15;
+  const rotateAmplitude = 18;
   const scaleOnHover = 1.03;
 
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -117,7 +110,6 @@ const TiltedFlipCard = ({
   };
 
   const handleMouseLeave = () => {
-    if (isFlipped) return;
     rotateX.set(0);
     rotateY.set(0);
     scale.set(1);
@@ -128,25 +120,24 @@ const TiltedFlipCard = ({
     handleMouseLeave(); // Reset tilt when flipping
   };
 
-  const { bgColor, iconFilter } = getCategoryStyles(category, themeMode);
+  const { bgColor, iconStyle } = getCategoryStyles(category, themeMode);
+
   const titleColor = themeMode === 'light' ? 'text-text-light-primary' : 'text-text-dark-primary';
   const descriptionColor = themeMode === 'light' ? 'text-text-light-secondary' : 'text-text-dark-secondary';
   const clickActionColor = themeMode === 'light' ? 'text-gray-500' : 'text-gray-400';
-  const eventLinkHoverColor = themeMode === 'light' ? 'hover:text-blue-600' : 'hover:text-blue-400';
+  const eventItemColor = themeMode === 'light' ? 'text-event-item-light' : 'text-event-item-dark';
+  const eventLinkHoverColor = themeMode === 'light' ? 'hover:text-event-link-hover-light' : 'hover:text-event-link-hover-dark';
+  
   const iconBgColor = themeMode === 'light' ? 'bg-white/80' : 'bg-white/5';
   const iconShadow = themeMode === 'light' ? 'shadow-md' : 'shadow-lg';
   const cardShadow = themeMode === 'light' ? 'shadow-md' : 'shadow-lg';
 
   return (
-    <div className="w-80 h-96 [perspective:1000px]">
+    <div className="w-full max-w-sm sm:w-80 h-96 mx-auto sm:mx-4 [perspective:1000px]">
       <motion.div
         ref={cardRef}
         className={`relative w-full h-full [transform-style:preserve-3d] cursor-pointer rounded-2xl ${cardShadow}`}
-        style={{
-          rotateX,
-          rotateY,
-          scale,
-        }}
+        style={{ rotateX, rotateY, scale }}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
         onClick={handleFlip}
@@ -154,17 +145,17 @@ const TiltedFlipCard = ({
         <motion.div
           className="relative w-full h-full [transform-style:preserve-3d]"
           animate={{ rotateY: isFlipped ? 180 : 0 }}
-          transition={{ duration: 0.5, ease: "easeInOut" }}
+          transition={{ duration: 0.6, ease: "easeInOut" }}
         >
           {/* Front of card */}
           <div className={`absolute inset-0 [backface-visibility:hidden] ${bgColor} rounded-2xl p-8 flex flex-col justify-between items-center text-center`}>
             <div className={`relative ${iconBgColor} ${iconShadow} rounded-full p-4 flex justify-center items-center`} style={{ width: '80px', height: '80px' }}>
-                <img
-                  src={iconSrc}
-                  alt={`${title} Icon`}
-                  className="w-10 h-10"
-                  style={{ filter: iconFilter }}
-                />
+              <img
+                src={iconSrc}
+                alt={`${title} Icon`}
+                className="w-10 h-10"
+                style={iconStyle}
+              />
             </div>
             <div className="flex flex-col items-center flex-grow justify-center">
               <h3 className={`text-2xl font-bold mb-2 ${titleColor}`}>{title}</h3>
@@ -186,7 +177,7 @@ const TiltedFlipCard = ({
                 >
                   <Link
                     href={event.link}
-                    className={`font-medium block ${descriptionColor} ${eventLinkHoverColor}`}
+                    className={`font-medium block ${eventItemColor} ${eventLinkHoverColor}`}
                     onClick={(e) => e.stopPropagation()}
                   >
                     {event.name}
