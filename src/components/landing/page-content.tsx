@@ -190,25 +190,6 @@ export default function PageContent() {
   const [loading, setLoading] = useState(true);
   const { theme } = useTheme();
 
-  const superpowerEvents = {
-    thinker: [
-      { name: 'Debate Championship', link: '#' },
-      { name: 'Model UN', link: '#' },
-    ],
-    brainiac: [
-      { name: 'Science Quiz', link: '#' },
-      { name: 'Logic Puzzles', link: '#' },
-    ],
-    strategist: [
-      { name: 'Robotics Challenge', link: '#' },
-      { name: 'Codefest', link: '#' },
-    ],
-    innovator: [
-      { name: 'Invention Convention', link: '#' },
-      { name: 'Design Challenge', link: '#' },
-    ],
-  };
-
   useEffect(() => {
     const fetchEvents = async () => {
       setLoading(true);
@@ -404,13 +385,16 @@ export default function PageContent() {
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
             </div>
           ) : (
-            <div className="flex flex-wrap justify-center items-stretch gap-y-8 gap-x-4 px-4 mx-auto max-w-screen-xl lg:max-w-[1400px]">
+            <div className="flex flex-wrap justify-center items-stretch gap-y-8 gap-x-4 px-4 mx-auto max-w-screen-2xl">
               <TiltedFlipCard
                 category="strategist"
                 iconSrc="https://img.icons8.com/fluency/96/rocket.png"
                 title="The Strategist"
                 description="Enjoy solving math riddles and cracking logic games? Master of numbers and patterns."
-                events={superpowerEvents.strategist}
+                events={[
+                  { name: 'Robotics Challenge', link: '#' },
+                  { name: 'Codefest', link: '#' },
+                ]}
                 themeMode={theme === 'dark' ? 'dark' : 'light'}
               />
               <TiltedFlipCard
@@ -418,7 +402,10 @@ export default function PageContent() {
                 iconSrc="https://img.icons8.com/fluency/96/puzzle.png"
                 title="The Brainiac"
                 description="Obsessed with facts, quizzes, and science puzzles? You see the patterns others miss."
-                events={superpowerEvents.brainiac}
+                events={[
+                  { name: 'Science Quiz', link: '#' },
+                  { name: 'Logic Puzzles', link: '#' },
+                ]}
                 themeMode={theme === 'dark' ? 'dark' : 'light'}
               />
               <TiltedFlipCard
@@ -426,7 +413,10 @@ export default function PageContent() {
                 iconSrc="https://img.icons8.com/fluency/96/brain.png"
                 title="The Thinker"
                 description="Excel in debating, global affairs, and public speaking? Born diplomat!"
-                events={superpowerEvents.thinker}
+                events={[
+                  { name: 'Debate Championship', link: '#' },
+                  { name: 'Model UN', link: '#' },
+                ]}
                 themeMode={theme === 'dark' ? 'dark' : 'light'}
               />
               <TiltedFlipCard
@@ -434,7 +424,10 @@ export default function PageContent() {
                 iconSrc="https://img.icons8.com/fluency/96/light-on.png"
                 title="The Innovator"
                 description="Love to design, build, and bring new ideas to life? Future tech pioneer!"
-                events={superpowerEvents.innovator}
+                events={[
+                  { name: 'Invention Convention', link: '#' },
+                  { name: 'Design Challenge', link: '#' },
+                ]}
                 themeMode={theme === 'dark' ? 'dark' : 'light'}
               />
             </div>

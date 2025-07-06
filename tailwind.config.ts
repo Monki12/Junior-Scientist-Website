@@ -1,5 +1,5 @@
 
-import type {Config} from 'tailwindcss';
+import type { Config } from 'tailwindcss';
 
 export default {
   darkMode: ['class'],
@@ -69,27 +69,22 @@ export default {
         },
         // --- NEW ENHANCED CARD BACKGROUNDS ---
         // Light Mode Card Backgrounds
-        'card-thinker-light': '#B6244F', // Amaranth purple
-        'card-brainiac-light': '#D4CCF9', // Richer Lavender
-        'card-strategist-light': '#CCEBF9', // Soft Teal/Aqua
-        'card-innovator-light': '#F9E0CC', // Warm Coral/Peach
+        'card-strategist-light': '#D0E0FF', // Soft light blue
+        'card-brainiac-light': '#E9DFFF', // Soft light lavender
+        'card-thinker-light': '#FDDDE8', // Soft light pink for new color
+        'card-innovator-light': '#FFE8D9', // Soft light coral
 
         // Dark Mode Card Backgrounds (Subtle Tints)
-        'card-thinker-dark': '#2F2E3A', // Purplish Dark Grey for Thinker
-        'card-brainiac-dark': '#322E3A', // Purplish Dark Grey for Brainiac
-        'card-strategist-dark': '#2D354A', // Bluish Dark Grey
-        'card-innovator-dark': '#352E2B', // Dark brownish-grey (matches Coral)
+        'card-strategist-dark': '#2E354A', // Dark blue-grey
+        'card-brainiac-dark': '#322E3A', // Dark purplish-grey
+        'card-thinker-dark': '#3A2E33', // Dark pinkish-grey
+        'card-innovator-dark': '#352E2B', // Dark brownish-grey
 
-        // --- ICON FILL COLORS ---
-        'icon-thinker-light': '#FFFFFF', // White for the new dark bg
-        'icon-brainiac-light': '#C287E8', // Lavender (floral)
-        'icon-strategist-light': '#0471A6', // Honolulu Blue
-        'icon-innovator-light': '#FF8552', // Coral
-
-        'icon-thinker-dark': '#B6244F', // Amaranth purple
-        'icon-brainiac-dark': '#C287E8', // Lavender (floral)
-        'icon-strategist-dark': '#0471A6',
-        'icon-innovator-dark': '#FF8552',
+        // --- ICON FILL COLORS (Unified) ---
+        'icon-strategist': '#0471A6', // Honolulu Blue
+        'icon-brainiac': '#C287E8', // Lavender (floral)
+        'icon-thinker': '#dd557e', // New Pink
+        'icon-innovator': '#FF8552', // Coral
 
         // --- TEXT COLORS ---
         'text-dark-primary': '#FFFFFF',
@@ -140,7 +135,8 @@ export default {
       },
       boxShadow: {
         soft: '0 4px 15px -1px hsl(var(--primary) / 0.1), 0 2px 8px -1px hsl(var(--primary) / 0.08)',
-        'md-soft': '0 10px 25px -3px hsl(var(--primary) / 0.1), 0 4px 10px -2px hsl(var(--primary) / 0.05)',
+        'md-soft':
+          '0 10px 25px -3px hsl(var(--primary) / 0.1), 0 4px 10px -2px hsl(var(--primary) / 0.05)',
       },
     },
   },

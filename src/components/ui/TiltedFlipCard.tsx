@@ -23,11 +23,14 @@ interface TiltedFlipCardProps {
   themeMode: 'light' | 'dark';
 }
 
-const getCategoryStyles = (category: string, themeMode: 'light' | 'dark') => {
+const getCategoryStyles = (
+  category: string,
+  themeMode: 'light' | 'dark'
+) => {
   const styles: {
     bgColor: string;
     iconFill: string;
-    iconFilter?: string; // For dark mode glow
+    iconFilter?: string;
   } = {
     bgColor: '',
     iconFill: '',
@@ -35,20 +38,20 @@ const getCategoryStyles = (category: string, themeMode: 'light' | 'dark') => {
 
   if (themeMode === 'light') {
     switch (category) {
-      case 'thinker':
-        styles.bgColor = 'bg-card-thinker-light'; // New Tailwind class
-        styles.iconFill = '#FFFFFF'; // White icon for contrast on dark bg
-        break;
-      case 'brainiac':
-        styles.bgColor = 'bg-card-brainiac-light'; // New Tailwind class
-        styles.iconFill = 'var(--icon-brainiac-light)'; // Changed icon fill
-        break;
       case 'strategist':
-        styles.bgColor = 'bg-card-strategist-light'; // New Tailwind class
+        styles.bgColor = 'bg-card-strategist-light'; // Blue
         styles.iconFill = 'var(--icon-strategist-light)';
         break;
+      case 'brainiac':
+        styles.bgColor = 'bg-card-brainiac-light'; // Lavender
+        styles.iconFill = 'var(--icon-brainiac-light)';
+        break;
+      case 'thinker':
+        styles.bgColor = 'bg-card-thinker-light'; // Pink
+        styles.iconFill = 'var(--icon-thinker-light)';
+        break;
       case 'innovator':
-        styles.bgColor = 'bg-card-innovator-light'; // New Tailwind class
+        styles.bgColor = 'bg-card-innovator-light'; // Coral
         styles.iconFill = 'var(--icon-innovator-light)';
         break;
       default:
@@ -58,26 +61,25 @@ const getCategoryStyles = (category: string, themeMode: 'light' | 'dark') => {
   } else {
     // Dark mode
     switch (category) {
-      // Now unique dark mode backgrounds per category
-      case 'thinker':
-        styles.bgColor = 'bg-card-thinker-dark'; // New Tailwind class
-        styles.iconFill = 'var(--icon-thinker-dark)';
-        styles.iconFilter = 'drop-shadow(0 0 8px #B6244F70)';
+      case 'strategist':
+        styles.bgColor = 'bg-card-strategist-dark';
+        styles.iconFill = 'var(--icon-strategist-dark)';
+        styles.iconFilter = 'drop-shadow(0 0 8px #0471A670)'; // Honolulu Blue glow
         break;
       case 'brainiac':
-        styles.bgColor = 'bg-card-brainiac-dark'; // New Tailwind class
+        styles.bgColor = 'bg-card-brainiac-dark';
         styles.iconFill = 'var(--icon-brainiac-dark)';
-        styles.iconFilter = 'drop-shadow(0 0 8px #C287E870)';
+        styles.iconFilter = 'drop-shadow(0 0 8px #C287E870)'; // Lavender glow
         break;
-      case 'strategist':
-        styles.bgColor = 'bg-card-strategist-dark'; // New Tailwind class
-        styles.iconFill = 'var(--icon-strategist-dark)';
-        styles.iconFilter = 'drop-shadow(0 0 8px #0471A670)';
+      case 'thinker':
+        styles.bgColor = 'bg-card-thinker-dark';
+        styles.iconFill = 'var(--icon-thinker-dark)';
+        styles.iconFilter = 'drop-shadow(0 0 8px #dd557e70)'; // New Pink glow
         break;
       case 'innovator':
-        styles.bgColor = 'bg-card-innovator-dark'; // New Tailwind class
+        styles.bgColor = 'bg-card-innovator-dark';
         styles.iconFill = 'var(--icon-innovator-dark)';
-        styles.iconFilter = 'drop-shadow(0 0 8px #FF855270)';
+        styles.iconFilter = 'drop-shadow(0 0 8px #FF855270)'; // Coral glow
         break;
       default:
         styles.bgColor = 'bg-gray-800'; // Fallback
@@ -99,16 +101,14 @@ const TiltedFlipCard = ({
   const [isFlipped, setIsFlipped] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
-  // Framer Motion values for tilt effect
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const rotateX = useSpring(0, springConfig);
   const rotateY = useSpring(0, springConfig);
   const scale = useSpring(1, springConfig);
 
-  // Constants for tilt amplitude
-  const rotateAmplitude = 18; // Increased for a more noticeable tilt.
-  const scaleOnHover = 1.03; // Slight scale, adjust as desired.
+  const rotateAmplitude = 18;
+  const scaleOnHover = 1.03;
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!cardRef.current) return;
@@ -140,30 +140,29 @@ const TiltedFlipCard = ({
     themeMode
   );
 
-  // Special condition for the Thinker card in light mode to use dark-theme text colors
-  const useDarkText =
-    themeMode === 'light' && category !== 'thinker';
-
-  const titleColor = useDarkText
-    ? 'text-text-light-primary'
-    : 'text-text-dark-primary';
-  const descriptionColor = useDarkText
-    ? 'text-text-light-secondary'
-    : 'text-text-dark-secondary';
-  const clickActionColor = useDarkText ? 'text-gray-500' : 'text-gray-400';
-  const eventItemColor = useDarkText
-    ? 'text-event-item-light'
-    : 'text-event-item-dark';
-  const eventLinkHoverColor = useDarkText
-    ? 'hover:text-event-link-hover-light'
-    : 'hover:text-event-link-hover-dark';
+  const titleColor =
+    themeMode === 'light'
+      ? 'text-text-light-primary'
+      : 'text-text-dark-primary';
+  const descriptionColor =
+    themeMode === 'light'
+      ? 'text-text-light-secondary'
+      : 'text-text-dark-secondary';
+  const clickActionColor =
+    themeMode === 'light' ? 'text-gray-500' : 'text-gray-400';
+  const eventItemColor =
+    themeMode === 'light' ? 'text-event-item-light' : 'text-event-item-dark';
+  const eventLinkHoverColor =
+    themeMode === 'light'
+      ? 'hover:text-event-link-hover-light'
+      : 'hover:text-event-link-hover-dark';
 
   const iconBgColor = themeMode === 'light' ? 'bg-white/80' : 'bg-white/5';
   const iconShadow = themeMode === 'light' ? 'shadow-md' : 'shadow-lg';
   const cardShadow = themeMode === 'light' ? 'shadow-md' : 'shadow-lg';
 
   return (
-    <div className="w-full max-w-sm sm:w-[288px] h-[368.64px] mx-auto sm:mx-4 [perspective:1000px]">
+    <div className="w-full max-w-sm sm:w-[calc(50%-1rem)] lg:w-[calc(25%-1.5rem)] h-96 mx-auto [perspective:1000px]">
       <motion.div
         ref={cardRef}
         className={`relative w-full h-full [transform-style:preserve-3d] cursor-pointer rounded-2xl ${cardShadow}`}

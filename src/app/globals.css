@@ -27,12 +27,6 @@
     --input: 204 14% 83%;
     --ring: 175 100% 37%;
     --radius: 0.8rem;
-    
-    /* Light Mode Icon Colors */
-    --icon-strategist-light: #0471A6;
-    --icon-brainiac-light: #C287E8;
-    --icon-thinker-light: #FFFFFF; /* White for new dark bg */
-    --icon-innovator-light: #FF8552;
   }
 
   .dark {
@@ -57,16 +51,24 @@
     --input: 214 19% 30%;
     --ring: 175 64% 53%;
     --radius: 0.8rem;
-
-    /* Dark Mode Icon Colors */
-    --icon-strategist-dark: #0471A6;
-    --icon-brainiac-dark: #C287E8;
-    --icon-thinker-dark: #B6244F;
-    --icon-innovator-dark: #FF8552;
   }
 }
 
 @layer base {
+  body.light-mode {
+    --icon-strategist-light: #0471a6; /* Honolulu Blue */
+    --icon-brainiac-light: #c287e8; /* Lavender (floral) */
+    --icon-thinker-light: #dd557e; /* New Pink */
+    --icon-innovator-light: #ff8552; /* Coral */
+  }
+
+  body.dark-mode {
+    --icon-strategist-dark: #0471a6;
+    --icon-brainiac-dark: #c287e8;
+    --icon-thinker-dark: #dd557e; /* New Pink */
+    --icon-innovator-dark: #ff8552;
+  }
+
   * {
     @apply border-border;
   }
@@ -74,7 +76,12 @@
     @apply bg-background text-foreground;
     @apply font-body antialiased;
   }
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply font-headline;
   }
 }
@@ -132,13 +139,17 @@
 }
 
 @keyframes pulseHint {
-    from { opacity: 0.8; }
-    to { opacity: 1; }
+  from {
+    opacity: 0.8;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @media (max-width: 768px) {
-    .gallery-item {
-        width: 300px;
-        height: 200px;
-    }
+  .gallery-item {
+    width: 300px;
+    height: 200px;
+  }
 }
