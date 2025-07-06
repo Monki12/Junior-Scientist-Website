@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { useAuth } from '@/hooks/use-auth';
-import { LightBulbToggle } from '@/components/layout/theme-toggle';
+import { LightBulbToggle } from '@/components/layout/light-bulb-toggle';
 import { 
   Menu, Home, Search, Phone, UserPlus, LogIn, LayoutDashboard
 } from 'lucide-react';
