@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
@@ -113,54 +112,37 @@ function GallerySection() {
 export default function PageContent() {
     const [events, setEvents] = useState<SubEvent[]>([]);
     const [loading, setLoading] = useState(true);
-
-    const refTitle = useRef(null);
-    const inViewTitle = useInView(refTitle, { once: true, threshold: 0.5 });
-    
-    const refPara1 = useRef(null);
-    const inViewPara1 = useInView(refPara1, { once: true, threshold: 0.6 });
-    
-    const refImg1 = useRef(null);
-    const inViewImg1 = useInView(refImg1, { once: true, threshold: 0.7 });
-
-    const refPara2 = useRef(null);
-    const inViewPara2 = useInView(refPara2, { once: true, threshold: 0.6 });
-
-    const refImg2 = useRef(null);
-    const inViewImg2 = useInView(refImg2, { once: true, threshold: 0.7 });
-
-    const refPara3 = useRef(null);
-    const inViewPara3 = useInView(refPara3, { once: true, threshold: 0.6 });
-
-    const quoteRef = useRef(null);
-    const inViewQuote = useInView(quoteRef, { once: true, threshold: 0.5 });
     
     const superpowers = [
       {
         id: 1,
-        icon: 'https://img.icons8.com/ios-filled/100/7A87E5/speech-bubble--v1.png',
         cardClassName: 'thinker-card',
+        icon: 'https://img.icons8.com/fluency/96/brain.png',
+        iconClassName: 'icon-thinker',
         title: "The Thinker",
         description: "Excel in debating, global affairs, and public speaking? Born diplomat!",
       },
       {
         id: 2,
-        icon: 'https://img.icons8.com/ios-filled/100/AFE152/brain.png',
         cardClassName: 'brainiac-card',
+        icon: 'https://img.icons8.com/fluency/96/puzzle.png',
+        iconClassName: 'icon-brainiac',
         title: "The Brainiac",
         description: "Obsessed with facts, quizzes, and science puzzles? You see the patterns others miss.",
       },
       {
         id: 3,
-        icon: 'https://img.icons8.com/ios-filled/100/F0AD4E/gears.png',
         cardClassName: 'strategist-card',
+        icon: 'https://img.icons8.com/fluency/96/rocket.png',
+        iconClassName: 'icon-strategist',
         title: "The Strategist",
         description: "Enjoy solving math riddles and cracking logic games? Master of numbers and patterns.",
       },
       {
         id: 4,
-        icon: 'https://img.icons8.com/ios-filled/100/EA5C9F/rocket.png',
         cardClassName: 'innovator-card',
+        icon: 'https://img.icons8.com/fluency/96/light-on.png',
+        iconClassName: 'icon-innovator',
         title: "The Innovator",
         description: "Love to design, build, and bring new ideas to life? Future tech pioneer!",
       },
@@ -206,33 +188,16 @@ export default function PageContent() {
             
             <section id="about-us" className="w-full py-12 md:py-20 scroll-mt-20">
                 <div className="container mx-auto px-4">
-                    <motion.h2
-                        ref={refTitle}
-                        className="text-3xl md:text-4xl font-bold text-center mb-16 text-foreground"
-                        initial={{ opacity: 0, y: 50 }}
-                        animate={inViewTitle ? { opacity: 1, y: 0 } : {}}
-                        transition={{ duration: 0.8, type: "spring", stiffness: 100 }}
-                    >
-                        About Junior Scientist
-                    </motion.h2>
-                    
+                    <AnimatedContent>
+                        <h2 className="text-3xl md:text-4xl font-bold text-center mb-16 text-foreground">About Junior Scientist</h2>
+                    </AnimatedContent>
+
                     <div className="space-y-12 md:space-y-16">
                         <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
-                             <motion.div
-                                ref={refPara1}
-                                initial={{ opacity: 0, x: -100 }}
-                                animate={inViewPara1 ? { opacity: 1, x: 0 } : {}}
-                                transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
-                                className="space-y-4 text-lg text-muted-foreground"
-                            >
+                             <AnimatedContent direction="left" className="space-y-4 text-lg text-muted-foreground">
                                 <p>At Junior Scientist, we are passionate about fostering curiosity and innovation in young minds.</p>
-                            </motion.div>
-                             <motion.div
-                                ref={refImg1}
-                                initial={{ opacity: 0, x: 100, scale: 0.9 }}
-                                animate={inViewImg1 ? { opacity: 1, x: 0, scale: 1 } : {}}
-                                transition={{ duration: 0.9, delay: 0.4, ease: "easeOut" }}
-                             >
+                             </AnimatedContent>
+                             <AnimatedContent direction="right">
                                 <div className="relative aspect-video rounded-xl shadow-lg dark:shadow-primary/20">
                                     <Image
                                         src="https://i.ibb.co/C07F81B/collaboration.jpg"
@@ -243,26 +208,14 @@ export default function PageContent() {
                                         className="rounded-xl"
                                     />
                                 </div>
-                            </motion.div>
+                            </AnimatedContent>
                         </div>
 
                         <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
-                            <motion.div 
-                                ref={refPara2}
-                                initial={{ opacity: 0, x: 100 }}
-                                animate={inViewPara2 ? { opacity: 1, x: 0 } : {}}
-                                transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
-                                className="space-y-4 text-lg text-muted-foreground md:order-2"
-                            >
+                            <AnimatedContent direction="right" className="space-y-4 text-lg text-muted-foreground md:order-2">
                                 <p>Our mission is to provide an engaging platform where students can explore scientific principles, critical thinking, and problem-solving through hands-on experiences and competitive events. We believe in nurturing the next generation of innovators and leaders by creating an environment that is not only challenging but also supportive and fun.</p>
-                            </motion.div>
-                             <motion.div
-                                ref={refImg2}
-                                initial={{ opacity: 0, x: -100, scale: 0.9 }}
-                                animate={inViewImg2 ? { opacity: 1, x: 0, scale: 1 } : {}}
-                                transition={{ duration: 0.9, delay: 0.4, ease: "easeOut" }}
-                                className="md:order-1"
-                             >
+                            </AnimatedContent>
+                             <AnimatedContent direction="left" className="md:order-1">
                                 <div className="relative aspect-video rounded-xl shadow-lg dark:shadow-primary/20">
                                      <Image
                                         src="https://i.ibb.co/q1zR2x9/abstract-tech.jpg"
@@ -273,20 +226,14 @@ export default function PageContent() {
                                         className="rounded-xl"
                                     />
                                 </div>
-                            </motion.div>
+                            </AnimatedContent>
                         </div>
                         
-                        <div className="text-center">
-                            <motion.div
-                                ref={refPara3}
-                                initial={{ opacity: 0, y: 50 }}
-                                animate={inViewPara3 ? { opacity: 1, y: 0 } : {}}
-                                transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
-                                className="space-y-4 text-lg text-muted-foreground max-w-3xl mx-auto"
-                            >
+                        <AnimatedContent className="text-center">
+                            <div className="space-y-4 text-lg text-muted-foreground max-w-3xl mx-auto">
                                  <p>Join us in fostering the bright minds of tomorrow, where every experiment is a step towards discovery.</p>
-                            </motion.div>
-                        </div>
+                            </div>
+                        </AnimatedContent>
                     </div>
                 </div>
             </section>
@@ -347,9 +294,7 @@ export default function PageContent() {
                     {loading ? (
                         <div className="flex justify-center items-center h-48"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>
                     ) : (
-                    <div 
-                        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 justify-items-center superpower-cards-container"
-                    >
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 justify-items-center superpower-cards-container">
                         {superpowers.map((superpower, i) => (
                            <motion.div 
                                 key={superpower.id}
@@ -361,6 +306,7 @@ export default function PageContent() {
                             <TiltedFlipCard
                                 className={superpower.cardClassName}
                                 icon={superpower.icon}
+                                iconClassName={superpower.iconClassName}
                                 title={superpower.title}
                                 description={superpower.description}
                                 events={
@@ -383,38 +329,19 @@ export default function PageContent() {
             
             <section className="w-full py-12 md:py-20">
                 <div className="container mx-auto px-4 text-center">
-                    <motion.div
-                        ref={quoteRef}
-                        className="quote-container"
-                        initial={{ opacity: 0, x: -200 }}
-                        animate={inViewQuote ? { opacity: 1, x: 0 } : {}}
-                        transition={{ duration: 1.0, ease: "easeOut", type: "spring", stiffness: 80 }}
-                      >
-                        <motion.div
-                          className="quote-icon"
-                          initial={{ scale: 0, opacity: 0 }}
-                          animate={inViewQuote ? { scale: 1, opacity: 1 } : {}}
-                          transition={{ duration: 0.5, delay: 0.5, ease: "easeOut" }}
-                        >
-                            <MessageSquare className="h-12 w-12 text-primary opacity-70" />
-                        </motion.div>
-                        <motion.p
-                          className="text-2xl md:text-3xl font-medium italic max-w-4xl mx-auto text-foreground"
-                          initial={{ opacity: 0 }}
-                          animate={inViewQuote ? { opacity: 1 } : {}}
-                          transition={{ duration: 1.2, delay: 0.8, ease: "easeOut" }}
-                        >
-                            "We empower students to explore their potential and shape the future through engaging events."
-                        </motion.p>
-                        <motion.p
-                          className="text-lg text-muted-foreground mt-4"
-                          initial={{ opacity: 0 }}
-                          animate={inViewQuote ? { opacity: 1 } : {}}
-                          transition={{ duration: 1.2, delay: 1.0, ease: "easeOut" }}
-                        >
-                            - The Junior Scientist Team
-                        </motion.p>
-                    </motion.div>
+                    <AnimatedContent>
+                        <div className="quote-container">
+                            <div className="quote-icon">
+                                <MessageSquare className="h-12 w-12 text-primary opacity-70" />
+                            </div>
+                            <p className="text-2xl md:text-3xl font-medium italic max-w-4xl mx-auto text-foreground">
+                                "We empower students to explore their potential and shape the future through engaging events."
+                            </p>
+                            <p className="text-lg text-muted-foreground mt-4">
+                                - The Junior Scientist Team
+                            </p>
+                        </div>
+                    </AnimatedContent>
                 </div>
             </section>
 
