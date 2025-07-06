@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { motion, useScroll, useTransform } from "framer-motion";
@@ -15,6 +15,13 @@ import { useTheme } from 'next-themes';
 
 function BackgroundVisuals() {
   const { theme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+
+  if (!mounted) {
+    return <div className="absolute inset-0 z-0 overflow-hidden bg-background"></div>;
+  }
 
   // Define colors for light and dark themes
   const baseColor = theme === 'dark' ? 'rgba(92, 197, 189, 0.1)' : 'rgba(44, 62, 80, 0.08)';

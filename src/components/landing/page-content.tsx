@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
@@ -19,7 +20,7 @@ import {
   Trophy,
   Loader2,
 } from 'lucide-react';
-import { collection, getDocs, query } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { SubEvent } from '@/types';
 import {
@@ -184,17 +185,42 @@ function GallerySection() {
   );
 }
 
+function SuperpowerSectionSkeleton() {
+  return (
+     <section id="superpowers" className="w-full py-12 md:py-20">
+      <div className="container mx-auto px-4">
+        <AnimatedContent>
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-4 text-foreground">
+            What's Your Superpower?
+          </h2>
+          <p className="text-lg text-muted-foreground text-center mt-2 max-w-xl mx-auto mb-16">
+            Discover events tailored to your unique interests and unlock your
+            true potential.
+          </p>
+        </AnimatedContent>
+        <div className="flex flex-wrap justify-center items-stretch gap-y-8 gap-x-4 px-4 mx-auto max-w-screen-xl lg:max-w-[1400px]">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="w-full max-w-sm sm:w-[294px] h-[372px] mx-auto sm:mx-2 bg-muted/50 rounded-2xl animate-pulse"></div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function PageContent() {
   const [events, setEvents] = useState<SubEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const { theme } = useTheme();
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const fetchEvents = async () => {
       setLoading(true);
       try {
         const eventsCollection = collection(db, 'subEvents');
-        const eventSnapshot = await getDocs(query(eventsCollection));
+        const eventSnapshot = await getDocs(query(eventsCollection, where("status", "==", "Active")));
         const eventsList = eventSnapshot.docs.map(
           (doc) => ({ id: doc.id, ...doc.data() } as SubEvent)
         );
@@ -210,12 +236,12 @@ export default function PageContent() {
 
   const getEventsForCategory = (categoryName: string) => {
     return events
-      .filter(event => event.superpowerCategory === categoryName && event.status === 'Active')
+      .filter(event => event.superpowerCategory === categoryName)
       .map(event => ({
         name: event.title,
         link: `/events/${event.slug}`
       }))
-      .slice(0, 2); // Limit to 2 events per card for consistent design
+      .slice(0, 2); 
   };
 
   const thinkerEvents = getEventsForCategory("The Thinker");
@@ -243,6 +269,21 @@ export default function PageContent() {
         'Dedicated team to guide and assist students throughout the event.',
     },
   ];
+  
+  if (!mounted) {
+    return (
+      <div className="space-y-24 md:space-y-32 bg-background z-10 relative w-full overflow-x-hidden">
+        {/* Render skeletons or placeholders for sections */}
+        <section id="about-us" className="w-full py-12 md:py-20 scroll-mt-20">
+            <div className="container h-96 animate-pulse"></div>
+        </section>
+        <section id="stats" className="w-full py-12 md:py-20 bg-card/50">
+            <div className="container h-48 animate-pulse"></div>
+        </section>
+        <SuperpowerSectionSkeleton />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-24 md:space-y-32 bg-background z-10 relative w-full overflow-x-hidden">
@@ -395,41 +436,39 @@ export default function PageContent() {
             </p>
           </AnimatedContent>
           {loading ? (
-            <div className="flex justify-center items-center h-48">
-              <Loader2 className="h-12 w-12 animate-spin text-primary" />
-            </div>
+             <SuperpowerSectionSkeleton />
           ) : (
             <div className="flex flex-wrap justify-center items-stretch gap-y-8 gap-x-4 px-4 mx-auto max-w-screen-xl lg:max-w-[1400px]">
               <TiltedFlipCard
-                category="thinker"
-                iconSrc="https://img.icons8.com/fluency/96/brain.png"
                 title="The Thinker"
                 description="Excel in debating, global affairs, and public speaking? Born diplomat!"
                 events={thinkerEvents}
+                iconSrc="https://img.icons8.com/fluency/96/brain.png"
+                category="thinker"
                 themeMode={theme === 'dark' ? 'dark' : 'light'}
               />
               <TiltedFlipCard
-                category="brainiac"
-                iconSrc="https://img.icons8.com/fluency/96/puzzle.png"
                 title="The Brainiac"
                 description="Obsessed with facts, quizzes, and science puzzles? You see the patterns others miss."
                 events={brainiacEvents}
+                iconSrc="https://img.icons8.com/fluency/96/puzzle.png"
+                category="brainiac"
                 themeMode={theme === 'dark' ? 'dark' : 'light'}
               />
               <TiltedFlipCard
-                category="strategist"
-                iconSrc="https://img.icons8.com/fluency/96/rocket.png"
                 title="The Strategist"
                 description="Enjoy solving math riddles and cracking logic games? Master of numbers and patterns."
                 events={strategistEvents}
+                iconSrc="https://img.icons8.com/fluency/96/rocket.png"
+                category="strategist"
                 themeMode={theme === 'dark' ? 'dark' : 'light'}
               />
               <TiltedFlipCard
-                category="innovator"
-                iconSrc="https://img.icons8.com/fluency/96/light-on.png"
                 title="The Innovator"
                 description="Love to design, build, and bring new ideas to life? Future tech pioneer!"
                 events={innovatorEvents}
+                iconSrc="https://img.icons8.com/fluency/96/light-on.png"
+                category="innovator"
                 themeMode={theme === 'dark' ? 'dark' : 'light'}
               />
             </div>
