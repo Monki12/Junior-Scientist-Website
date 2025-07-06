@@ -5,50 +5,50 @@
 
 @layer base {
   :root {
-    /* React Bits Inspired Dark Theme (Applied to both light and dark modes) */
-    --background: 240 22% 7%; /* ~#0A0A15 */
-    --foreground: 0 0% 88%; /* #E0E0E0 */
-    --card: 240 33% 15%; /* #1A1A33 */
-    --card-foreground: 0 0% 88%; /* #E0E0E0 */
-    --popover: 240 22% 7%;
-    --popover-foreground: 0 0% 88%;
-    --primary: 280 100% 50%; /* #A800FF */
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 33% 20%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 33% 20%;
-    --muted-foreground: 0 0% 69%; /* #B0B0B0 */
-    --accent: 258 100% 50%; /* #4A00FF */
-    --accent-foreground: 0 0% 98%;
+    /* Light Mode Palette */
+    --background: 204 25% 95%; /* #F0F2F5 */
+    --foreground: 210 22% 24%; /* #2C3E50 */
+    --card: 255 100% 100%; /* #FFFFFF */
+    --card-foreground: 210 22% 24%; /* #2C3E50 */
+    --popover: 255 100% 100%;
+    --popover-foreground: 210 22% 24%;
+    --primary: 175 100% 37%; /* #00BFB2 */
+    --primary-foreground: 255 100% 100%; /* #FFFFFF */
+    --secondary: 210 16% 82%; /* #CFD8DC */
+    --secondary-foreground: 210 22% 24%;
+    --muted: 210 16% 90%; /* #E0E0E0 */
+    --muted-foreground: 210 14% 40%; /* #546E7A */
+    --accent: 175 100% 37%; /* #00BFB2 - Same as primary */
+    --accent-foreground: 255 100% 100%;
     --destructive: 0 70% 50%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 33% 25%;
-    --input: 240 33% 25%;
-    --ring: 280 100% 50%;
+    --border: 204 14% 83%; /* #DDE3EA */
+    --input: 204 14% 83%;
+    --ring: 175 100% 37%;
     --radius: 0.8rem;
   }
 
   .dark {
-    /* React Bits Inspired Dark Theme */
-    --background: 240 22% 7%;
-    --foreground: 0 0% 88%;
-    --card: 240 33% 15%;
-    --card-foreground: 0 0% 88%;
-    --popover: 240 22% 7%;
-    --popover-foreground: 0 0% 88%;
-    --primary: 280 100% 50%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 33% 20%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 33% 20%;
-    --muted-foreground: 0 0% 69%;
-    --accent: 258 100% 50%;
-    --accent-foreground: 0 0% 98%;
+    /* Dark Mode Palette */
+    --background: 216 33% 13%; /* #1A1E28 */
+    --foreground: 0 0% 100%; /* #FFFFFF */
+    --card: 218 20% 18%; /* #2B303D */
+    --card-foreground: 0 0% 100%;
+    --popover: 216 33% 13%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 175 64% 53%; /* #5CC5BD */
+    --primary-foreground: 216 33% 13%; /* #1A1E28 */
+    --secondary: 218 20% 18%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 218 20% 18%;
+    --muted-foreground: 210 25% 75%; /* #B0C0CC */
+    --accent: 175 64% 53%; /* #5CC5BD */
+    --accent-foreground: 216 33% 13%;
     --destructive: 0 70% 50%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 33% 25%;
-    --input: 240 33% 25%;
-    --ring: 280 100% 50%;
+    --border: 214 19% 30%; /* #4A505F */
+    --input: 214 19% 30%;
+    --ring: 175 64% 53%;
     --radius: 0.8rem;
   }
 }
@@ -93,7 +93,7 @@
   height: 280px;
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 0 15px rgba(74, 0, 255, 0.3);
+  box-shadow: 0 0 15px rgba(92, 197, 189, 0.3);
   transition: box-shadow 0.3s ease-in-out;
   position: relative;
 }
@@ -107,7 +107,7 @@
 }
 
 .gallery-item:hover {
-  box-shadow: 0 0 30px rgba(168, 0, 255, 0.7);
+  box-shadow: 0 0 30px rgba(92, 197, 189, 0.7);
 }
 
 .scroll-hint {

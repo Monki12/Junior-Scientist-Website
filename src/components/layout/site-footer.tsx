@@ -5,7 +5,7 @@ import { Logo } from '@/components/layout/logo';
 
 export default function SiteFooter() {
   return (
-    <footer className="border-t border-border/40 bg-muted/50 text-muted-foreground">
+    <footer className="border-t border-border/40 bg-card/50 text-muted-foreground">
       <div className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start md:items-center">
           <div className="flex flex-col items-center md:items-start text-center md:text-left">

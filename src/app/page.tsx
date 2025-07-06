@@ -11,29 +11,24 @@ import Link from "next/link";
 import { ArrowDown, Loader2 } from "lucide-react";
 import PageContent from "@/components/landing/page-content";
 import MagnetLines from '@/components/ui/magnet-lines';
+import { useTheme } from 'next-themes';
 
 function BackgroundVisuals() {
+  const { theme } = useTheme();
+
+  // Define colors for light and dark themes
+  const baseColor = theme === 'dark' ? 'rgba(92, 197, 189, 0.1)' : 'rgba(44, 62, 80, 0.08)';
+  const interactiveColor = theme === 'dark' ? 'rgba(92, 197, 189, 0.4)' : 'rgba(92, 197, 189, 0.5)';
+    
     return (
         <div className="absolute inset-0 z-0 overflow-hidden bg-background">
-            <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 0.15 }}
-                transition={{ duration: 2 }}
-                className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary via-background to-background"
-            />
-            <motion.div
-                initial={{ y: '100%' }}
-                animate={{ y: '-100%' }}
-                transition={{ duration: 30, repeat: Infinity, repeatType: 'mirror', ease: 'linear' }}
-                className="absolute top-0 left-1/4 w-1/2 h-[200%] bg-gradient-to-b from-transparent via-accent/5 to-transparent"
-            />
             <MagnetLines
-              className="absolute inset-0 opacity-40"
-              baseColor="rgba(168, 0, 255, 0.15)"
-              interactiveColor="rgba(74, 0, 255, 0.8)"
+              className="absolute inset-0 opacity-100"
+              baseColor={baseColor}
+              interactiveColor={interactiveColor}
               lineWidth="1px"
               lineHeight="4vmin"
-              interactionRadius={250}
+              interactionRadius={200}
             />
         </div>
     );
@@ -77,8 +72,7 @@ export default function JuniorScientistHomePage() {
           >
             <Logo className="h-28 w-20 md:h-32 md:w-24 mx-auto mb-4" />
             <h1 
-              className="text-5xl md:text-7xl lg:text-8xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary font-headline" 
-              style={{ filter: 'drop-shadow(0 0 15px hsl(var(--primary) / 0.5))' }}
+              className="text-5xl md:text-7xl lg:text-8xl font-extrabold tracking-tight text-foreground font-headline"
             >
               JUNIOR SCIENTIST
             </h1>

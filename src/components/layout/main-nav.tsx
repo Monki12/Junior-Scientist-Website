@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { useAuth } from '@/hooks/use-auth';
-import { LightBulbToggle } from '@/components/layout/light-bulb-toggle';
+import { LightBulbToggle } from '@/components/layout/theme-toggle';
 import { 
   Menu, Home, Search, Phone, UserPlus, LogIn, LayoutDashboard
 } from 'lucide-react';
@@ -87,7 +87,7 @@ export default function MainNav() {
   }
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur-sm supports-[backdrop-filter]:bg-background/60 shadow-sm">
+    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-sm supports-[backdrop-filter]:bg-background/60 shadow-sm">
       <div className="container flex h-16 items-center">
         <Link href="/" className="flex items-center mr-6" aria-label="Junior Scientist Home">
           <Logo className="h-12 w-8" />

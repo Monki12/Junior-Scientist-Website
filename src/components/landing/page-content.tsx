@@ -1,18 +1,17 @@
 
 'use client';
 
+import React, { useEffect, useState, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ShieldCheck, BookOpen, Users2, Phone, Mail, Instagram, Facebook, Twitter, Sparkles, Zap, Trophy, MessageSquare, Brain, Puzzle, Bot, Info, Loader2, Lightbulb, Rocket } from 'lucide-react';
-import { useEffect, useState, useRef } from 'react';
+import { ShieldCheck, BookOpen, Users2, Phone, Mail, Instagram, Facebook, Twitter, MessageSquare, Brain, Puzzle, Bot, Zap, Trophy, Loader2 } from 'lucide-react';
 import { collection, getDocs, query, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { SubEvent } from '@/types';
 import { motion, useInView, animate, useScroll, useTransform } from 'framer-motion';
 import TiltedFlipCard from '@/components/ui/TiltedFlipCard';
-import { cn } from '@/lib/utils';
 
 interface AnimatedNumberProps {
   to: number;
@@ -37,7 +36,7 @@ function AnimatedNumber({ to, suffix = '', prefix = '' }: AnimatedNumberProps) {
     }
   }, [isInView, to, suffix, prefix]);
 
-  return <p ref={ref} className="text-4xl lg:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary" style={{ filter: 'drop-shadow(0 0 10px hsl(var(--primary) / 0.5))' }} >{prefix}0{suffix}</p>;
+  return <p ref={ref} className="text-4xl lg:text-5xl font-bold text-primary" >{prefix}0{suffix}</p>;
 }
 
 const AnimatedContent = ({ children, direction = 'up', className, delay = 0 }: { children: React.ReactNode, direction?: 'up' | 'left' | 'right', className?: string, delay?: number }) => {
@@ -72,7 +71,7 @@ const AnimatedContent = ({ children, direction = 'up', className, delay = 0 }: {
 };
 
 function GallerySection() {
-    const galleryRef = useRef(null);
+    const galleryRef = useRef<HTMLDivElement>(null);
     const { scrollYProgress } = useScroll({
       target: galleryRef,
       offset: ['start end', 'end start'],
@@ -91,7 +90,7 @@ function GallerySection() {
     return (
         <section ref={galleryRef} className="gallery-section">
             <AnimatedContent>
-                <h2 className="text-3xl md:text-4xl font-bold text-center mb-2 bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary">Moments of Brilliance</h2>
+                <h2 className="text-3xl md:text-4xl font-bold text-center mb-2 text-foreground">Moments of Brilliance</h2>
                 <p className="text-lg text-muted-foreground text-center mt-2 max-w-xl mx-auto mb-16">Explore our vibrant community in action.</p>
             </AnimatedContent>
             <motion.div style={{ x }} className="gallery-strip">
@@ -137,39 +136,35 @@ export default function PageContent() {
     const inViewQuote = useInView(quoteRef, { once: true, threshold: 0.5 });
     
     const superpowers = [
-    {
-      id: 1,
-      mainImage: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cf/Teenage_boy_reading.jpg/1200px-Teenage_boy_reading.jpg',
-      icon: 'https://img.icons8.com/ios-filled/100/A800FF/speech-bubble--v1.png',
-      title: "The Thinker",
-      description: "Excel in debating, global affairs, and public speaking? Born diplomat!",
-      gradient: "from-[#A800FF] to-[#6C00FF]",
-    },
-    {
-      id: 2,
-      mainImage: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Kids_at_science_fair.jpg/1280px-Kids_at_science_fair.jpg',
-      icon: 'https://img.icons8.com/ios-filled/100/A800FF/brain.png',
-      title: "The Brainiac",
-      description: "Obsessed with facts, quizzes, and science puzzles? You see the patterns others miss.",
-      gradient: "from-[#4D00FF] to-[#0051FF]",
-    },
-    {
-      id: 3,
-      mainImage: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/Chess_problem.jpg/1280px-Chess_problem.jpg',
-      icon: 'https://img.icons8.com/ios-filled/100/A800FF/gears.png',
-      title: "The Strategist",
-      description: "Enjoy solving math riddles and cracking logic games? Master of numbers and patterns.",
-      gradient: "from-[#009688] to-[#4DB6AC]",
-    },
-    {
-      id: 4,
-      mainImage: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Kid_with_robot_at_exhibition.jpg/1280px-Kid_with_robot_at_exhibition.jpg',
-      icon: 'https://img.icons8.com/ios-filled/100/A800FF/rocket.png',
-      title: "The Innovator",
-      description: "Love to design, build, and bring new ideas to life? Future tech pioneer!",
-      gradient: "from-[#FF0077] to-[#A800FF]",
-    },
-  ];
+      {
+        id: 1,
+        icon: 'https://img.icons8.com/ios-filled/100/7A87E5/speech-bubble--v1.png',
+        gradient: 'from-[#7A87E5] to-[#A2B2FF]',
+        title: "The Thinker",
+        description: "Excel in debating, global affairs, and public speaking? Born diplomat!",
+      },
+      {
+        id: 2,
+        icon: 'https://img.icons8.com/ios-filled/100/AFE152/brain.png',
+        gradient: 'from-[#AFE152] to-[#D4FF7D]',
+        title: "The Brainiac",
+        description: "Obsessed with facts, quizzes, and science puzzles? You see the patterns others miss.",
+      },
+      {
+        id: 3,
+        icon: 'https://img.icons8.com/ios-filled/100/F0AD4E/gears.png',
+        gradient: 'from-[#F0AD4E] to-[#FFD58A]',
+        title: "The Strategist",
+        description: "Enjoy solving math riddles and cracking logic games? Master of numbers and patterns.",
+      },
+      {
+        id: 4,
+        icon: 'https://img.icons8.com/ios-filled/100/EA5C9F/rocket.png',
+        gradient: 'from-[#EA5C9F] to-[#FF8DC7]',
+        title: "The Innovator",
+        description: "Love to design, build, and bring new ideas to life? Future tech pioneer!",
+      },
+    ];
 
     useEffect(() => {
         const fetchEvents = async () => {
@@ -190,17 +185,17 @@ export default function PageContent() {
 
     const perks = [
       {
-        icon: <ShieldCheck className="h-10 w-10 text-accent" />,
+        icon: <ShieldCheck />,
         title: 'Safe Campus Environment',
         description: 'Ensuring a secure and supportive atmosphere for all participants.',
       },
       {
-        icon: <BookOpen className="h-10 w-10 text-accent" />,
+        icon: <BookOpen />,
         title: 'Real Learning Beyond Textbooks',
         description: 'Practical application of knowledge and development of critical skills.',
       },
       {
-        icon: <Users2 className="h-10 w-10 text-accent" />,
+        icon: <Users2 />,
         title: 'Organized Supervision & Verified Volunteers',
         description: 'Dedicated team to guide and assist students throughout the event.',
       },
@@ -213,7 +208,7 @@ export default function PageContent() {
                 <div className="container mx-auto px-4">
                     <motion.h2
                         ref={refTitle}
-                        className="text-3xl md:text-4xl font-bold text-center mb-16 bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary"
+                        className="text-3xl md:text-4xl font-bold text-center mb-16 text-foreground"
                         initial={{ opacity: 0, y: 50 }}
                         animate={inViewTitle ? { opacity: 1, y: 0 } : {}}
                         transition={{ duration: 0.8, type: "spring", stiffness: 100 }}
@@ -238,7 +233,7 @@ export default function PageContent() {
                                 animate={inViewImg1 ? { opacity: 1, x: 0, scale: 1 } : {}}
                                 transition={{ duration: 0.9, delay: 0.4, ease: "easeOut" }}
                              >
-                                <div className="relative aspect-video rounded-xl shadow-2xl shadow-primary/20">
+                                <div className="relative aspect-video rounded-xl shadow-lg dark:shadow-primary/20">
                                     <Image
                                         src="https://i.ibb.co/C07F81B/collaboration.jpg"
                                         alt="Students collaborating on a science project"
@@ -268,7 +263,7 @@ export default function PageContent() {
                                 transition={{ duration: 0.9, delay: 0.4, ease: "easeOut" }}
                                 className="md:order-1"
                              >
-                                <div className="relative aspect-video rounded-xl shadow-2xl shadow-primary/20">
+                                <div className="relative aspect-video rounded-xl shadow-lg dark:shadow-primary/20">
                                      <Image
                                         src="https://i.ibb.co/q1zR2x9/abstract-tech.jpg"
                                         alt="Abstract technology visualization"
@@ -301,21 +296,21 @@ export default function PageContent() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
                         <AnimatedContent delay={0}>
                             <div className="p-6">
-                                <Users2 className="h-12 w-12 text-accent mx-auto mb-4" />
+                                <Users2 className="h-12 w-12 text-primary mx-auto mb-4" />
                                 <AnimatedNumber to={50} suffix="+" />
                                 <p className="text-muted-foreground mt-2">Partner Schools</p>
                             </div>
                         </AnimatedContent>
                         <AnimatedContent delay={0.2}>
                             <div className="p-6">
-                                <Trophy className="h-12 w-12 text-accent mx-auto mb-4" />
+                                <Trophy className="h-12 w-12 text-primary mx-auto mb-4" />
                                 <AnimatedNumber to={100000} prefix="₹" suffix="+" />
                                 <p className="text-muted-foreground mt-2">Worth of Prizes</p>
                             </div>
                         </AnimatedContent>
                         <AnimatedContent delay={0.4}>
                             <div className="p-6">
-                                <Zap className="h-12 w-12 text-accent mx-auto mb-4" />
+                                <Zap className="h-12 w-12 text-primary mx-auto mb-4" />
                                 <AnimatedNumber to={15000} suffix="+" />
                                 <p className="text-muted-foreground mt-2">Expected Participants</p>
                             </div>
@@ -327,13 +322,13 @@ export default function PageContent() {
             <section id="why-choose-us" className="w-full py-12 md:py-20">
                 <div className="container mx-auto px-4">
                     <AnimatedContent>
-                        <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary">Why Choose Junior Scientist?</h2>
+                        <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 text-foreground">Why Choose Junior Scientist?</h2>
                     </AnimatedContent>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                         {perks.map((perk, i) => (
                            <AnimatedContent key={perk.title} delay={i * 0.2}>
-                                <Card className="bg-card shadow-soft hover:shadow-primary/20 transition-all duration-300 p-8 text-center rounded-xl border border-border/30 hover:border-primary/50 hover:-translate-y-2 h-full">
-                                    {perk.icon}
+                                <Card className="bg-card shadow-lg dark:shadow-primary/10 hover:shadow-xl dark:hover:shadow-primary/20 transition-all duration-300 p-8 text-center rounded-2xl border border-border/30 hover:border-primary/50 hover:-translate-y-2 h-full">
+                                    {React.cloneElement(perk.icon, {className: "h-10 w-10 text-primary mx-auto mb-4 icon-glow"})}
                                     <h3 className="text-xl font-bold mt-4 mb-2 text-foreground">{perk.title}</h3>
                                     <p className="text-base text-muted-foreground">{perk.description}</p>
                                 </Card>
@@ -346,7 +341,7 @@ export default function PageContent() {
             <section id="superpowers" className="w-full py-12 md:py-20">
                 <div className="container mx-auto px-4">
                     <AnimatedContent>
-                      <h2 className="text-center font-headline bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary" style={{ fontSize: 'clamp(2.5rem, 6vw, 4rem)', fontWeight: 800 }}>What's Your Superpower?</h2>
+                      <h2 className="text-center font-headline text-foreground" style={{ fontSize: 'clamp(2.5rem, 6vw, 4rem)', fontWeight: 800 }}>What's Your Superpower?</h2>
                       <p className="text-lg text-muted-foreground text-center mt-2 max-w-xl mx-auto mb-16">Discover events tailored to your unique interests and unlock your true potential.</p>
                     </AnimatedContent>
                     {loading ? (
@@ -365,7 +360,6 @@ export default function PageContent() {
                             >
                             <TiltedFlipCard
                                 id={superpower.id}
-                                imageSrc={superpower.mainImage}
                                 icon={superpower.icon}
                                 title={superpower.title}
                                 description={superpower.description}
@@ -428,7 +422,7 @@ export default function PageContent() {
             <section id="contact-us" className="w-full py-12 md:py-20 bg-card/50 scroll-mt-20">
                 <div className="container mx-auto px-4 text-center">
                     <AnimatedContent>
-                        <h2 className="text-3xl md:text-4xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary">Get in Touch</h2>
+                        <h2 className="text-3xl md:text-4xl font-bold mb-6 text-foreground">Get in Touch</h2>
                         <p className="text-lg text-muted-foreground mb-8 max-w-lg mx-auto">Have questions or want to partner with us? We'd love to hear from you!</p>
                     </AnimatedContent>
                     <AnimatedContent delay={0.2} className="flex flex-col md:flex-row justify-center items-center gap-4 mb-8">

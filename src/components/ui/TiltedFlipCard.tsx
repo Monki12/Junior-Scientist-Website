@@ -5,7 +5,7 @@ import React, { useRef, useState, useEffect } from "react";
 import { motion, useMotionValue, useSpring } from "framer-motion";
 import Link from 'next/link';
 
-import "./TiltedFlipCard.css";
+import "./TiltedCard.css";
 
 const springValues = {
   damping: 30,
@@ -15,29 +15,24 @@ const springValues = {
 
 interface TiltedFlipCardProps {
     id: number;
-    imageSrc?: string;
-    altText?: string;
-    icon: string | React.ReactNode;
+    icon: string;
     title: string;
     description: string;
     gradient: string;
     events: Array<{ name: string; link: string; }>;
     tiltAmplitude?: number;
     scaleOnHover?: number;
-    showMobileWarning?: boolean;
 }
 
 export default function TiltedFlipCard({
-  imageSrc,
-  altText = "Tilted card image",
+  id,
   icon,
   title,
   description,
   gradient,
   events,
-  tiltAmplitude = 14,
+  tiltAmplitude = 10,
   scaleOnHover = 1.05,
-  showMobileWarning = false,
 }: TiltedFlipCardProps) {
   const ref = useRef<HTMLElement>(null);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -52,6 +47,22 @@ export default function TiltedFlipCard({
     stiffness: 80,
     mass: 1.5,
   });
+  
+  const [glowColor, setGlowColor] = useState('transparent');
+
+  useEffect(() => {
+    // Extract color from gradient for the glow
+    const colorMatch = gradient.match(/from-\[(#[0-9a-fA-F]{6})\]/);
+    if (colorMatch && colorMatch[1]) {
+        const hex = colorMatch[1];
+        // Convert hex to rgba for glow
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        setGlowColor(`rgba(${r}, ${g}, ${b}, 0.4)`);
+    }
+
+  }, [gradient]);
 
   useEffect(() => {
     if (isFlipped) {
@@ -106,15 +117,26 @@ export default function TiltedFlipCard({
   };
 
   return (
-    <figure
+    <motion.figure
       ref={ref}
       className="tilted-card-figure"
       onMouseMove={handleMouseMove}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onClick={handleClick}
-      style={{ perspective: "1000px" }}
+      style={{
+        perspective: "1000px",
+        scale: scale,
+        rotateX: rotateX,
+        rotateY: rotateY,
+      }}
+      transition={{
+        scale: springValues,
+        rotateX: springValues,
+        rotateY: springValues,
+      }}
     >
+      <div className="card-glow" style={{'--glow-color': glowColor} as React.CSSProperties}></div>
       <motion.div
         className="tilted-card-flipper"
         style={{
@@ -124,64 +146,38 @@ export default function TiltedFlipCard({
         transition={{ duration: 0.7 }}
       >
         {/* Front Face */}
-        <motion.div
-          className="tilted-card-face tilted-card-face-front"
-          style={{
-            rotateX: rotateX,
-            rotateY: rotateY,
-            scale: scale,
-          }}
-        >
-          {imageSrc && (
-            <img src={imageSrc} alt={altText} className="absolute inset-0 w-full h-full object-cover rounded-2xl -z-10" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-          )}
-          <div className={`glass rounded-2xl p-8 h-full bg-gradient-to-br ${gradient} relative overflow-hidden flex flex-col justify-center items-center text-center`}>
-              <div className="absolute top-6 right-6 text-5xl opacity-80">{typeof icon === 'string' ? <img src={icon} alt="" className="w-12 h-12" /> : icon}</div>
-              <div className="z-10">
-                <h3 className="text-2xl font-headline font-bold text-white mb-6">{title}</h3>
-                <p className="text-white/90 text-lg leading-relaxed mb-8">{description}</p>
-                <div className="text-white/60 text-sm">Click to see events</div>
-              </div>
-              <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2">
-                <div className="w-12 h-1 bg-white/50 rounded-full animate-pulse"></div>
-              </div>
-            </div>
-        </motion.div>
+        <div className="tilted-card-face tilted-card-face-front">
+          <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-20 dark:opacity-100`}></div>
+          <div className="relative z-10 flex flex-col items-center justify-center h-full">
+            <img src={icon} alt={`${title} icon`} className="superpower-icon" />
+            <h3 className="superpower-title-front">{title}</h3>
+            <p className="superpower-description-front">{description}</p>
+            <span className="flip-hint mt-auto">Click to see events</span>
+          </div>
+        </div>
 
         {/* Back Face */}
         <div
           className="tilted-card-face tilted-card-face-back"
         >
-             <div className="glass rounded-2xl p-8 h-full bg-gradient-to-br from-science-dark to-science-darker border border-science-blue/30 flex flex-col justify-center">
-              <h3 className="text-xl font-headline font-bold text-science-blue mb-8 text-center">Related Events</h3>
-              <div className="space-y-4 flex-1 flex flex-col justify-center">
-                {events.map((event, index) => (
-                  <motion.div 
-                    key={index}
-                    className="p-4 bg-gradient-to-r from-science-blue/20 to-science-purple/20 rounded-lg border border-science-blue/30 hover:border-science-blue/60 transition-all duration-300"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <Link 
-                      href={event.link}
-                      className="text-white hover:text-science-cyan transition-colors duration-300 font-medium block"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {event.name}
-                    </Link>
-                  </motion.div>
-                ))}
-                {events.length === 0 && <p className="text-white/70">No events yet. Check back soon!</p>}
+          <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-20 dark:opacity-100`}></div>
+          <div className="relative z-10 flex flex-col items-center justify-center h-full">
+              <h4 className="superpower-back-title">Related Events:</h4>
+              <div className="superpower-back-content">
+                {events.length > 0 ? (
+                  <ul>
+                    {events.map((event, index) => (
+                      <li key={index}>
+                        <Link href={event.link} onClick={(e) => e.stopPropagation()}>{event.name}</Link>
+                      </li>
+                    ))}
+                  </ul>
+                ) : <p>No events yet. Check back soon!</p> }
               </div>
-              <div className="text-white/60 text-sm text-center mt-6">Click to flip back</div>
-            </div>
+              <span className="flip-back-hint mt-auto">Click to flip back</span>
+          </div>
         </div>
       </motion.div>
-      {showMobileWarning && (
-        <div className="absolute top-4 text-center text-sm block sm:hidden text-white/60">
-            This effect is not optimized for mobile. Check on desktop.
-        </div>
-      )}
-    </figure>
+    </motion.figure>
   );
 }
