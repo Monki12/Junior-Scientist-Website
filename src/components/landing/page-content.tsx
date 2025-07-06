@@ -119,29 +119,29 @@ export default function PageContent() {
     const superpowers = [
       {
         id: 1,
-        category: 'thinker',
-        icon: 'https://img.icons8.com/fluency/96/brain.png',
+        category: 'thinker' as const,
+        iconSrc: 'https://img.icons8.com/fluency/96/brain.png',
         title: "The Thinker",
         description: "Excel in debating, global affairs, and public speaking? Born diplomat!",
       },
       {
         id: 2,
-        category: 'brainiac',
-        icon: 'https://img.icons8.com/fluency/96/puzzle.png',
+        category: 'brainiac' as const,
+        iconSrc: 'https://img.icons8.com/fluency/96/puzzle.png',
         title: "The Brainiac",
         description: "Obsessed with facts, quizzes, and science puzzles? You see the patterns others miss.",
       },
       {
         id: 3,
-        category: 'strategist',
-        icon: 'https://img.icons8.com/fluency/96/rocket.png',
+        category: 'strategist' as const,
+        iconSrc: 'https://img.icons8.com/fluency/96/rocket.png',
         title: "The Strategist",
         description: "Enjoy solving math riddles and cracking logic games? Master of numbers and patterns.",
       },
       {
         id: 4,
-        category: 'innovator',
-        icon: 'https://img.icons8.com/fluency/96/light-on.png',
+        category: 'innovator' as const,
+        iconSrc: 'https://img.icons8.com/fluency/96/light-on.png',
         title: "The Innovator",
         description: "Love to design, build, and bring new ideas to life? Future tech pioneer!",
       },
@@ -293,7 +293,7 @@ export default function PageContent() {
                     {loading ? (
                         <div className="flex justify-center items-center h-48"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>
                     ) : (
-                    <div className="superpower-cards-container">
+                    <div className="flex justify-center items-stretch flex-wrap md:flex-nowrap gap-4 md:gap-6 lg:gap-8 xl:gap-10 mx-auto max-w-[1400px]">
                         {superpowers.map((superpower, i) => (
                            <motion.div 
                                 key={superpower.id}
@@ -303,8 +303,8 @@ export default function PageContent() {
                                 viewport={{ once: true, amount: 0.2 }}
                             >
                             <TiltedFlipCard
-                                category={superpower.category as any}
-                                icon={superpower.icon}
+                                category={superpower.category}
+                                iconSrc={superpower.iconSrc}
                                 title={superpower.title}
                                 description={superpower.description}
                                 events={
@@ -315,6 +315,7 @@ export default function PageContent() {
                                         link: `/events/${event.slug}`
                                     }))
                                 }
+                                themeMode={theme === 'dark' ? 'dark' : 'light'}
                             />
                             </motion.div>
                         ))}
