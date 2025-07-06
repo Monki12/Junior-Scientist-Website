@@ -215,12 +215,14 @@ export default function PageContent() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // This effect runs once on component mount.
     setMounted(true);
     const fetchEvents = async () => {
       setLoading(true);
       try {
         const eventsCollection = collection(db, 'subEvents');
-        const eventSnapshot = await getDocs(query(eventsCollection, where("status", "==", "Active")));
+        // Fetch all events without filtering by status to ensure cards populate
+        const eventSnapshot = await getDocs(query(eventsCollection));
         const eventsList = eventSnapshot.docs.map(
           (doc) => ({ id: doc.id, ...doc.data() } as SubEvent)
         );
@@ -232,7 +234,7 @@ export default function PageContent() {
       }
     };
     fetchEvents();
-  }, []);
+  }, []); // Empty dependency array ensures this runs only once.
 
   const getEventsForCategory = (categoryName: string) => {
     return events
@@ -241,7 +243,7 @@ export default function PageContent() {
         name: event.title,
         link: `/events/${event.slug}`
       }))
-      .slice(0, 2); 
+      .slice(0, 2); // Show a maximum of 2 events per card
   };
 
   const thinkerEvents = getEventsForCategory("The Thinker");
@@ -275,7 +277,7 @@ export default function PageContent() {
       <div className="space-y-24 md:space-y-32 bg-background z-10 relative w-full overflow-x-hidden">
         {/* Render skeletons or placeholders for sections */}
         <section id="about-us" className="w-full py-12 md:py-20 scroll-mt-20">
-            <div className="container h-96 animate-pulse"></div>
+            <div className="container h-96 animate-pulse bg-muted/20 rounded-lg"></div>
         </section>
         <section id="stats" className="w-full py-12 md:py-20 bg-card/50">
             <div className="container h-48 animate-pulse"></div>
