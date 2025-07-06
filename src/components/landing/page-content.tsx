@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
@@ -20,7 +19,7 @@ import {
   Trophy,
   Loader2,
 } from 'lucide-react';
-import { collection, getDocs, query, limit } from 'firebase/firestore';
+import { collection, getDocs, query } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { SubEvent } from '@/types';
 import {
@@ -195,7 +194,7 @@ export default function PageContent() {
       setLoading(true);
       try {
         const eventsCollection = collection(db, 'subEvents');
-        const eventSnapshot = await getDocs(query(eventsCollection, limit(10)));
+        const eventSnapshot = await getDocs(query(eventsCollection));
         const eventsList = eventSnapshot.docs.map(
           (doc) => ({ id: doc.id, ...doc.data() } as SubEvent)
         );
@@ -208,6 +207,21 @@ export default function PageContent() {
     };
     fetchEvents();
   }, []);
+
+  const getEventsForCategory = (categoryName: string) => {
+    return events
+      .filter(event => event.superpowerCategory === categoryName && event.status === 'Active')
+      .map(event => ({
+        name: event.title,
+        link: `/events/${event.slug}`
+      }))
+      .slice(0, 2); // Limit to 2 events per card for consistent design
+  };
+
+  const thinkerEvents = getEventsForCategory("The Thinker");
+  const brainiacEvents = getEventsForCategory("The Brainiac");
+  const strategistEvents = getEventsForCategory("The Strategist");
+  const innovatorEvents = getEventsForCategory("The Innovator");
 
   const perks = [
     {
@@ -385,16 +399,13 @@ export default function PageContent() {
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
             </div>
           ) : (
-            <div className="flex flex-wrap justify-center items-stretch gap-y-8 gap-x-4 px-4 mx-auto max-w-screen-2xl">
+            <div className="flex flex-wrap justify-center items-stretch gap-y-8 gap-x-4 px-4 mx-auto max-w-screen-xl lg:max-w-[1400px]">
               <TiltedFlipCard
-                category="strategist"
-                iconSrc="https://img.icons8.com/fluency/96/rocket.png"
-                title="The Strategist"
-                description="Enjoy solving math riddles and cracking logic games? Master of numbers and patterns."
-                events={[
-                  { name: 'Robotics Challenge', link: '#' },
-                  { name: 'Codefest', link: '#' },
-                ]}
+                category="thinker"
+                iconSrc="https://img.icons8.com/fluency/96/brain.png"
+                title="The Thinker"
+                description="Excel in debating, global affairs, and public speaking? Born diplomat!"
+                events={thinkerEvents}
                 themeMode={theme === 'dark' ? 'dark' : 'light'}
               />
               <TiltedFlipCard
@@ -402,21 +413,15 @@ export default function PageContent() {
                 iconSrc="https://img.icons8.com/fluency/96/puzzle.png"
                 title="The Brainiac"
                 description="Obsessed with facts, quizzes, and science puzzles? You see the patterns others miss."
-                events={[
-                  { name: 'Science Quiz', link: '#' },
-                  { name: 'Logic Puzzles', link: '#' },
-                ]}
+                events={brainiacEvents}
                 themeMode={theme === 'dark' ? 'dark' : 'light'}
               />
               <TiltedFlipCard
-                category="thinker"
-                iconSrc="https://img.icons8.com/fluency/96/brain.png"
-                title="The Thinker"
-                description="Excel in debating, global affairs, and public speaking? Born diplomat!"
-                events={[
-                  { name: 'Debate Championship', link: '#' },
-                  { name: 'Model UN', link: '#' },
-                ]}
+                category="strategist"
+                iconSrc="https://img.icons8.com/fluency/96/rocket.png"
+                title="The Strategist"
+                description="Enjoy solving math riddles and cracking logic games? Master of numbers and patterns."
+                events={strategistEvents}
                 themeMode={theme === 'dark' ? 'dark' : 'light'}
               />
               <TiltedFlipCard
@@ -424,10 +429,7 @@ export default function PageContent() {
                 iconSrc="https://img.icons8.com/fluency/96/light-on.png"
                 title="The Innovator"
                 description="Love to design, build, and bring new ideas to life? Future tech pioneer!"
-                events={[
-                  { name: 'Invention Convention', link: '#' },
-                  { name: 'Design Challenge', link: '#' },
-                ]}
+                events={innovatorEvents}
                 themeMode={theme === 'dark' ? 'dark' : 'light'}
               />
             </div>
