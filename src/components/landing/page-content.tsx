@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
@@ -5,7 +6,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ShieldCheck, BookOpen, Users2, Phone, Mail, Instagram, Facebook, Twitter, MessageSquare, Brain, Puzzle, Bot, Zap, Trophy, Loader2 } from 'lucide-react';
+import { ShieldCheck, BookOpen, Users2, Phone, Mail, Instagram, Facebook, Twitter, MessageSquare, Zap, Trophy, Loader2 } from 'lucide-react';
 import { collection, getDocs, query, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { SubEvent } from '@/types';
@@ -118,33 +119,29 @@ export default function PageContent() {
     const superpowers = [
       {
         id: 1,
-        className: 'thinker-card',
+        category: 'thinker',
         icon: 'https://img.icons8.com/fluency/96/brain.png',
-        iconClassName: 'icon-thinker',
         title: "The Thinker",
         description: "Excel in debating, global affairs, and public speaking? Born diplomat!",
       },
       {
         id: 2,
-        className: 'brainiac-card',
+        category: 'brainiac',
         icon: 'https://img.icons8.com/fluency/96/puzzle.png',
-        iconClassName: 'icon-brainiac',
         title: "The Brainiac",
         description: "Obsessed with facts, quizzes, and science puzzles? You see the patterns others miss.",
       },
       {
         id: 3,
-        className: 'strategist-card',
+        category: 'strategist',
         icon: 'https://img.icons8.com/fluency/96/rocket.png',
-        iconClassName: 'icon-strategist',
         title: "The Strategist",
         description: "Enjoy solving math riddles and cracking logic games? Master of numbers and patterns.",
       },
       {
         id: 4,
-        className: 'innovator-card',
+        category: 'innovator',
         icon: 'https://img.icons8.com/fluency/96/light-on.png',
-        iconClassName: 'icon-innovator',
         title: "The Innovator",
         description: "Love to design, build, and bring new ideas to life? Future tech pioneer!",
       },
@@ -306,9 +303,8 @@ export default function PageContent() {
                                 viewport={{ once: true, amount: 0.2 }}
                             >
                             <TiltedFlipCard
-                                className={`${superpower.className} ${theme === 'light' ? 'light' : 'dark'}`}
+                                category={superpower.category as any}
                                 icon={superpower.icon}
-                                iconClassName={superpower.iconClassName}
                                 title={superpower.title}
                                 description={superpower.description}
                                 events={

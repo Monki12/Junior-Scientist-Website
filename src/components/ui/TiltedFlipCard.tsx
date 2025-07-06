@@ -4,6 +4,7 @@ import React, { useRef, useState } from 'react';
 import { motion, useMotionValue, useSpring } from 'framer-motion';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { useTheme } from 'next-themes';
 import './TiltedFlipCard.css';
 
 // Spring values for smooth animations
@@ -14,32 +15,30 @@ const springConfig = {
 };
 
 interface TiltedFlipCardProps {
-  className?: string;
+  category: 'thinker' | 'brainiac' | 'strategist' | 'innovator';
   icon: string;
-  iconClassName?: string;
   title: string;
   description: string;
   events: Array<{ name: string; link: string }>;
 }
 
 export default function TiltedFlipCard({
-  className,
+  category,
   icon,
-  iconClassName,
   title,
   description,
   events,
 }: TiltedFlipCardProps) {
   const [isFlipped, setIsFlipped] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+  const { theme } = useTheme();
 
-  const x = useMotionValue(0);
-  const y = useMotionValue(0);
-  const rotateX = useSpring(0, springConfig);
-  const rotateY = useSpring(0, springConfig);
+  // Framer Motion values for tilt effect
+  const rotateX = useSpring(5, springConfig);
+  const rotateY = useSpring(8, springConfig);
   const scale = useSpring(1, springConfig);
 
-  const rotateAmplitude = 8;
+  const rotateAmplitude = 12; // Increased for more effect
   const scaleOnHover = 1.03;
 
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -59,13 +58,14 @@ export default function TiltedFlipCard({
 
   const handleMouseLeave = () => {
     if (isFlipped) return;
-    rotateX.set(0);
-    rotateY.set(0);
+    rotateX.set(5);
+    rotateY.set(8);
     scale.set(1);
   };
 
   const handleFlip = () => {
     setIsFlipped(!isFlipped);
+    // Reset tilt when flipping
     rotateX.set(0);
     rotateY.set(0);
     scale.set(1);
@@ -74,12 +74,11 @@ export default function TiltedFlipCard({
   return (
     <motion.div
       ref={cardRef}
-      className={cn("superpower-card", className)}
+      className={cn("superpower-card", `${category}-card`, theme === 'light' ? 'light-mode' : 'dark')}
       style={{
         rotateX,
         rotateY,
         scale,
-        perspective: '1000px',
       }}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
@@ -93,7 +92,7 @@ export default function TiltedFlipCard({
         {/* Front Face */}
         <div className="card-front">
           <div className="card-icon-wrapper">
-            <img src={icon} alt={`${title} Icon`} className={cn('icon', iconClassName)} />
+            <img src={icon} alt={`${title} Icon`} className={cn('icon', `icon-${category}`)} />
           </div>
           <h3 className="card-title">{title}</h3>
           <p className="card-description">{description}</p>
@@ -103,15 +102,17 @@ export default function TiltedFlipCard({
         {/* Back Face */}
         <div className="card-back">
           <h4 className="related-events-title">Related Events:</h4>
-          <div className="event-list">
+          <ul className="event-list">
             {events.length > 0 ? (
               events.map((event, index) => (
-                <p key={index} className="event-item">
-                  <Link href={event.link} onClick={(e) => e.stopPropagation()}>{event.name}</Link>
-                </p>
+                <li key={index} className="event-item">
+                  <Link href={event.link} onClick={(e) => e.stopPropagation()}>
+                    {event.name}
+                  </Link>
+                </li>
               ))
-            ) : <p className="event-item">No events yet. Check back soon!</p>}
-          </div>
+            ) : <li className="event-item">No events yet. Check back soon!</li>}
+          </ul>
           <span className="click-to-action-back">Click to flip back</span>
         </div>
       </motion.div>
