@@ -25,7 +25,7 @@ function SubEventCard({ event }: { event: SubEvent }) {
             alt={event.mainImage.alt}
             fill
             style={{ objectFit: 'cover' }}
-            data-ai-hint={event.mainImage.dataAiHint}
+            data-ai-hint={event.mainImage.dataAiHint || 'event banner'}
             className="group-hover:scale-105 transition-transform duration-300"
           />
            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20"></div>

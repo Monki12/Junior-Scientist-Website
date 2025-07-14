@@ -106,6 +106,7 @@ export function EditEventForm({ event }: EditEventFormProps) {
     
     const slug = formData.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
     let mainImageUrl = formData.mainImage.src;
+    let mainImageDataAiHint = formData.mainImage.dataAiHint || 'event banner';
 
     try {
         if (mainImageFile) {
@@ -127,7 +128,7 @@ export function EditEventForm({ event }: EditEventFormProps) {
             deadline: formData.deadline ? formData.deadline.toISOString() : null,
             eventDate: formData.eventDate ? formData.eventDate.toISOString() : null,
             slug: slug,
-            mainImage: { ...formData.mainImage, src: mainImageUrl },
+            mainImage: { ...formData.mainImage, src: mainImageUrl, dataAiHint: mainImageDataAiHint },
             galleryImages: uploadedGalleryUrls,
         };
 
@@ -231,6 +232,8 @@ export function EditEventForm({ event }: EditEventFormProps) {
             <div>
                 <Label htmlFor="mainImageFile">Main Event Image</Label>
                 <Input id="mainImageFile" type="file" accept="image/*" onChange={handleMainImageFileChange} />
+                 <Label htmlFor="mainImageDataAiHint" className="text-xs text-muted-foreground mt-1 block">AI Hint (1-2 keywords for image search)</Label>
+                <Input id="mainImageDataAiHint" value={formData.mainImage.dataAiHint || ''} onChange={e => setFormData({...formData, mainImage: {...formData.mainImage, dataAiHint: e.target.value}})} />
                 {mainImagePreview && (
                     <div className="mt-2 relative w-full h-40 rounded-md overflow-hidden border">
                         <Image src={mainImagePreview} alt="Event image preview" fill style={{ objectFit: 'cover' }} />

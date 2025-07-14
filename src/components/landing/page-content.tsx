@@ -32,6 +32,7 @@ import {
 } from 'framer-motion';
 import TiltedFlipCard from '@/components/ui/TiltedFlipCard';
 import { useTheme } from 'next-themes';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface AnimatedNumberProps {
   to: number;
@@ -116,27 +117,27 @@ function GallerySection() {
 
   const galleryImages = [
     {
-      src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Science_fair_project.jpg/1280px-Science_fair_project.jpg',
+      src: 'https://placehold.co/1280x853.png',
       alt: 'Science fair project',
       dataAiHint: 'science fair',
     },
     {
-      src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Girl_uses_a_microscope_at_a_science_camp.jpg/1280px-Girl_uses_a_microscope_at_a_science_camp.jpg',
+      src: 'https://placehold.co/1280x853.png',
       alt: 'Girl uses a microscope',
       dataAiHint: 'student microscope',
     },
     {
-      src: 'https://www.publicdomainpictures.net/pictures/320000/velka/science-background-with-test-tubes.jpg',
+      src: 'https://placehold.co/1920x1280.png',
       alt: 'chemistry experiment',
       dataAiHint: 'student experiment',
     },
     {
-      src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Robot_at_a_STEM_camp.jpg/1280px-Robot_at_a_STEM_camp.jpg',
+      src: 'https://placehold.co/1280x853.png',
       alt: 'Robot at a STEM camp',
       dataAiHint: 'student robot',
     },
     {
-      src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/Computer_programming_class_for_kids.jpg/1280px-Computer_programming_class_for_kids.jpg',
+      src: 'https://placehold.co/1280x853.png',
       alt: 'Kids coding class',
       dataAiHint: 'students coding',
     },
@@ -200,7 +201,7 @@ function SuperpowerSectionSkeleton() {
         </AnimatedContent>
         <div className="flex flex-wrap justify-center items-stretch gap-y-8 gap-x-4 px-4 mx-auto max-w-screen-xl lg:max-w-[1400px]">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="w-full max-w-sm sm:w-[294px] h-[372px] mx-auto sm:mx-2 bg-muted/50 rounded-2xl animate-pulse"></div>
+            <div key={i} className="w-full max-w-sm sm:w-[calc(50%-1rem)] lg:w-[calc(25%-0.75rem)] h-96 mx-auto bg-muted/50 rounded-2xl animate-pulse"></div>
           ))}
         </div>
       </div>
@@ -221,7 +222,6 @@ export default function PageContent() {
       setLoading(true);
       try {
         const eventsCollection = collection(db, 'subEvents');
-        // Fetch all events without filtering by status to ensure cards populate
         const eventSnapshot = await getDocs(query(eventsCollection));
         const eventsList = eventSnapshot.docs.map(
           (doc) => ({ id: doc.id, ...doc.data() } as SubEvent)
@@ -234,7 +234,7 @@ export default function PageContent() {
       }
     };
     fetchEvents();
-  }, []); // Empty dependency array ensures this runs only once.
+  }, []);
 
   const getEventsForCategory = (categoryName: string) => {
     return events
@@ -314,7 +314,7 @@ export default function PageContent() {
               <AnimatedContent direction="right">
                 <div className="relative aspect-video rounded-xl shadow-lg dark:shadow-primary/20">
                   <Image
-                    src="https://i.ibb.co/C07F81B/collaboration.jpg"
+                    src="https://placehold.co/1280x720.png"
                     alt="Students collaborating on a science project"
                     data-ai-hint="students collaborating"
                     fill
@@ -342,7 +342,7 @@ export default function PageContent() {
               <AnimatedContent direction="left" className="md:order-1">
                 <div className="relative aspect-video rounded-xl shadow-lg dark:shadow-primary/20">
                   <Image
-                    src="https://i.ibb.co/q1zR2x9/abstract-tech.jpg"
+                    src="https://placehold.co/1280x720.png"
                     alt="Abstract technology visualization"
                     data-ai-hint="data visualization"
                     fill

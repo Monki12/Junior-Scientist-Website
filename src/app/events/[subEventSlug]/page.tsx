@@ -349,7 +349,7 @@ export default function SubEventDetailPage() {
               fill
               style={{ objectFit: 'cover' }} 
               priority
-              data-ai-hint={event.mainImage.dataAiHint}
+              data-ai-hint={event.mainImage.dataAiHint || 'event banner'}
             />
           </div>
         </Card>
@@ -382,7 +382,7 @@ export default function SubEventDetailPage() {
             <CardContent className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {event.galleryImages.map((image, index) => (
                     <div key={index} className="relative aspect-square rounded-lg overflow-hidden shadow-md">
-                        <Image src={image.src} alt={image.alt} fill style={{ objectFit: 'cover' }} data-ai-hint={image.dataAiHint} />
+                        <Image src={image.src} alt={image.alt} fill style={{ objectFit: 'cover' }} data-ai-hint={image.dataAiHint || 'event gallery'} />
                     </div>
                 ))}
             </CardContent>
