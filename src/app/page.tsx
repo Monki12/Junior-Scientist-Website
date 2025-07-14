@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { motion, useScroll, useTransform } from "framer-motion";
@@ -10,33 +10,35 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ArrowDown, Loader2 } from "lucide-react";
 import PageContent from "@/components/landing/page-content";
-import MagnetLines from '@/components/ui/magnet-lines';
 import { useTheme } from 'next-themes';
+import { Skeleton } from '@/components/ui/skeleton';
+
+const MagnetLines = lazy(() => import('@/components/ui/magnet-lines'));
 
 function BackgroundVisuals() {
   const { theme } = useTheme();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-
   if (!mounted) {
     return <div className="absolute inset-0 z-0 overflow-hidden bg-background"></div>;
   }
 
-  // Define colors for light and dark themes
   const baseColor = theme === 'dark' ? 'rgba(92, 197, 189, 0.1)' : 'rgba(44, 62, 80, 0.08)';
   const interactiveColor = theme === 'dark' ? 'rgba(92, 197, 189, 0.4)' : 'rgba(92, 197, 189, 0.5)';
     
     return (
         <div className="absolute inset-0 z-0 overflow-hidden bg-background">
-            <MagnetLines
-              className="absolute inset-0 opacity-100"
-              baseColor={baseColor}
-              interactiveColor={interactiveColor}
-              lineWidth="1px"
-              lineHeight="4vmin"
-              interactionRadius={200}
-            />
+            <Suspense fallback={<Skeleton className="absolute inset-0" />}>
+              <MagnetLines
+                className="absolute inset-0 opacity-100"
+                baseColor={baseColor}
+                interactiveColor={interactiveColor}
+                lineWidth="1px"
+                lineHeight="4vmin"
+                interactionRadius={200}
+              />
+            </Suspense>
         </div>
     );
 }

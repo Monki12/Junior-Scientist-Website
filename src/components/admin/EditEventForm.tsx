@@ -134,7 +134,7 @@ export function EditEventForm({ event }: EditEventFormProps) {
         const eventRef = doc(db, 'subEvents', event.id);
         await updateDoc(eventRef, dataToSave);
         toast({ title: "Event Updated", description: "Changes have been saved successfully." });
-        router.push(`/organizer/events/manage/${dataToSave.slug}`);
+        router.push(`/events/manage/${dataToSave.slug}`);
     } catch (error: any) {
       console.error("Error updating event:", error);
       toast({ title: "Update Failed", description: error.message || "Could not save changes.", variant: "destructive" });
