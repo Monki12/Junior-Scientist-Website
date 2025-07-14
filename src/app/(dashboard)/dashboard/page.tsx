@@ -445,6 +445,7 @@ const StudentDashboard = ({ userProfile }: { userProfile: UserProfileData }) => 
       
       const eventIds = [...new Set(regs.map(r => r.subEventId))];
 
+      // Fix N+1 problem: Batch fetch event details
       if (eventIds.length > 0) {
         try {
           const eventsQuery = query(collection(db, 'subEvents'), where('__name__', 'in', eventIds));
@@ -459,7 +460,7 @@ const StudentDashboard = ({ userProfile }: { userProfile: UserProfileData }) => 
           setRegistrations(registrationsWithDetails);
         } catch (error) {
           console.error("Error fetching event details for dashboard: ", error);
-          setRegistrations(regs); 
+          setRegistrations(regs); // Set regs without details on error
         }
       } else {
          setRegistrations([]);
