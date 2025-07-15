@@ -57,8 +57,6 @@ const getNavLinksForRole = (role: string | undefined) => {
     links: [
         { href: '/my-tasks', label: 'My Assigned Tasks'},
         { href: '/tasks', label: 'Team Task Boards'},
-        { href: '/tasks/my-boards', label: 'My Boards'},
-        { href: '/tasks/manage-boards', label: 'Manage All Boards'},
     ]
   };
   
@@ -80,7 +78,6 @@ const getNavLinksForRole = (role: string | undefined) => {
         links: [
             { href: '/my-tasks', label: 'My Assigned Tasks'},
             { href: '/tasks', label: 'Team Task Boards'},
-            { href: '/tasks/my-boards', label: 'My Boards'},
         ]
     },
     { href: '/my-events', label: 'My Events', icon: Calendar },
@@ -94,7 +91,6 @@ const getNavLinksForRole = (role: string | undefined) => {
         links: [
             { href: '/my-tasks', label: 'My Assigned Tasks'},
             { href: '/tasks', label: 'Team Task Boards'},
-            { href: '/tasks/my-boards', label: 'My Boards'},
         ]
     },
     { href: '/my-events', label: 'My Events', icon: Calendar },
