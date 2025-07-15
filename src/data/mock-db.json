@@ -80,7 +80,8 @@ service cloud.firestore {
     function isAssigneeUpdatingOwnTask(task, requestData) {
       // True if the user is an assignee and is only updating specific fields
       let allowedFields = ['status', 'description', 'subtasks', 'updatedAt', 'completedAt', 'completedByUserId'];
-      return request.auth.uid in task.data.assignedToUserIds && requestData.diff(task.data).affectedKeys().hasOnly(allowedFields);
+      // Use resource.data (the existing document) not request.resource.data (the incoming data) for the check
+      return resource.data.assignedToUserIds.hasAny([request.auth.uid]) && requestData.diff(task.data).affectedKeys().hasOnly(allowedFields);
     }
 
 
