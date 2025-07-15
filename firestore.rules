@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -57,8 +56,8 @@ service cloud.firestore {
 
     // --- BOARDS Collection Rules ---
     match /boards/{boardId} {
-      // Allow read if the user is a member or a manager of the board
-      allow get, list: if isAuthenticated() && (request.auth.uid in resource.data.memberUids || request.auth.uid in resource.data.managerUids);
+      // Allow read if the user is a member of the board
+      allow get, list: if isAuthenticated() && (request.auth.uid in resource.data.memberUids);
       
       // Allow board creation by any authenticated (non-student) user
       allow create: if isAuthenticated() && request.auth.uid == request.resource.data.createdBy;
@@ -79,22 +78,10 @@ service cloud.firestore {
       allow create: if isAuthenticated() && isBoardMember(request.resource.data.boardId) && request.auth.uid == request.resource.data.creatorId;
 
       // Allow task updates if user is assignee, board manager, or task creator
-      allow update: if isAuthenticated() && (request.auth.uid == resource.data.assignedToUserIds[0] || isBoardManager(resource.data.boardId) || request.auth.uid == resource.data.creatorId);
+      allow update: if isAuthenticated() && ((request.auth.uid in resource.data.assignedToUserIds) || isBoardManager(resource.data.boardId) || request.auth.uid == resource.data.creatorId);
 
       // Allow task deletion if user is board manager or task creator
       allow delete: if isAuthenticated() && (isBoardManager(resource.data.boardId) || request.auth.uid == resource.data.creatorId);
-      
-       // --- COMMENTS Sub-collection Rules ---
-      match /comments/{commentId} {
-        // Allow read if the user can read the parent task
-        allow read: if isAuthenticated() && isBoardMember(get(/databases/$(database)/documents/tasks/$(taskId)).data.boardId);
-        
-        // Allow create if the user can read the parent task
-        allow create: if isAuthenticated() && isBoardMember(get(/databases/$(database)/documents/tasks/$(taskId)).data.boardId) && request.auth.uid == request.resource.data.userId;
-        
-        // Allow update/delete only by the user who created the comment
-        allow update, delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
-      }
     }
     
     // --- NOTIFICATIONS Collection Rules (Example) ---

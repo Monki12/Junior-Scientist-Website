@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/use-auth';
 import type { Task, Board } from '@/types';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { Loader2, ListTodo, Inbox, ChevronDown } from 'lucide-react';
+import { Loader2, ListTodo, Inbox } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import TaskDetailModal from '@/components/tasks/TaskDetailModal';
@@ -20,10 +20,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useRouter } from 'next/navigation';
-import { getMockTasksForUser, getMockBoards } from '@/data/mock-tasks';
-
-// --- DEV FLAG ---
-const USE_MOCK_DATA = process.env.NODE_ENV === 'development';
 
 interface EnrichedTask extends Task {
   boardName?: string;
@@ -65,20 +61,6 @@ export default function MyTasksPage() {
     };
 
     setLoading(true);
-
-    if (USE_MOCK_DATA) {
-        const userTasks = getMockTasksForUser(userProfile.uid);
-        const { myBoards } = getMockBoards(userProfile.uid);
-        const boardsMap = new Map(myBoards.map(b => [b.id, b.name]));
-        const enrichedTasks = userTasks.map(task => ({
-            ...task,
-            boardName: boardsMap.get(task.boardId) || 'Unknown Board'
-        }));
-        setTasks(enrichedTasks);
-        setBoards(myBoards);
-        setLoading(false);
-        return;
-    }
 
     let unsubTasks: () => void;
     let unsubBoards: () => void;
@@ -223,10 +205,14 @@ export default function MyTasksPage() {
           isOpen={!!selectedTask}
           onClose={() => setSelectedTask(null)}
           task={selectedTask}
-          board={null}
+          board={null} // Board context is not fully available here, modal must handle this
           boardMembers={[]} // We don't have board context here, modal should handle this
           allUsers={[]} // Same as above
           canManage={false} // User can't manage from this view, only update their own status
+          onTaskUpdate={() => {
+            // This page is read-only for now, but onTaskUpdate needs to be passed
+            toast({ title: 'Read-only View', description: 'Task modifications should be done from the board view.' });
+          }}
         />
       )}
     </div>

@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import type { Board, UserProfileData } from '@/types';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, query, where } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,10 +17,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, PlusCircle, Users2, ShieldAlert, Edit, Users } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
-import { getMockBoards, getMockUsers } from '@/data/mock-tasks';
-
-// --- DEV FLAG ---
-const USE_MOCK_DATA = process.env.NODE_ENV === 'development';
 
 export default function ManageBoardsPage() {
   const { userProfile, loading: authLoading } = useAuth();
@@ -33,7 +29,7 @@ export default function ManageBoardsPage() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBoard, setEditingBoard] = useState<Board | null>(null);
-  const [boardForm, setBoardForm] = useState<{ name: string; description: string; memberUids: string[] }>({ name: '', description: '', memberUids: [] });
+  const [boardForm, setBoardForm] = useState<{ name: string; description: string; memberUids: string[], managerUids: string[] }>({ name: '', description: '', memberUids: [], managerUids: [] });
 
   const canManagePage = userProfile && ['admin', 'overall_head'].includes(userProfile.role);
 
@@ -46,21 +42,14 @@ export default function ManageBoardsPage() {
     }
     setLoadingData(true);
 
-    if (USE_MOCK_DATA) {
-        const { allBoards } = getMockBoards('any-user');
-        setBoards(allBoards);
-        setAllUsers(getMockUsers());
-        setLoadingData(false);
-        return;
-    }
+    const q = query(collection(db, 'users'), where('role', '!=', 'student'));
+    const unsubUsers = onSnapshot(q, (snapshot) => {
+      setAllUsers(snapshot.docs.map(doc => ({...doc.data(), uid: doc.id} as UserProfileData)));
+    });
 
     const unsubBoards = onSnapshot(collection(db, 'boards'), (snapshot) => {
       setBoards(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Board)));
       if(loadingData) setLoadingData(false);
-    });
-    
-    const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
-      setAllUsers(snapshot.docs.map(doc => ({...doc.data(), uid: doc.id} as UserProfileData)));
     });
 
     return () => {
@@ -72,9 +61,9 @@ export default function ManageBoardsPage() {
   const handleOpenModal = (board: Board | null) => {
     setEditingBoard(board);
     if (board) {
-        setBoardForm({ name: board.name, description: board.description || '', memberUids: board.memberUids });
+        setBoardForm({ name: board.name, description: board.description || '', memberUids: board.memberUids, managerUids: board.managerUids || [] });
     } else {
-        setBoardForm({ name: '', description: '', memberUids: userProfile ? [userProfile.uid] : [] });
+        setBoardForm({ name: '', description: '', memberUids: userProfile ? [userProfile.uid] : [], managerUids: userProfile ? [userProfile.uid] : [] });
     }
     setIsModalOpen(true);
   };
@@ -82,11 +71,6 @@ export default function ManageBoardsPage() {
   const handleFormSubmit = async () => {
     if (!boardForm.name.trim()) {
         toast({ title: "Name is required", variant: "destructive" });
-        return;
-    }
-     if (USE_MOCK_DATA) {
-        toast({ title: "Mock Data Mode", description: "Cannot save boards in development."});
-        setIsModalOpen(false);
         return;
     }
 
@@ -158,6 +142,11 @@ export default function ManageBoardsPage() {
                 </div>
               </Card>
             ))}
+             {boards.length === 0 && (
+                <div className="col-span-full text-center py-10 text-muted-foreground border-2 border-dashed rounded-lg">
+                    <p>No boards found. Create one to get started.</p>
+                </div>
+             )}
           </div>
         </CardContent>
       </Card>
@@ -167,7 +156,7 @@ export default function ManageBoardsPage() {
             <DialogHeader>
                 <DialogTitle>{editingBoard ? "Edit Board" : "Create New Board"}</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 py-4">
+            <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
                 <div>
                     <Label htmlFor="boardName">Board Name</Label>
                     <Input id="boardName" value={boardForm.name} onChange={e => setBoardForm({...boardForm, name: e.target.value})} />
@@ -178,11 +167,11 @@ export default function ManageBoardsPage() {
                 </div>
                 <div>
                     <Label>Members</Label>
-                    <div className="p-2 border rounded-md max-h-60 overflow-y-auto space-y-2">
+                    <div className="p-2 border rounded-md max-h-40 overflow-y-auto space-y-2">
                         {allUsers.map(user => (
                             <div key={user.uid} className="flex items-center gap-2">
                                 <Checkbox
-                                    id={`user-${user.uid}`}
+                                    id={`member-${user.uid}`}
                                     checked={boardForm.memberUids.includes(user.uid)}
                                     onCheckedChange={(checked) => {
                                         const newUids = checked
@@ -191,9 +180,30 @@ export default function ManageBoardsPage() {
                                         setBoardForm({...boardForm, memberUids: newUids});
                                     }}
                                 />
-                                <Label htmlFor={`user-${user.uid}`} className="flex-grow">{user.fullName} ({user.role})</Label>
+                                <Label htmlFor={`member-${user.uid}`} className="flex-grow">{user.fullName} ({user.role})</Label>
                             </div>
                         ))}
+                    </div>
+                </div>
+                 <div>
+                    <Label>Managers</Label>
+                     <div className="p-2 border rounded-md max-h-40 overflow-y-auto space-y-2">
+                        {allUsers.filter(u => boardForm.memberUids.includes(u.uid)).map(user => (
+                            <div key={user.uid} className="flex items-center gap-2">
+                                <Checkbox
+                                    id={`manager-${user.uid}`}
+                                    checked={boardForm.managerUids.includes(user.uid)}
+                                    onCheckedChange={(checked) => {
+                                        const newUids = checked
+                                            ? [...boardForm.managerUids, user.uid]
+                                            : boardForm.managerUids.filter(id => id !== user.uid);
+                                        setBoardForm({...boardForm, managerUids: newUids});
+                                    }}
+                                />
+                                <Label htmlFor={`manager-${user.uid}`} className="flex-grow">{user.fullName} ({user.role})</Label>
+                            </div>
+                        ))}
+                         {allUsers.filter(u => boardForm.memberUids.includes(u.uid)).length === 0 && <p className="text-xs text-muted-foreground">Add members first to assign managers.</p>}
                     </div>
                 </div>
             </div>

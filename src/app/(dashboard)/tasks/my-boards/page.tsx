@@ -14,10 +14,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Users2, Users, Search } from 'lucide-react';
-import { getMockBoards } from '@/data/mock-tasks';
-
-// --- DEV FLAG ---
-const USE_MOCK_DATA = process.env.NODE_ENV === 'development';
 
 export default function MyBoardsPage() {
   const { userProfile, loading: authLoading } = useAuth();
@@ -34,14 +30,6 @@ export default function MyBoardsPage() {
   useEffect(() => {
     if (authLoading || !userProfile) return;
     setLoadingData(true);
-
-    if (USE_MOCK_DATA) {
-        const { myBoards, otherBoards } = getMockBoards(userProfile.uid);
-        setMyBoards(myBoards);
-        setOtherBoards(otherBoards);
-        setLoadingData(false);
-        return;
-    }
 
     const boardsRef = collection(db, 'boards');
     const unsubscribe = onSnapshot(boardsRef, (snapshot) => {
@@ -62,8 +50,8 @@ export default function MyBoardsPage() {
   }, [userProfile, authLoading, toast]);
   
   const handleJoinBoard = async (boardId: string) => {
-    if(!userProfile || USE_MOCK_DATA) {
-        toast({ title: "Mock Data Mode", description: "Cannot join boards in development." });
+    if(!userProfile) {
+        toast({ title: "Authentication Error", description: "You must be logged in to join a board." });
         return;
     }
     try {
@@ -106,7 +94,7 @@ export default function MyBoardsPage() {
           {myBoards.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {myBoards.map(board => (
-                    <Card key={board.id} className="p-4 flex flex-col justify-between">
+                    <Card key={board.id} className="p-4 flex flex-col justify-between hover:border-primary transition-colors">
                         <div>
                             <h3 className="font-bold text-lg">{board.name}</h3>
                             <p className="text-sm text-muted-foreground">{board.description || 'No description'}</p>
