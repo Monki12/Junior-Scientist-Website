@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import type { Task, Board } from '@/types';
+import type { Task, Board, TaskStatus } from '@/types';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { Loader2, ListTodo, Inbox } from 'lucide-react';
@@ -103,18 +103,32 @@ export default function MyTasksPage() {
 
   }, [userProfile, authLoading, toast, router]);
   
-  const handleTaskUpdate = async (updatedTask: Partial<EnrichedTask>) => {
+  const handleTaskUpdate = async (updatedTask: Partial<Task>) => {
     if (!updatedTask.id) return;
     try {
       const taskRef = doc(db, 'tasks', updatedTask.id);
-      
-      // The `boardName` is a client-side enrichment, not a DB field. It must be removed before updating.
-      const { boardName, ...taskToUpdate } = updatedTask;
 
-      await updateDoc(taskRef, {
-        ...taskToUpdate,
-        updatedAt: serverTimestamp(),
-      });
+      // Create a minimal update payload with only the fields an assignee can change.
+      // This prevents Firestore permission errors.
+      const updatePayload: {
+          status: TaskStatus;
+          subtasks: any[];
+          updatedAt: any;
+          completedAt?: any;
+          completedByUserId?: string | null;
+      } = {
+          status: updatedTask.status || 'Not Started',
+          subtasks: updatedTask.subtasks || [],
+          updatedAt: serverTimestamp(),
+      };
+      
+      if (updatedTask.status === 'Completed') {
+        updatePayload.completedAt = serverTimestamp();
+        updatePayload.completedByUserId = userProfile?.uid || null;
+      }
+
+      await updateDoc(taskRef, updatePayload);
+
       toast({ title: "Task Updated" });
     } catch(e) {
       toast({ title: "Update Failed", description: "You might not have permission for this action.", variant: "destructive" });
