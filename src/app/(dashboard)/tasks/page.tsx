@@ -1,20 +1,20 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import type { Task, UserProfileData, Board, BoardMember } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
 import { ListChecks, Loader2, PlusCircle, Users, Users2 } from 'lucide-react';
-import { getMockBoards, getMockTasksForBoard, getMockUsers } from '@/data/mock-tasks';
 import { nanoid } from 'nanoid';
 import TaskBoard from '@/components/tasks/TaskBoard';
 import TaskDetailModal from '@/components/tasks/TaskDetailModal';
 import { Input } from '@/components/ui/input';
+import { db } from '@/lib/firebase';
+import { collection, onSnapshot, query, where, doc, addDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 
-const USE_MOCK_DATA = process.env.NODE_ENV !== 'production';
 
 export default function TasksPage() {
   const { toast } = useToast();
@@ -37,18 +37,20 @@ export default function TasksPage() {
     if (!userProfile?.uid) return;
     setLoading(true);
 
-    if (USE_MOCK_DATA) {
-        setAllUsers(getMockUsers());
-        const { myBoards } = getMockBoards(userProfile.uid);
-        setBoards(myBoards);
-        setLoading(false);
-        return;
-    }
-    
-    // Firestore logic would go here in a real scenario
-    console.log("Fetching live data is disabled in this development mode.");
-    setLoading(false);
+    const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
+        setAllUsers(snapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as UserProfileData)));
+    });
 
+    const boardsQuery = query(collection(db, 'boards'), where('memberUids', 'array-contains', userProfile.uid));
+    const unsubBoards = onSnapshot(boardsQuery, (snapshot) => {
+        setBoards(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Board)));
+        setLoading(false);
+    });
+    
+    return () => {
+        unsubUsers();
+        unsubBoards();
+    }
   }, [userProfile?.uid, toast]);
 
   useEffect(() => {
@@ -59,59 +61,79 @@ export default function TasksPage() {
     }
     setLoading(true);
 
-    if (USE_MOCK_DATA) {
-        setTasks(getMockTasksForBoard(currentBoard.id));
-        setBoardMembers(currentBoard.members);
-    } else {
-        // Firestore logic for tasks would go here
-    }
-    setLoading(false);
-  }, [currentBoard]);
+    const members = currentBoard.memberUids.map(uid => {
+        const user = allUsers.find(u => u.uid === uid);
+        return {
+            userId: uid,
+            name: user?.fullName || 'Unknown User',
+            role: user?.role || 'member',
+            photoURL: user?.photoURL
+        }
+    });
+    setBoardMembers(members);
+
+    const tasksQuery = query(collection(db, 'tasks'), where('boardId', '==', currentBoard.id));
+    const unsubTasks = onSnapshot(tasksQuery, (snapshot) => {
+        setTasks(snapshot.docs.map(doc => ({...doc.data(), id: doc.id} as Task)));
+        setLoading(false);
+    });
+
+    return () => unsubTasks();
+
+  }, [currentBoard, allUsers]);
 
   const handleCreateBoard = async () => {
     if (!newBoardName.trim() || !userProfile) return;
-    
-    if (USE_MOCK_DATA) {
-        const newMockBoard: Board = {
-            id: `mock_board_${nanoid()}`,
+    setIsNewBoardModalOpen(false);
+
+    try {
+        const newBoardData: Omit<Board, 'id'> = {
             name: newBoardName,
-            type: 'general',
+            type: 'team', // Or another default type
             memberUids: [userProfile.uid],
-            members: [{ userId: userProfile.uid, name: userProfile.fullName || userProfile.displayName || 'Me', role: userProfile.role as string, photoURL: userProfile.photoURL }],
             managerUids: [userProfile.uid],
-            createdAt: new Date(),
+            createdAt: serverTimestamp(),
             createdBy: userProfile.uid,
         };
-        setBoards(prev => [...prev, newMockBoard]);
-        setCurrentBoard(newMockBoard);
-        toast({ title: "Board Created (Mock)", description: `Board "${newBoardName}" has been added.` });
+        const docRef = await addDoc(collection(db, 'boards'), newBoardData);
+        // The real-time listener will automatically update the UI.
+        setCurrentBoard({ ...newBoardData, id: docRef.id, createdAt: new Date() });
+        toast({ title: "Board Created", description: `Board "${newBoardName}" has been added.` });
         setNewBoardName('');
-        setIsNewBoardModalOpen(false);
-        return;
+    } catch (e: any) {
+        toast({ title: "Error", description: `Could not create board: ${e.message}`, variant: "destructive" });
     }
-
-    // Firestore logic for creating a board would go here
   };
 
   const handleOpenTaskModal = (task: Task | null) => {
     setEditingTask(task);
   };
   
-  const handleTaskUpdate = (updatedTask: Task) => {
-    // If task has an ID, it's an update.
-    if (updatedTask.id && tasks.some(t => t.id === updatedTask.id)) {
-        setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
-    } else {
-        // This is a new task. Give it a mock ID and add it to the state.
-        const newTaskWithId: Task = { 
-            ...updatedTask, 
-            id: `mock_task_${nanoid()}`,
-            assignedToUserIds: [], // New tasks are always unassigned
-            createdAt: new Date().toISOString(),
-            boardId: currentBoard!.id, // Assign to current board
-        };
-        setTasks(prev => [...prev, newTaskWithId]);
+  const handleTaskUpdate = async (updatedTask: Task) => {
+    if (!currentBoard) return;
+    onCloseModal();
+
+    if (updatedTask.id) { // Update existing task
+        const taskRef = doc(db, 'tasks', updatedTask.id);
+        await updateDoc(taskRef, {
+            ...updatedTask,
+            updatedAt: serverTimestamp(),
+        });
+        toast({ title: "Task Updated" });
+    } else { // Create new task
+        await addDoc(collection(db, 'tasks'), {
+            ...updatedTask,
+            boardId: currentBoard.id,
+            creatorId: userProfile?.uid,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+        });
+        toast({ title: "Task Created" });
     }
+  };
+
+  const onCloseModal = () => {
+    setEditingTask(null);
   };
 
   const canCreateBoards = userProfile && ['admin', 'overall_head', 'event_representative'].includes(userProfile.role);
@@ -133,7 +155,7 @@ export default function TasksPage() {
       </header>
       
       <main className="flex-1 overflow-auto pb-4">
-        {loading ? (
+        {loading && !currentBoard ? (
             <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
         ) : !currentBoard ? (
             <div className="p-4">
@@ -150,7 +172,7 @@ export default function TasksPage() {
                         {boards.map(board => (
                             <button key={board.id} onClick={() => setCurrentBoard(board)} className="p-4 border rounded-lg text-left hover:border-primary transition-colors">
                                 <h3 className="font-bold text-lg">{board.name}</h3>
-                                <p className="text-sm text-muted-foreground"><Users2 className="inline h-4 w-4 mr-1"/>{board.members?.length || board.memberUids.length} members</p>
+                                <p className="text-sm text-muted-foreground"><Users2 className="inline h-4 w-4 mr-1"/>{board.memberUids.length} members</p>
                             </button>
                         ))}
                     </div>
@@ -170,7 +192,6 @@ export default function TasksPage() {
             members={boardMembers}
             onEditTask={handleOpenTaskModal}
             loading={loading}
-            setTasks={setTasks}
           />
         )}
       </main>
@@ -195,7 +216,7 @@ export default function TasksPage() {
       {editingTask !== undefined && (
         <TaskDetailModal
             isOpen={editingTask !== null}
-            onClose={() => setEditingTask(null)}
+            onClose={onCloseModal}
             task={editingTask}
             board={currentBoard}
             boardMembers={boardMembers}

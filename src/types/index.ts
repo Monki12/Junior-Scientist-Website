@@ -24,13 +24,12 @@ export interface BoardMember {
 
 export interface Board {
   id: string;
-  name: string;
+  name:string;
   description?: string;
-  type: 'general' | 'event';
+  type: 'general' | 'event' | 'team';
   eventId?: string;
   memberUids: string[];
-  members: BoardMember[];
-  managerUids?: string[];
+  managerUids: string[];
   createdAt: any;
   createdBy: string;
   updatedAt?: any;

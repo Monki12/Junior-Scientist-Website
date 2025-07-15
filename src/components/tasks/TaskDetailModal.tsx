@@ -46,15 +46,16 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
           dueDate: task.dueDate && isValid(parseISO(task.dueDate)) ? parseISO(task.dueDate) : null,
         });
       } else {
+        // Defaults for a new task
         setFormState({
           title: '',
+          caption: '',
           description: '',
           priority: 'Medium',
           status: 'Not Started',
           assignedToUserIds: [],
           subtasks: [],
           bucket: 'other',
-          caption: '',
           dueDate: null,
         });
       }
@@ -75,16 +76,19 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
     
     setIsUpdating(true);
 
-    const dataToSave: Partial<Task> = {
-      ...formState,
+    const dataToSave: Task = {
+      ...(task || {}), // Start with existing task data or empty object
+      ...formState,    // Overlay form state
+      id: task?.id || nanoid(), // Use existing ID or generate one
       boardId: board.id,
       dueDate: formState.dueDate ? (formState.dueDate as Date).toISOString() : null,
       updatedAt: new Date().toISOString(),
-    };
+      createdAt: task?.createdAt || new Date().toISOString(),
+      title: formState.caption || 'Untitled Task', // Ensure title exists
+    } as Task;
     
-    onTaskUpdate(dataToSave as Task);
-    toast({ title: task ? "Task Updated" : "Task Created" });
-    onClose();
+    onTaskUpdate(dataToSave);
+    // The parent component will handle closing the modal and showing toast
     setIsUpdating(false);
   };
 

@@ -9,9 +9,8 @@ import type { Task, Board, BoardMember } from '@/types';
 import TaskColumn from './TaskColumn';
 import { useAuth } from '@/hooks/use-auth';
 import { Loader2 } from 'lucide-react';
-import { nanoid } from 'nanoid';
-
-const USE_MOCK_DATA = process.env.NODE_ENV !== 'production';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 interface TaskBoardProps {
   board: Board;
@@ -19,10 +18,9 @@ interface TaskBoardProps {
   members: BoardMember[];
   onEditTask: (task: Task | null) => void;
   loading: boolean;
-  setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
 }
 
-export default function TaskBoard({ board, tasks, members, onEditTask, loading, setTasks }: TaskBoardProps) {
+export default function TaskBoard({ board, tasks, members, onEditTask, loading }: TaskBoardProps) {
   const { toast } = useToast();
   const { userProfile } = useAuth();
   
@@ -72,20 +70,16 @@ export default function TaskBoard({ board, tasks, members, onEditTask, loading, 
     
     const newAssignedIds = targetColumnId === 'unassigned' ? [] : [targetColumnId];
     
-    setTasks(prevTasks => prevTasks.map(t => 
-      t.id === draggedTaskId 
-        ? { ...t, 
-            assignedToUserIds: newAssignedIds, 
-            status: t.status === 'Not Started' && targetColumnId !== 'unassigned' ? 'In Progress' : t.status, 
-            updatedAt: new Date().toISOString() 
-          } 
-        : t
-    ));
-    toast({ title: "Task Reassigned", description: `Task moved successfully.`});
-
-    if (!USE_MOCK_DATA) {
-        // Here you would add the Firestore update logic
-        // For now, it's handled optimistically in the state
+    try {
+        const taskRef = doc(db, 'tasks', draggedTaskId);
+        await updateDoc(taskRef, {
+            assignedToUserIds: newAssignedIds,
+            status: task.status === 'Not Started' && targetColumnId !== 'unassigned' ? 'In Progress' : task.status,
+            updatedAt: serverTimestamp(),
+        });
+        toast({ title: "Task Reassigned", description: `Task moved successfully.`});
+    } catch(e: any) {
+        toast({ title: "Error Reassigning Task", description: e.message, variant: "destructive" });
     }
   };
   

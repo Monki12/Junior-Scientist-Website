@@ -1,223 +1,104 @@
+rules_version = '2';
 
-{
-  "users": [
-    {
-      "id": "user-1",
-      "name": "Alice Wonderland",
-      "email": "alice@example.com",
-      "profilePictureUrl": "https://placehold.co/100x100.png"
-    },
-    {
-      "id": "user-2",
-      "name": "Bob Builder",
-      "email": "bob@example.com",
-      "profilePictureUrl": "https://placehold.co/100x100.png"
-    },
-    {
-      "id": "user-3",
-      "name": "Charlie Chocolate",
-      "email": "charlie@example.com",
-      "profilePictureUrl": "https://placehold.co/100x100.png"
-    },
-    {
-      "id": "user-4",
-      "name": "Diana Prince",
-      "email": "diana@example.com",
-      "profilePictureUrl": "https://placehold.co/100x100.png"
-    },
-    {
-      "id": "user-5",
-      "name": "Eve Moneypenny",
-      "email": "eve@example.com",
-      "profilePictureUrl": "https://placehold.co/100x100.png"
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to check if a user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
     }
-  ],
-  "boards": [
-    {
-      "id": "board-1",
-      "name": "Q3 Marketing Campaign",
-      "description": "All tasks related to the upcoming Q3 marketing launch.",
-      "ownerId": "user-1",
-      "memberIds": ["user-1", "user-2", "user-4"],
-      "createdAt": "2025-07-01T10:00:00Z",
-      "updatedAt": "2025-07-01T10:00:00Z"
-    },
-    {
-      "id": "board-2",
-      "name": "Website Redesign Project",
-      "description": "Tracking progress for the new company website.",
-      "ownerId": "user-3",
-      "memberIds": ["user-2", "user-3", "user-5"],
-      "createdAt": "2025-06-15T09:00:00Z",
-      "updatedAt": "2025-06-15T09:00:00Z"
-    },
-    {
-      "id": "board-3",
-      "name": "Internal Tools Development",
-      "description": "Sprint board for developing internal admin tools.",
-      "ownerId": "user-2",
-      "memberIds": ["user-2", "user-5"],
-      "createdAt": "2025-07-10T11:00:00Z",
-      "updatedAt": "2025-07-10T11:00:00Z"
+
+    // Helper function to check if a user has one of the specified roles
+    function hasRole(allowedRoles) {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in allowedRoles;
     }
-  ],
-  "tasks": [
-    {
-      "id": "task-1",
-      "title": "Draft blog post for new feature",
-      "description": "Create a 500-word blog post announcing the new 'Super-Widget' feature.",
-      "status": "in-progress",
-      "dueDate": "2025-07-25T23:59:59Z",
-      "assignedToId": "user-4",
-      "boardId": "board-1",
-      "priority": "high",
-      "createdAt": "2025-07-15T11:00:00Z",
-      "updatedAt": "2025-07-16T14:20:00Z",
-      "comments": [
-        {
-          "id": "comment-1",
-          "userId": "user-1",
-          "text": "Great start, Diana! Can we add a section on pricing?",
-          "timestamp": "2025-07-16T14:20:00Z"
-        }
-      ]
-    },
-    {
-      "id": "task-2",
-      "title": "Design social media graphics",
-      "description": "Create graphics for Twitter, Facebook, and Instagram for the Q3 campaign.",
-      "status": "to-do",
-      "dueDate": "2025-07-28T23:59:59Z",
-      "assignedToId": null,
-      "boardId": "board-1",
-      "priority": "medium",
-      "createdAt": "2025-07-15T11:05:00Z",
-      "updatedAt": "2025-07-15T11:05:00Z",
-      "comments": []
-    },
-    {
-      "id": "task-3",
-      "title": "Finalize homepage wireframe",
-      "description": "Incorporate feedback from the last review and finalize the wireframe for development.",
-      "status": "completed",
-      "dueDate": "2025-07-10T23:59:59Z",
-      "assignedToId": "user-2",
-      "boardId": "board-2",
-      "priority": "high",
-      "createdAt": "2025-07-05T15:00:00Z",
-      "updatedAt": "2025-07-10T10:00:00Z",
-      "comments": []
-    },
-    {
-      "id": "task-4",
-      "title": "Develop login component",
-      "description": "Build the React component for user login.",
-      "status": "in-progress",
-      "dueDate": "2025-07-22T23:59:59Z",
-      "assignedToId": "user-5",
-      "boardId": "board-2",
-      "priority": "high",
-      "createdAt": "2025-07-11T09:30:00Z",
-      "updatedAt": "2025-07-11T09:30:00Z",
-      "comments": [
-        {
-            "id": "comment-2",
-            "userId": "user-3",
-            "text": "Make sure to handle the 'forgot password' flow.",
-            "timestamp": "2025-07-12T11:00:00Z"
-        },
-        {
-            "id": "comment-3",
-            "userId": "user-5",
-            "text": "Will do!",
-            "timestamp": "2025-07-12T11:05:00Z"
-        }
-      ]
-    },
-    {
-      "id": "task-5",
-      "title": "Set up CI/CD pipeline",
-      "description": null,
-      "status": "to-do",
-      "dueDate": null,
-      "assignedToId": "user-2",
-      "boardId": "board-3",
-      "priority": "medium",
-      "createdAt": "2025-07-12T16:00:00Z",
-      "updatedAt": "2025-07-12T16:00:00Z",
-      "comments": []
-    },
-    {
-        "id": "task-6",
-        "title": "Create user authentication endpoints",
-        "description": "API endpoints for user sign-up, sign-in, and sign-out.",
-        "status": "blocked",
-        "dueDate": "2025-07-20T23:59:59Z",
-        "assignedToId": "user-5",
-        "boardId": "board-3",
-        "priority": "urgent",
-        "createdAt": "2025-07-14T18:00:00Z",
-        "updatedAt": "2025-07-14T18:00:00Z",
-        "comments": [
-          {
-            "id": "comment-4",
-            "userId": "user-2",
-            "text": "Blocked until database schema is finalized.",
-            "timestamp": "2025-07-14T18:05:00Z"
-          }
-        ]
-      },
-      {
-        "id": "task-7",
-        "title": "Test payment gateway integration",
-        "description": "Run through all test cases for the Stripe integration.",
-        "status": "to-do",
-        "dueDate": "2025-08-01T23:59:59Z",
-        "assignedToId": null,
-        "boardId": "board-2",
-        "priority": "medium",
-        "createdAt": "2025-07-18T12:00:00Z",
-        "updatedAt": "2025-07-18T12:00:00Z",
-        "comments": []
-      },
-      {
-        "id": "task-8",
-        "title": "Update landing page copy",
-        "description": "Revise the main headline and feature descriptions on the homepage.",
-        "status": "in-progress",
-        "dueDate": "2025-07-24T23:59:59Z",
-        "assignedToId": "user-4",
-        "boardId": "board-1",
-        "priority": "low",
-        "createdAt": "2025-07-19T10:00:00Z",
-        "updatedAt": "2025-07-19T10:00:00Z",
-        "comments": []
-      },
-      {
-        "id": "task-9",
-        "title": "QA the new mobile responsive views",
-        "description": "Test the website redesign on iOS and Android devices.",
-        "status": "to-do",
-        "dueDate": "2025-07-29T23:59:59Z",
-        "assignedToId": "user-3",
-        "boardId": "board-2",
-        "priority": "high",
-        "createdAt": "2025-07-20T11:00:00Z",
-        "updatedAt": "2025-07-20T11:00:00Z",
-        "comments": []
-      },
-      {
-        "id": "task-10",
-        "title": "Plan the team offsite event",
-        "description": "Research venues and activities for the annual team offsite.",
-        "status": "to-do",
-        "dueDate": null,
-        "assignedToId": "user-1",
-        "boardId": "board-1",
-        "priority": "low",
-        "createdAt": "2025-07-21T14:00:00Z",
-        "updatedAt": "2025-07-21T14:00:00Z",
-        "comments": []
+
+    // Helper function to check if a user is a member of a specific board
+    function isBoardMember(boardId) {
+      return request.auth.uid in get(/databases/$(database)/documents/boards/$(boardId)).data.memberUids;
+    }
+    
+    // Helper function to check if a user is a manager of a specific board
+    function isBoardManager(boardId) {
+      return request.auth.uid in get(/databases/$(database)/documents/boards/$(boardId)).data.managerUids;
+    }
+
+    // --- USERS Collection Rules ---
+    match /users/{userId} {
+      // ANY authenticated user can read basic profile info for display purposes
+      allow get: if isAuthenticated();
+      // ONLY the user themselves OR an admin/overall_head can read the full document
+      allow read: if isAuthenticated() && (request.auth.uid == userId || hasRole(['admin', 'overall_head']));
+      
+      // A user can update their own profile
+      allow update: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Admin/overall_head can update any user's profile (e.g., to change roles, scores)
+      allow update: if hasRole(['admin', 'overall_head']);
+
+      // Only admins/overall_heads should be able to create new organizational users.
+      // Student users are created via a different flow (client-side signup).
+      allow create: if hasRole(['admin', 'overall_head']);
+    }
+
+    // --- SUBEVENTS Collection Rules (Example, assuming they exist) ---
+    match /subEvents/{eventId} {
+      allow read: if true; // Publicly readable
+      allow write: if hasRole(['admin', 'overall_head']); // Only admins can create/update events
+    }
+    
+    // --- EVENT REGISTRATIONS Collection Rules (Example) ---
+    match /event_registrations/{registrationId} {
+      allow read: if isAuthenticated(); // More specific rules needed, e.g., only user or event manager
+      allow create: if isAuthenticated(); // Students can register
+      allow update: if hasRole(['admin', 'overall_head', 'event_representative']); // Staff can update status
+    }
+
+    // --- BOARDS Collection Rules ---
+    match /boards/{boardId} {
+      // Allow read if the user is a member or a manager of the board
+      allow get, list: if isAuthenticated() && (request.auth.uid in resource.data.memberUids || request.auth.uid in resource.data.managerUids);
+      
+      // Allow board creation by any authenticated (non-student) user
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.createdBy;
+      
+      // Allow board updates only by managers or the creator
+      allow update: if isAuthenticated() && (request.auth.uid in resource.data.managerUids || request.auth.uid == resource.data.createdBy);
+
+      // Allow board deletion only by the creator or an admin
+      allow delete: if isAuthenticated() && (request.auth.uid == resource.data.createdBy || hasRole(['admin']));
+    }
+
+    // --- TASKS Collection Rules ---
+    match /tasks/{taskId} {
+      // Allow read if the user is a member of the board the task belongs to
+      allow get, list: if isAuthenticated() && isBoardMember(resource.data.boardId);
+
+      // Allow task creation if the user is a member of the board
+      allow create: if isAuthenticated() && isBoardMember(request.resource.data.boardId) && request.auth.uid == request.resource.data.creatorId;
+
+      // Allow task updates if user is assignee, board manager, or task creator
+      allow update: if isAuthenticated() && (request.auth.uid == resource.data.assignedToUserIds[0] || isBoardManager(resource.data.boardId) || request.auth.uid == resource.data.creatorId);
+
+      // Allow task deletion if user is board manager or task creator
+      allow delete: if isAuthenticated() && (isBoardManager(resource.data.boardId) || request.auth.uid == resource.data.creatorId);
+      
+       // --- COMMENTS Sub-collection Rules ---
+      match /comments/{commentId} {
+        // Allow read if the user can read the parent task
+        allow read: if isAuthenticated() && isBoardMember(get(/databases/$(database)/documents/tasks/$(taskId)).data.boardId);
+        
+        // Allow create if the user can read the parent task
+        allow create: if isAuthenticated() && isBoardMember(get(/databases/$(database)/documents/tasks/$(taskId)).data.boardId) && request.auth.uid == request.resource.data.userId;
+        
+        // Allow update/delete only by the user who created the comment
+        allow update, delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
       }
-  ]
+    }
+    
+    // --- NOTIFICATIONS Collection Rules (Example) ---
+    match /notifications/{notificationId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+  }
 }
