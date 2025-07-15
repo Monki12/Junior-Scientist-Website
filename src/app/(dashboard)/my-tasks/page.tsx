@@ -6,12 +6,10 @@ import { useAuth } from '@/hooks/use-auth';
 import type { Task, Board } from '@/types';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { Loader2, ListTodo, Inbox } from 'lucide-react';
+import { Loader2, ListTodo, Inbox, ChevronDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import TaskDetailModal from '@/components/tasks/TaskDetailModal';
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -22,13 +20,17 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useRouter } from 'next/navigation';
+import { getMockTasksForUser, getMockBoards } from '@/data/mock-tasks';
+
+// --- DEV FLAG ---
+const USE_MOCK_DATA = process.env.NODE_ENV === 'development';
 
 interface EnrichedTask extends Task {
   boardName?: string;
 }
 
 const statusColors: { [key: string]: string } = {
-  'Not Started': 'bg-purple-500',
+  'Not Started': 'bg-gray-400',
   'In Progress': 'bg-blue-500',
   'Pending Review': 'bg-yellow-500',
   'Completed': 'bg-green-500',
@@ -63,6 +65,21 @@ export default function MyTasksPage() {
     };
 
     setLoading(true);
+
+    if (USE_MOCK_DATA) {
+        const userTasks = getMockTasksForUser(userProfile.uid);
+        const { myBoards } = getMockBoards(userProfile.uid);
+        const boardsMap = new Map(myBoards.map(b => [b.id, b.name]));
+        const enrichedTasks = userTasks.map(task => ({
+            ...task,
+            boardName: boardsMap.get(task.boardId) || 'Unknown Board'
+        }));
+        setTasks(enrichedTasks);
+        setBoards(myBoards);
+        setLoading(false);
+        return;
+    }
+
     let unsubTasks: () => void;
     let unsubBoards: () => void;
 
@@ -183,7 +200,7 @@ export default function MyTasksPage() {
                                 <div className="flex items-center gap-4">
                                     <div className={`w-2 h-10 rounded-full ${statusColors[task.status] || 'bg-gray-400'}`}></div>
                                     <div>
-                                        <p className="font-semibold">{task.title}</p>
+                                        <p className="font-semibold">{task.caption || task.title}</p>
                                         <p className="text-sm text-muted-foreground">From Board: <span className="font-medium text-primary">{task.boardName}</span></p>
                                     </div>
                                 </div>

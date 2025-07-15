@@ -13,6 +13,10 @@ import { collection, query, onSnapshot, addDoc, serverTimestamp, where, getDocs,
 import { db } from '@/lib/firebase';
 import TaskBoard from '@/components/tasks/TaskBoard';
 import TaskDetailModal from '@/components/tasks/TaskDetailModal';
+import { getMockBoards, getMockTasksForBoard, getMockUsers } from '@/data/mock-tasks';
+
+// --- DEV FLAG ---
+const USE_MOCK_DATA = process.env.NODE_ENV === 'development';
 
 export default function TasksPage() {
   const { toast } = useToast();
@@ -35,7 +39,7 @@ export default function TasksPage() {
   // Auto-create event boards if they don't exist
   useEffect(() => {
       const syncEventBoards = async () => {
-          if (!userProfile || !['admin', 'overall_head'].includes(userProfile.role)) return;
+          if (!userProfile || !['admin', 'overall_head'].includes(userProfile.role) || USE_MOCK_DATA) return;
 
           const eventsRef = collection(db, 'subEvents');
           const eventsSnapshot = await getDocs(eventsRef);
@@ -53,6 +57,7 @@ export default function TasksPage() {
                       type: 'event',
                       eventId: event.id,
                       memberUids: [userProfile.uid, ...event.eventReps, ...event.organizerUids],
+                      members: [{ userId: userProfile.uid, name: userProfile.fullName || userProfile.displayName || '', role: userProfile.role }], // simplified initial member
                       managerUids: [userProfile.uid, ...event.eventReps],
                       createdAt: serverTimestamp(),
                       createdBy: userProfile.uid
@@ -68,8 +73,15 @@ export default function TasksPage() {
   // Fetch all boards the user is a member of and all potential users
   useEffect(() => {
     if (!userProfile?.uid) return;
-    
     setLoading(true);
+
+    if (USE_MOCK_DATA) {
+        setAllUsers(getMockUsers());
+        const { myBoards } = getMockBoards(userProfile.uid);
+        setBoards(myBoards);
+        setLoading(false);
+        return;
+    }
 
     const usersQuery = query(collection(db, 'users'));
     onSnapshot(usersQuery, (snapshot) => {
@@ -98,8 +110,15 @@ export default function TasksPage() {
       setBoardMembers([]);
       return;
     }
-
     setLoadingBoardData(true);
+
+    if (USE_MOCK_DATA) {
+        setTasks(getMockTasksForBoard(currentBoard.id));
+        setBoardMembers(currentBoard.members);
+        setLoadingBoardData(false);
+        return;
+    }
+
     const tasksQuery = query(collection(db, 'tasks'), where('boardId', '==', currentBoard.id));
     const unsubTasks = onSnapshot(tasksQuery, (snapshot) => {
       const boardTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
@@ -107,7 +126,6 @@ export default function TasksPage() {
       setLoadingBoardData(false);
     });
 
-    // Use the rich `members` array from the board document
     const membersWithDetails = currentBoard.members || [];
     setBoardMembers(membersWithDetails);
     
@@ -117,6 +135,13 @@ export default function TasksPage() {
 
   const handleCreateBoard = async () => {
     if (!newBoardName.trim() || !userProfile) return;
+    
+    if (USE_MOCK_DATA) {
+        toast({ title: "Mock Data Mode", description: "Cannot create boards in development."});
+        setIsNewBoardModalOpen(false);
+        return;
+    }
+
     try {
         const newBoardRef = await addDoc(collection(db, 'boards'), {
             name: newBoardName,
@@ -132,14 +157,16 @@ export default function TasksPage() {
         setNewBoardName('');
         setIsNewBoardModalOpen(false);
         
+        // This part needs adjustment, as serverTimestamp is not immediately available client-side
+        // For immediate feedback, we create a temporary object.
         setCurrentBoard({
           id: newBoardRef.id,
           name: newBoardName,
           type: 'general',
           memberUids: [userProfile.uid],
-          members: [{ userId: userProfile.uid, name: userProfile.fullName || userProfile.displayName, role: userProfile.role }],
+          members: [{ userId: userProfile.uid, name: userProfile.fullName || userProfile.displayName || '', role: userProfile.role }],
           managerUids: [userProfile.uid],
-          createdAt: new Date(),
+          createdAt: new Date(), // Use local date for immediate UI update
           createdBy: userProfile.uid
         });
 

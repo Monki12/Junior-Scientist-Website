@@ -10,6 +10,9 @@ import {
   SidebarHeader,
   SidebarTrigger,
   SidebarGroup,
+  SidebarGroupLabel,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/use-auth';
 import { usePathname, useRouter } from 'next/navigation';
@@ -29,14 +32,13 @@ import {
   Users2,
   ListTodo,
   CheckCircle,
-  PlusCircle,
-  FileCog,
   Settings,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from './logo';
 import { LightBulbToggle } from './light-bulb-toggle';
 import { useToast } from '@/hooks/use-toast';
+import { useState } from 'react';
 
 const getNavLinksForRole = (role: string | undefined) => {
   const baseLinks = [
@@ -48,39 +50,54 @@ const getNavLinksForRole = (role: string | undefined) => {
     { href: '/events', label: 'Explore Events', icon: Search },
     { href: '/my-registrations', label: 'My Registrations', icon: Ticket },
   ];
-
+  
+  const taskSubLinks = {
+    group: 'Tasks',
+    icon: ClipboardList,
+    links: [
+        { href: '/my-tasks', label: 'My Assigned Tasks'},
+        { href: '/tasks', label: 'Team Task Boards'},
+        { href: '/tasks/my-boards', label: 'My Boards'},
+        { href: '/tasks/manage-boards', label: 'Manage All Boards'},
+    ]
+  };
+  
   const managerLinks = [
     ...baseLinks,
-    { href: '/my-tasks', label: 'My Tasks', icon: CheckCircle },
-    { href: '/tasks', label: 'Task Boards', icon: ClipboardList },
+    taskSubLinks,
     { href: '/my-events', label: 'All Events', icon: Calendar },
     { href: '/staff', label: 'Manage Staff', icon: Users },
     { href: '/students', label: 'Manage Students', icon: GraduationCap },
-    {
-      group: 'Teams',
-      links: [
-        { href: '/teams', label: 'My Boards', icon: Users2 },
-        { href: '/teams/manage', label: 'Manage Boards', icon: Settings },
-      ]
-    },
     { href: '/ocr-tool', label: 'OCR Scanner', icon: ScanLine },
     { href: '/leaderboard', label: 'Leaderboard', icon: Trophy },
   ];
   
   const organizerLinks = [
     ...baseLinks,
-    { href: '/my-tasks', label: 'My Tasks', icon: CheckCircle },
-    { href: '/tasks', label: 'Task Boards', icon: ClipboardList },
+    {
+        group: 'Tasks',
+        icon: ClipboardList,
+        links: [
+            { href: '/my-tasks', label: 'My Assigned Tasks'},
+            { href: '/tasks', label: 'Team Task Boards'},
+            { href: '/tasks/my-boards', label: 'My Boards'},
+        ]
+    },
     { href: '/my-events', label: 'My Events', icon: Calendar },
-    { href: '/teams', label: 'My Boards', icon: Users2 },
   ];
 
   const repLinks = [
     ...baseLinks,
-    { href: '/my-tasks', label: 'My Tasks', icon: CheckCircle },
-    { href: '/tasks', label: 'Task Boards', icon: ClipboardList },
+    {
+        group: 'Tasks',
+        icon: ClipboardList,
+        links: [
+            { href: '/my-tasks', label: 'My Assigned Tasks'},
+            { href: '/tasks', label: 'Team Task Boards'},
+            { href: '/tasks/my-boards', label: 'My Boards'},
+        ]
+    },
     { href: '/my-events', label: 'My Events', icon: Calendar },
-    { href: '/teams', label: 'My Boards', icon: Users2 },
     { href: '/students', label: 'Event Students', icon: GraduationCap },
   ];
 
@@ -105,6 +122,9 @@ export default function AppSidebar() {
   const router = useRouter();
   const pathname = usePathname();
   const { toast } = useToast();
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
+      Tasks: pathname.startsWith('/tasks')
+  });
 
   const handleLogout = async () => {
     try {
@@ -120,8 +140,9 @@ export default function AppSidebar() {
     }
   };
 
-  const navLinks = getNavLinksForRole(userProfile?.role);
+  let navLinks = getNavLinksForRole(userProfile?.role);
   
+  // Dynamically add 'Student Data' link for organizers with permission
   if (userProfile?.role === 'organizer' && userProfile.studentDataEventAccess && Object.values(userProfile.studentDataEventAccess).some(v => v === true)) {
     const studentDataLink = { href: '/students', label: 'Student Data', icon: GraduationCap };
     if (!navLinks.some(link => 'href' in link && link.href === studentDataLink.href)) {
@@ -138,7 +159,7 @@ export default function AppSidebar() {
      <SidebarMenuItem key={link.href}>
         <SidebarMenuButton
           onClick={() => router.push(link.href)}
-          isActive={pathname.startsWith(link.href) && (link.href !== '/dashboard' || pathname === '/dashboard')}
+          isActive={pathname === link.href}
           tooltip={{ children: link.label }}
         >
           <link.icon />
@@ -166,12 +187,32 @@ export default function AppSidebar() {
         <SidebarMenu>
           {navLinks.map((item) => {
             if ('group' in item) {
+                const Icon = item.icon;
+                const isGroupActive = pathname.startsWith('/tasks');
                 return (
-                    <SidebarGroup key={item.group}>
-                        <SidebarMenu>
-                            {item.links.map(renderLink)}
-                        </SidebarMenu>
-                    </SidebarGroup>
+                    <SidebarMenuItem key={item.group}>
+                        <SidebarMenuButton
+                          onClick={() => setOpenGroups(prev => ({...prev, [item.group]: !prev[item.group]}))}
+                          isActive={isGroupActive}
+                          data-state={openGroups[item.group] ? 'open' : 'closed'}
+                          className="pr-2"
+                        >
+                            <Icon />
+                            <span>{item.group}</span>
+                            <ChevronDown className="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 group-data-[collapsible=icon]:hidden data-[state=open]:rotate-180" />
+                        </SidebarMenuButton>
+                        {openGroups[item.group] && (
+                            <SidebarMenuSub className="group-data-[collapsible=icon]:hidden">
+                                {item.links.map(sublink => (
+                                     <SidebarMenuSubItem key={sublink.href}>
+                                        <SidebarMenuSubButton onClick={() => router.push(sublink.href)} isActive={pathname === sublink.href}>
+                                            {sublink.label}
+                                        </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                ))}
+                            </SidebarMenuSub>
+                        )}
+                    </SidebarMenuItem>
                 )
             }
             return renderLink(item);

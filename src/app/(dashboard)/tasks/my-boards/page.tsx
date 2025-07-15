@@ -14,8 +14,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Users2, Users, Search } from 'lucide-react';
+import { getMockBoards } from '@/data/mock-tasks';
 
-export default function MyTeamsPage() {
+// --- DEV FLAG ---
+const USE_MOCK_DATA = process.env.NODE_ENV === 'development';
+
+export default function MyBoardsPage() {
   const { userProfile, loading: authLoading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
@@ -29,10 +33,17 @@ export default function MyTeamsPage() {
 
   useEffect(() => {
     if (authLoading || !userProfile) return;
-
     setLoadingData(true);
-    const boardsRef = collection(db, 'boards');
 
+    if (USE_MOCK_DATA) {
+        const { myBoards, otherBoards } = getMockBoards(userProfile.uid);
+        setMyBoards(myBoards);
+        setOtherBoards(otherBoards);
+        setLoadingData(false);
+        return;
+    }
+
+    const boardsRef = collection(db, 'boards');
     const unsubscribe = onSnapshot(boardsRef, (snapshot) => {
       const allBoards = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Board));
       const userBoards = allBoards.filter(board => board.memberUids.includes(userProfile.uid));
@@ -51,7 +62,10 @@ export default function MyTeamsPage() {
   }, [userProfile, authLoading, toast]);
   
   const handleJoinBoard = async (boardId: string) => {
-    if(!userProfile) return;
+    if(!userProfile || USE_MOCK_DATA) {
+        toast({ title: "Mock Data Mode", description: "Cannot join boards in development." });
+        return;
+    }
     try {
         const boardRef = doc(db, 'boards', boardId);
         await updateDoc(boardRef, {

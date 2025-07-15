@@ -17,9 +17,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, PlusCircle, Users2, ShieldAlert, Edit, Users } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
+import { getMockBoards, getMockUsers } from '@/data/mock-tasks';
 
+// --- DEV FLAG ---
+const USE_MOCK_DATA = process.env.NODE_ENV === 'development';
 
-export default function ManageTeamsPage() {
+export default function ManageBoardsPage() {
   const { userProfile, loading: authLoading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
@@ -41,8 +44,16 @@ export default function ManageTeamsPage() {
         router.push('/dashboard');
         return;
     }
-
     setLoadingData(true);
+
+    if (USE_MOCK_DATA) {
+        const { allBoards } = getMockBoards('any-user');
+        setBoards(allBoards);
+        setAllUsers(getMockUsers());
+        setLoadingData(false);
+        return;
+    }
+
     const unsubBoards = onSnapshot(collection(db, 'boards'), (snapshot) => {
       setBoards(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Board)));
       if(loadingData) setLoadingData(false);
@@ -71,6 +82,11 @@ export default function ManageTeamsPage() {
   const handleFormSubmit = async () => {
     if (!boardForm.name.trim()) {
         toast({ title: "Name is required", variant: "destructive" });
+        return;
+    }
+     if (USE_MOCK_DATA) {
+        toast({ title: "Mock Data Mode", description: "Cannot save boards in development."});
+        setIsModalOpen(false);
         return;
     }
 
