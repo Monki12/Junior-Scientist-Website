@@ -103,18 +103,22 @@ export default function MyTasksPage() {
 
   }, [userProfile, authLoading, toast, router]);
   
-  const handleTaskUpdate = async (updatedTask: Partial<Task>) => {
-    if (!updatedTask.id) return; // Should not happen in this view
+  const handleTaskUpdate = async (updatedTask: Partial<EnrichedTask>) => {
+    if (!updatedTask.id) return;
     try {
-        const taskRef = doc(db, 'tasks', updatedTask.id);
-        await updateDoc(taskRef, {
-            ...updatedTask,
-            updatedAt: serverTimestamp(),
-        });
-        toast({ title: "Task Updated" });
+      const taskRef = doc(db, 'tasks', updatedTask.id);
+      
+      // The `boardName` is a client-side enrichment, not a DB field. It must be removed before updating.
+      const { boardName, ...taskToUpdate } = updatedTask;
+
+      await updateDoc(taskRef, {
+        ...taskToUpdate,
+        updatedAt: serverTimestamp(),
+      });
+      toast({ title: "Task Updated" });
     } catch(e) {
-        toast({ title: "Update Failed", description: "You might not have permission for this action.", variant: "destructive" });
-        console.error(e);
+      toast({ title: "Update Failed", description: "You might not have permission for this action.", variant: "destructive" });
+      console.error(e);
     }
     setSelectedTask(null);
   };
