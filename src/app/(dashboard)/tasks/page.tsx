@@ -113,7 +113,7 @@ export default function TasksPage() {
   
   const handleTaskUpdate = async (updatedTask: Partial<Task>) => {
     if (!currentBoard || !userProfile) return;
-    
+
     // If the task has an ID, it's an update operation.
     if (updatedTask.id) {
         const taskRef = doc(db, 'tasks', updatedTask.id);
@@ -123,13 +123,19 @@ export default function TasksPage() {
         });
         toast({ title: "Task Updated" });
     } else { // If the task does NOT have an ID, it's a new task.
-        await addDoc(collection(db, 'tasks'), {
+        const newTaskData: any = {
             ...updatedTask,
             boardId: currentBoard.id,
             creatorId: userProfile.uid,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
-        });
+        };
+
+        // Firestore does not allow `undefined` values. The `id` is `undefined` for new tasks.
+        // We must remove it before sending it to Firestore, which will auto-generate its own ID.
+        delete newTaskData.id;
+
+        await addDoc(collection(db, 'tasks'), newTaskData);
         toast({ title: "Task Created" });
     }
     setIsTaskModalOpen(false);
