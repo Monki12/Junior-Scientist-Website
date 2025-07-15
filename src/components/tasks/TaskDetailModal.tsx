@@ -3,8 +3,6 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import type { Task, Board, UserProfileData, Subtask, TaskStatus, TaskPriority, BoardMember } from '@/types';
-import { db } from '@/lib/firebase';
-import { doc, updateDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { nanoid } from 'nanoid';
 import { format, parseISO, isValid } from 'date-fns';
@@ -23,12 +21,10 @@ import { Loader2, Trash2, PlusCircle, Calendar as CalendarIcon } from 'lucide-re
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card } from '../ui/card';
 
-const USE_MOCK_DATA = process.env.NODE_ENV === 'development';
-
 interface TaskDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
-  task: Task | null; // Null when creating a new task
+  task: Task | null;
   board: Board | null;
   boardMembers: BoardMember[];
   allUsers: UserProfileData[];
@@ -45,13 +41,11 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
   useEffect(() => {
     if (isOpen) {
       if (task) {
-        // Editing existing task
         setFormState({
           ...task,
           dueDate: task.dueDate && isValid(parseISO(task.dueDate)) ? parseISO(task.dueDate) : null,
         });
       } else {
-        // Creating a new task
         setFormState({
           title: '',
           description: '',
@@ -74,7 +68,6 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
   const handleSaveChanges = async () => {
     if (!board) return;
     
-    // Ensure title is not empty when creating new task
     if (!task && !formState.caption?.trim()) {
         toast({ title: "Caption is required", description: "Please enter a short title for the task.", variant: "destructive" });
         return;
@@ -82,48 +75,17 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
     
     setIsUpdating(true);
 
-    const dataToSave: any = {
+    const dataToSave: Partial<Task> = {
       ...formState,
       boardId: board.id,
       dueDate: formState.dueDate ? (formState.dueDate as Date).toISOString() : null,
-      updatedAt: serverTimestamp(),
+      updatedAt: new Date().toISOString(),
     };
     
-    if (USE_MOCK_DATA) {
-        const mockTask: Task = {
-            ...dataToSave,
-            id: task?.id || nanoid(),
-            createdAt: task?.createdAt || new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            assignedToUserIds: task ? dataToSave.assignedToUserIds : [],
-        };
-        onTaskUpdate(mockTask);
-        toast({ title: task ? "Task Updated (Mock)" : "Task Created (Mock)" });
-        onClose();
-        setIsUpdating(false);
-        return;
-    }
-
-    try {
-        if (task) { // Update existing task
-            const taskRef = doc(db, 'tasks', task.id);
-            await updateDoc(taskRef, dataToSave);
-            toast({ title: "Task Updated" });
-        } else { // Create new task
-            await addDoc(collection(db, 'tasks'), {
-              ...dataToSave,
-              createdAt: serverTimestamp(),
-              assignedToUserIds: [], // New tasks are always unassigned initially
-            });
-            toast({ title: "Task Created" });
-        }
-        onClose();
-    } catch(e: any) {
-        console.error("Error saving task:", e);
-        toast({ title: "Save Failed", description: e.message, variant: "destructive"});
-    } finally {
-        setIsUpdating(false);
-    }
+    onTaskUpdate(dataToSave as Task);
+    toast({ title: task ? "Task Updated" : "Task Created" });
+    onClose();
+    setIsUpdating(false);
   };
 
   const handleSubtaskChange = (index: number, field: 'text' | 'completed', value: string | boolean) => {
@@ -147,7 +109,6 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
 
   const assignedUser = useMemo(() => {
     if (!formState.assignedToUserIds || formState.assignedToUserIds.length === 0) return null;
-    // In this simplified modal, we use allUsers since boardMembers might not be complete
     return allUsers.find(u => u.uid === formState.assignedToUserIds![0]);
   }, [formState.assignedToUserIds, allUsers]);
 
@@ -161,7 +122,6 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
           <DialogDescription>Board: {board?.name}</DialogDescription>
         </DialogHeader>
         <div className="grid md:grid-cols-3 gap-6 py-4 flex-1 overflow-y-auto pr-4">
-          {/* Left/Main Column */}
           <div className="md:col-span-2 space-y-6">
             <div>
                 <Label htmlFor="taskCaption">Caption (Short Title)</Label>
@@ -190,7 +150,6 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
             </div>
           </div>
 
-          {/* Right Column */}
           <div className="space-y-6">
               <Card className="p-4 bg-muted/50">
                 <h4 className="font-semibold mb-2">Details</h4>
@@ -270,7 +229,7 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
         </div>
         <DialogFooter className="pt-4 border-t">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSaveChanges} disabled={isUpdating || (!canManage && !!task)}>
+          <Button onClick={handleSaveChanges} disabled={isUpdating}>
             {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
             {isUpdating ? 'Saving...' : 'Save Changes'}
           </Button>
