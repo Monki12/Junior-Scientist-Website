@@ -2,17 +2,18 @@
 'use client';
 
 import { useAuth } from '@/hooks/use-auth';
-import { Loader2, Users, ShieldCheck, Trophy, Briefcase, ListChecks, Award, BarChart3, LineChart, Ticket, Compass, CheckCircle, Search, AlertCircle } from 'lucide-react';
+import { Loader2, Users, ShieldCheck, Trophy, Briefcase, ListChecks, Award, BarChart3, LineChart, Ticket, Compass, CheckCircle, Search, AlertCircle, Inbox, UserCheck as UserCheckIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { useEffect, useState }from 'react';
-import type { SubEvent, UserProfileData, EventRegistration, Task, TaskPriority } from '@/types';
-import { collection, onSnapshot, query, orderBy, limit, where, getDocs } from 'firebase/firestore';
+import { useEffect, useState, useMemo } from 'react';
+import type { SubEvent, UserProfileData, EventRegistration, Task, TaskPriority, Board, BoardMember } from '@/types';
+import { collection, onSnapshot, query, orderBy, limit, where, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { format, isPast } from 'date-fns';
 
 const OverallHeadDashboard = () => {
   const [stats, setStats] = useState({ events: 0, staff: 0, students: 0, avgParticipants: '0.0' });
@@ -288,86 +289,142 @@ const EventRepDashboard = ({ userProfile }: { userProfile: UserProfileData }) =>
   );
 };
 
+
+const useOrganizerData = (userProfile: UserProfileData) => {
+    const [data, setData] = useState<{ boards: Board[], tasks: Task[], members: UserProfileData[] }>({ boards: [], tasks: [], members: [] });
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!userProfile?.uid) {
+            setLoading(false);
+            return;
+        }
+
+        setLoading(true);
+
+        const boardsQuery = query(collection(db, 'boards'), where('memberUids', 'array-contains', userProfile.uid));
+        
+        const unsubBoards = onSnapshot(boardsQuery, (boardSnapshot) => {
+            const userBoards = boardSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Board));
+            setData(prev => ({ ...prev, boards: userBoards }));
+
+            if (userBoards.length > 0) {
+                const allMemberUids = [...new Set(userBoards.flatMap(b => b.memberUids))];
+                const allBoardIds = userBoards.map(b => b.id);
+                
+                // Fetch members
+                if (allMemberUids.length > 0) {
+                    const membersQuery = query(collection(db, 'users'), where('__name__', 'in', allMemberUids));
+                    const unsubMembers = onSnapshot(membersQuery, (memberSnapshot) => {
+                        const boardMembers = memberSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfileData));
+                        setData(prev => ({ ...prev, members: boardMembers }));
+                    });
+                    return () => unsubMembers();
+                }
+
+                // Fetch tasks
+                if (allBoardIds.length > 0) {
+                    const tasksQuery = query(collection(db, 'tasks'), where('boardId', 'in', allBoardIds));
+                    const unsubTasks = onSnapshot(tasksQuery, (taskSnapshot) => {
+                        const allTasks = taskSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
+                        setData(prev => ({ ...prev, tasks: allTasks }));
+                        setLoading(false);
+                    });
+                    return () => unsubTasks();
+                }
+
+            } else {
+                 setLoading(false);
+            }
+        }, error => {
+            console.error("Error fetching boards:", error);
+            setLoading(false);
+        });
+
+        return () => unsubBoards();
+    }, [userProfile.uid]);
+
+    return { ...data, loading };
+};
+
+
 const OrganizerDashboard = ({ userProfile }: { userProfile: UserProfileData }) => {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
+    const { boards, tasks, members, loading } = useOrganizerData(userProfile);
 
-  useEffect(() => {
-    if (!userProfile?.uid) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
+    const myTasks = useMemo(() => tasks.filter(t => t.assignedToUserIds.includes(userProfile.uid)), [tasks, userProfile.uid]);
+    const unassignedTasks = useMemo(() => tasks.filter(t => t.assignedToUserIds.length === 0), [tasks]);
+    const teamWorkload = useMemo(() => {
+        const workload: { [uid: string]: { name: string, total: number, inProgress: number } } = {};
+        members.forEach(member => {
+            workload[member.uid] = { name: member.fullName || 'Unknown', total: 0, inProgress: 0 };
+        });
+        tasks.forEach(task => {
+            task.assignedToUserIds.forEach(uid => {
+                if (workload[uid]) {
+                    workload[uid].total++;
+                    if (task.status === 'In Progress') {
+                        workload[uid].inProgress++;
+                    }
+                }
+            });
+        });
+        return Object.values(workload).sort((a, b) => b.total - a.total).slice(0, 5); // Top 5
+    }, [tasks, members]);
 
-    const q = query(collection(db, 'tasks'), where('assignedToUserIds', 'array-contains', userProfile.uid));
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const tasksList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
-      setTasks(tasksList);
-      setLoading(false);
-    }, (error) => {
-      console.error("Error fetching organizer tasks:", error);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [userProfile.uid]);
-
-  if (loading) {
-    return (
-      <div className="flex h-full w-full items-center justify-center">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <span className="ml-4">Loading Your Dashboard...</span>
-      </div>
-    );
-  }
-
-  const stats = {
-    tasksTotal: tasks.length,
-    tasksCompleted: tasks.filter(t => t.status === 'Completed').length,
-  };
-  
-  const taskCompletionPercentage = stats.tasksTotal > 0 ? (stats.tasksCompleted / stats.tasksTotal) * 100 : 0;
-  
-  const priorityOrder: { [key in TaskPriority]: number } = { 'High': 1, 'Medium': 2, 'Low': 3 };
-
-  const upcomingTasks = tasks
-    .filter(t => t.status !== 'Completed')
-    .sort((a, b) => {
-      // Sort by priority first
-      const priorityA = priorityOrder[a.priority] || 4;
-      const priorityB = priorityOrder[b.priority] || 4;
-      if (priorityA !== priorityB) {
-        return priorityA - priorityB;
-      }
+    const myCompletedTasks = myTasks.filter(t => t.status === 'Completed').length;
+    const myTotalTasks = myTasks.length;
+    const myCompletionPercentage = myTotalTasks > 0 ? (myCompletedTasks / myTotalTasks) * 100 : 0;
+    
+    const priorityOrder: { [key in TaskPriority]: number } = { 'High': 1, 'Medium': 2, 'Low': 3 };
+    const upcomingTasks = myTasks
+      .filter(t => t.status !== 'Completed')
+      .sort((a, b) => {
+        const priorityA = priorityOrder[a.priority] || 4;
+        const priorityB = priorityOrder[b.priority] || 4;
+        if (priorityA !== priorityB) return priorityA - priorityB;
+        
+        const dateA = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+        const dateB = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+        return dateA - dateB;
+      })
+      .slice(0, 3);
       
-      // If priority is the same, sort by due date (nearest first)
-      const dateA = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
-      const dateB = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
-      return dateA - dateB;
-    })
-    .slice(0, 3);
+    const urgentUnassigned = unassignedTasks.sort((a,b) => (priorityOrder[a.priority] || 4) - (priorityOrder[b.priority] || 4)).slice(0,3);
 
-
+    if (loading) {
+        return (
+            <div className="flex h-full w-full items-center justify-center">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" /><span className="ml-4">Loading Your Dashboard...</span>
+            </div>
+        );
+    }
+  
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-primary">Organizer Dashboard</h1>
-      <div className="grid gap-6 md:grid-cols-2">
+      <h1 className="text-3xl font-bold text-primary">Organizer Dashboard</h1>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        
+        {/* Task Completion Overview */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tasks Completed</CardTitle>
-            <CheckCircle className="h-4 w-4 text-muted-foreground" />
+          <CardHeader>
+            <CardTitle>Your Task Completion</CardTitle>
+            <CardDescription>Your assigned tasks across all boards.</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">{stats.tasksCompleted} / {stats.tasksTotal}</div>
-            <p className="text-xs text-muted-foreground">Overall completion rate</p>
-            <Progress value={taskCompletionPercentage} className="mt-2 h-2"/>
+            <div className="text-4xl font-bold text-primary">{myCompletionPercentage.toFixed(0)}%</div>
+            <Progress value={myCompletionPercentage} className="mt-2 h-2"/>
+            <p className="text-sm text-muted-foreground mt-2">{myCompletedTasks} of {myTotalTasks} tasks completed.</p>
           </CardContent>
+          <CardFooter>
+            <Button asChild variant="outline" className="w-full"><Link href="/my-tasks">View My Tasks</Link></Button>
+          </CardFooter>
         </Card>
+        
+        {/* Your Top 3 Urgent Tasks */}
         <Card>
           <CardHeader>
             <CardTitle>Your Top 3 Urgent Tasks</CardTitle>
-            <CardDescription>Highest priority tasks with the nearest deadlines.</CardDescription>
+            <CardDescription>Highest priority tasks assigned to you.</CardDescription>
           </CardHeader>
           <CardContent>
             {upcomingTasks.length > 0 ? (
@@ -375,9 +432,9 @@ const OrganizerDashboard = ({ userProfile }: { userProfile: UserProfileData }) =
                 {upcomingTasks.map(task => (
                   <li key={task.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                     <div>
-                      <p className="font-semibold">{task.title}</p>
+                      <p className="font-semibold">{task.caption}</p>
                       <p className="text-sm text-muted-foreground">
-                        Due: {task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : 'No due date'}
+                        Due: {task.dueDate ? format(new Date(task.dueDate), 'MMM dd') : 'No due date'}
                       </p>
                     </div>
                     <Badge variant={task.priority === 'High' ? 'destructive' : task.priority === 'Medium' ? 'secondary' : 'outline'}>{task.priority}</Badge>
@@ -385,19 +442,78 @@ const OrganizerDashboard = ({ userProfile }: { userProfile: UserProfileData }) =
                 ))}
               </ul>
             ) : (
-              <div className="text-center py-10 text-muted-foreground">
-                <ListChecks className="h-12 w-12 mx-auto mb-3 text-primary/30" />
-                <h3 className="text-lg font-semibold text-foreground mb-1">No Pending Tasks</h3>
-                <p className="text-sm">You're all caught up!</p>
+              <div className="text-center py-6 text-muted-foreground">
+                <Trophy className="h-12 w-12 mx-auto mb-3 text-green-500/50" />
+                <h3 className="text-lg font-semibold text-foreground mb-1">You're all caught up! ✨</h3>
+                <p className="text-sm">No pending tasks assigned to you.</p>
               </div>
             )}
           </CardContent>
-          <CardFooter>
-            <Button asChild variant="outline" className="w-full">
-              <Link href="/tasks">View All Tasks</Link>
-            </Button>
-          </CardFooter>
         </Card>
+
+        {/* Unassigned Tasks */}
+        <Card>
+            <CardHeader>
+                <CardTitle>Unassigned Tasks</CardTitle>
+                <CardDescription>Tasks waiting for assignment across your boards.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                 {unassignedTasks.length > 0 ? (
+                    <div>
+                        <p className="text-2xl font-bold text-accent">{unassignedTasks.length} <span className="text-lg font-medium text-muted-foreground">tasks</span></p>
+                        <ul className="space-y-2 mt-3 text-sm">
+                           {urgentUnassigned.map(task => (
+                               <li key={task.id} className="flex justify-between items-center text-muted-foreground">
+                                   <span className="truncate pr-2">{task.caption}</span>
+                                   <Badge variant={task.priority === 'High' ? 'destructive' : 'outline'}>{task.priority}</Badge>
+                               </li>
+                           ))}
+                        </ul>
+                    </div>
+                 ) : (
+                    <div className="text-center py-6 text-muted-foreground">
+                        <Inbox className="h-12 w-12 mx-auto mb-3 text-primary/30" />
+                        <h3 className="text-lg font-semibold text-foreground mb-1">No Unassigned Tasks</h3>
+                        <p className="text-sm">All tasks have an owner.</p>
+                    </div>
+                 )}
+            </CardContent>
+            <CardFooter>
+                <Button asChild variant="secondary" className="w-full"><Link href="/tasks">Assign Tasks</Link></Button>
+            </CardFooter>
+        </Card>
+
+         {/* Team Workload */}
+        <Card className="md:col-span-2 lg:col-span-3">
+            <CardHeader>
+                <CardTitle>Team Workload Overview</CardTitle>
+                <CardDescription>Tasks assigned across all members of your boards.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {teamWorkload.length > 0 ? (
+                    <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {teamWorkload.map(member => (
+                            <li key={member.name} className="p-3 bg-muted/50 rounded-lg">
+                                <p className="font-semibold text-primary">{member.name}</p>
+                                <p className="text-sm text-muted-foreground">
+                                    <span className="font-bold">{member.total}</span> total tasks assigned
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                     <span className="font-bold">{member.inProgress}</span> tasks in progress
+                                </p>
+                            </li>
+                        ))}
+                    </ul>
+                ) : (
+                    <div className="text-center py-10 text-muted-foreground">
+                        <UserCheckIcon className="h-12 w-12 mx-auto mb-3 text-primary/30" />
+                        <h3 className="text-lg font-semibold text-foreground mb-1">No Team Members Found</h3>
+                        <p className="text-sm">Add members to your boards to see their workload.</p>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+
       </div>
     </div>
   );
@@ -427,7 +543,6 @@ const StudentDashboard = ({ userProfile }: { userProfile: UserProfileData }) => 
       
       const eventIds = [...new Set(regs.map(r => r.subEventId))];
 
-      // Fix N+1 problem: Batch fetch event details
       if (eventIds.length > 0) {
         try {
           const eventsQuery = query(collection(db, 'subEvents'), where('__name__', 'in', eventIds));
@@ -442,7 +557,7 @@ const StudentDashboard = ({ userProfile }: { userProfile: UserProfileData }) => 
           setRegistrations(registrationsWithDetails);
         } catch (error) {
           console.error("Error fetching event details for dashboard: ", error);
-          setRegistrations(regs); // Set regs without details on error
+          setRegistrations(regs);
         }
       } else {
          setRegistrations([]);
@@ -467,12 +582,14 @@ const StudentDashboard = ({ userProfile }: { userProfile: UserProfileData }) => 
   
   const upcomingEvents = registrations.filter(reg => {
     if (!reg.eventDetails?.eventDate) return false;
-    const eventDate = new Date(reg.eventDetails.eventDate);
+    const eventDate = reg.eventDetails.eventDate instanceof Timestamp 
+        ? reg.eventDetails.eventDate.toDate() 
+        : new Date(reg.eventDetails.eventDate);
     return eventDate >= new Date();
   }).sort((a, b) => {
-      const dateA = a.eventDetails?.eventDate ? new Date(a.eventDetails.eventDate) : new Date(0);
-      const dateB = b.eventDetails?.eventDate ? new Date(b.eventDetails.eventDate) : new Date(0);
-      return dateA.getTime() - dateB.getTime();
+      const dateA = a.eventDetails?.eventDate ? (a.eventDetails.eventDate instanceof Timestamp ? a.eventDetails.eventDate.toMillis() : new Date(a.eventDetails.eventDate).getTime()) : 0;
+      const dateB = b.eventDetails?.eventDate ? (b.eventDetails.eventDate instanceof Timestamp ? b.eventDetails.eventDate.toMillis() : new Date(b.eventDetails.eventDate).getTime()) : 0;
+      return dateA - dateB;
   });
 
   if (registrations.length === 0) {
@@ -530,9 +647,7 @@ const StudentDashboard = ({ userProfile }: { userProfile: UserProfileData }) => 
                       {reg.eventDetails?.title || 'Event details loading...'}
                     </Link>
                     <p className="text-sm text-muted-foreground">
-                      {reg.eventDetails?.eventDate ? new Date(reg.eventDetails.eventDate).toLocaleDateString('en-US', {
-                          year: 'numeric', month: 'long', day: 'numeric'
-                      }) : 'Date TBD'}
+                      {reg.eventDetails?.eventDate ? format(reg.eventDetails.eventDate instanceof Timestamp ? reg.eventDetails.eventDate.toDate() : new Date(reg.eventDetails.eventDate), "PPP") : 'Date TBD'}
                     </p>
                   </div>
                   <Badge variant={reg.registrationStatus === 'approved' ? 'default' : 'secondary'} className="capitalize">{reg.registrationStatus}</Badge>
