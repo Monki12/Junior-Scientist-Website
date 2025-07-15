@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useEffect, useState }from 'react';
-import type { SubEvent, UserProfileData, EventRegistration, Task } from '@/types';
+import type { SubEvent, UserProfileData, EventRegistration, Task, TaskPriority } from '@/types';
 import { collection, onSnapshot, query, orderBy, limit, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Badge } from '@/components/ui/badge';
@@ -303,7 +303,7 @@ const OrganizerDashboard = ({ userProfile }: { userProfile: UserProfileData }) =
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const tasksList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
-      setTasks(tasksList.sort((a, b) => (a.dueDate && b.dueDate) ? new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime() : 0));
+      setTasks(tasksList);
       setLoading(false);
     }, (error) => {
       console.error("Error fetching organizer tasks:", error);
@@ -323,28 +323,36 @@ const OrganizerDashboard = ({ userProfile }: { userProfile: UserProfileData }) =
   }
 
   const stats = {
-    points: userProfile.points || 0,
     tasksTotal: tasks.length,
     tasksCompleted: tasks.filter(t => t.status === 'Completed').length,
   };
   
   const taskCompletionPercentage = stats.tasksTotal > 0 ? (stats.tasksCompleted / stats.tasksTotal) * 100 : 0;
-  const upcomingTasks = tasks.filter(t => t.status !== 'Completed').slice(0, 5);
+  
+  const priorityOrder: { [key in TaskPriority]: number } = { 'High': 1, 'Medium': 2, 'Low': 3 };
+
+  const upcomingTasks = tasks
+    .filter(t => t.status !== 'Completed')
+    .sort((a, b) => {
+      // Sort by priority first
+      const priorityA = priorityOrder[a.priority] || 4;
+      const priorityB = priorityOrder[b.priority] || 4;
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB;
+      }
+      
+      // If priority is the same, sort by due date (nearest first)
+      const dateA = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+      const dateB = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+      return dateA - dateB;
+    })
+    .slice(0, 3);
+
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-primary">Organizer Dashboard</h1>
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Points Earned</CardTitle>
-            <Trophy className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-accent">{stats.points}</div>
-            <p className="text-xs text-muted-foreground">From completed tasks</p>
-          </CardContent>
-        </Card>
+      <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Tasks Completed</CardTitle>
@@ -356,42 +364,41 @@ const OrganizerDashboard = ({ userProfile }: { userProfile: UserProfileData }) =
             <Progress value={taskCompletionPercentage} className="mt-2 h-2"/>
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Your Top 3 Urgent Tasks</CardTitle>
+            <CardDescription>Highest priority tasks with the nearest deadlines.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {upcomingTasks.length > 0 ? (
+              <ul className="space-y-3">
+                {upcomingTasks.map(task => (
+                  <li key={task.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                    <div>
+                      <p className="font-semibold">{task.title}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Due: {task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : 'No due date'}
+                      </p>
+                    </div>
+                    <Badge variant={task.priority === 'High' ? 'destructive' : task.priority === 'Medium' ? 'secondary' : 'outline'}>{task.priority}</Badge>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="text-center py-10 text-muted-foreground">
+                <ListChecks className="h-12 w-12 mx-auto mb-3 text-primary/30" />
+                <h3 className="text-lg font-semibold text-foreground mb-1">No Pending Tasks</h3>
+                <p className="text-sm">You're all caught up!</p>
+              </div>
+            )}
+          </CardContent>
+          <CardFooter>
+            <Button asChild variant="outline" className="w-full">
+              <Link href="/tasks">View All Tasks</Link>
+            </Button>
+          </CardFooter>
+        </Card>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Your Upcoming Tasks</CardTitle>
-          <CardDescription>Here are your next 5 pending tasks. Go to the Tasks page to see all.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {upcomingTasks.length > 0 ? (
-            <ul className="space-y-3">
-              {upcomingTasks.map(task => (
-                <li key={task.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                  <div>
-                    <p className="font-semibold">{task.title}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Due: {task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : 'No due date'}
-                    </p>
-                  </div>
-                  <Badge variant={task.priority === 'High' ? 'destructive' : 'secondary'}>{task.priority}</Badge>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="text-center py-10 text-muted-foreground">
-              <ListChecks className="h-12 w-12 mx-auto mb-3 text-primary/30" />
-              <h3 className="text-lg font-semibold text-foreground mb-1">No Pending Tasks</h3>
-              <p className="text-sm">You're all caught up!</p>
-            </div>
-          )}
-        </CardContent>
-        <CardFooter>
-          <Button asChild variant="outline" className="w-full">
-            <Link href="/tasks">View All Tasks</Link>
-          </Button>
-        </CardFooter>
-      </Card>
     </div>
   );
 };
