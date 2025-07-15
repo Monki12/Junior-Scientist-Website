@@ -11,6 +11,9 @@ import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { Loader2 } from 'lucide-react';
+import { nanoid } from 'nanoid';
+
+const USE_MOCK_DATA = process.env.NODE_ENV === 'development';
 
 interface TaskBoardProps {
   board: Board;
@@ -18,16 +21,17 @@ interface TaskBoardProps {
   members: BoardMember[];
   onEditTask: (task: Task | null) => void;
   loading: boolean;
+  setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
 }
 
-export default function TaskBoard({ board, tasks, members, onEditTask, loading }: TaskBoardProps) {
+export default function TaskBoard({ board, tasks, members, onEditTask, loading, setTasks }: TaskBoardProps) {
   const { toast } = useToast();
   const { userProfile } = useAuth();
   
   const canManageBoard = userProfile && (board.managerUids?.includes(userProfile.uid) || ['admin', 'overall_head'].includes(userProfile.role));
 
   const columns = useMemo(() => {
-    const unassignedTasks = tasks.filter(task => !task.assignedToUserIds || task.assignedToUserIds.length === 0 || !task.assignedToUserIds[0]);
+    const unassignedTasks = tasks.filter(task => !task.assignedToUserIds || task.assignedToUserIds.length === 0);
     
     const memberColumns = members.map(member => ({
         id: member.userId,
@@ -67,11 +71,27 @@ export default function TaskBoard({ board, tasks, members, onEditTask, loading }
         toast({ title: "Permission Denied", description: "You can only assign tasks from 'New Tasks' to yourself.", variant: "destructive"});
         return;
     }
+    
+    const newAssignedIds = targetColumnId === 'unassigned' ? [] : [targetColumnId];
+
+    if (USE_MOCK_DATA) {
+      setTasks(prevTasks => prevTasks.map(t => 
+        t.id === draggedTaskId 
+          ? { ...t, 
+              assignedToUserIds: newAssignedIds, 
+              status: t.status === 'Not Started' && targetColumnId !== 'unassigned' ? 'In Progress' : t.status, 
+              updatedAt: new Date().toISOString() 
+            } 
+          : t
+      ));
+      toast({ title: "Task Reassigned (Mock)", description: `Task moved successfully.`});
+      return;
+    }
 
     try {
         const taskRef = doc(db, "tasks", draggedTaskId);
         await updateDoc(taskRef, {
-            assignedToUserIds: targetColumnId === 'unassigned' ? [] : [targetColumnId],
+            assignedToUserIds: newAssignedIds,
             updatedAt: serverTimestamp(),
             status: task.status === 'Not Started' && targetColumnId !== 'unassigned' ? 'In Progress' : task.status,
         });

@@ -30,8 +30,9 @@ export default function TaskColumn({ id, title, tasks, member, onEditTask, canMa
     const breakdown: { [key: string]: number } = { a: 0, b: 0, c: 0, other: 0 };
     tasks.forEach(task => {
         if (task.status !== 'Completed' && task.bucket) {
-            if (task.bucket in breakdown) {
-                breakdown[task.bucket]++;
+            const bucketKey = task.bucket as keyof typeof breakdown;
+            if (bucketKey in breakdown) {
+                breakdown[bucketKey]++;
             } else {
                 breakdown.other++;
             }

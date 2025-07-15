@@ -23,6 +23,8 @@ import { Loader2, Trash2, PlusCircle, Calendar as CalendarIcon } from 'lucide-re
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card } from '../ui/card';
 
+const USE_MOCK_DATA = process.env.NODE_ENV === 'development';
+
 interface TaskDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -31,9 +33,10 @@ interface TaskDetailModalProps {
   boardMembers: UserProfileData[];
   allUsers: UserProfileData[];
   canManage: boolean;
+  onTaskUpdate: (task: Task) => void;
 }
 
-export default function TaskDetailModal({ isOpen, onClose, task, board, boardMembers, allUsers, canManage }: TaskDetailModalProps) {
+export default function TaskDetailModal({ isOpen, onClose, task, board, boardMembers, allUsers, canManage, onTaskUpdate }: TaskDetailModalProps) {
   const { toast } = useToast();
   const [isUpdating, setIsUpdating] = useState(false);
   const [formState, setFormState] = useState<Partial<Task>>({});
@@ -71,14 +74,37 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
   const handleSaveChanges = async () => {
     if (!board) return;
     setIsUpdating(true);
-    try {
-        const dataToSave = {
-            ...formState,
-            boardId: board.id,
-            dueDate: formState.dueDate ? (formState.dueDate as Date).toISOString() : null,
-            updatedAt: serverTimestamp(),
+    
+    const dataToSave: any = {
+      ...formState,
+      boardId: board.id,
+      dueDate: formState.dueDate ? (formState.dueDate as Date).toISOString() : null,
+      updatedAt: serverTimestamp(),
+    };
+    
+    // Ensure title is not empty when creating new task
+    if (!task && !dataToSave.caption?.trim()) {
+        toast({ title: "Caption is required", description: "Please enter a short title for the task.", variant: "destructive" });
+        setIsUpdating(false);
+        return;
+    }
+    
+    if (USE_MOCK_DATA) {
+        const mockTask: Task = {
+            ...dataToSave,
+            id: task?.id || nanoid(),
+            createdAt: task?.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            assignedToUserIds: task ? dataToSave.assignedToUserIds : [],
         };
+        onTaskUpdate(mockTask);
+        toast({ title: task ? "Task Updated (Mock)" : "Task Created (Mock)" });
+        onClose();
+        setIsUpdating(false);
+        return;
+    }
 
+    try {
         if (task) { // Update existing task
             const taskRef = doc(db, 'tasks', task.id);
             await updateDoc(taskRef, dataToSave);
@@ -141,8 +167,8 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
                 <Input id="taskCaption" value={formState.caption || ''} onChange={(e) => handleInputChange('caption', e.target.value)} disabled={!canManage} />
             </div>
              <div>
-                <Label htmlFor="taskDesc">Detailed Task</Label>
-                <Textarea id="taskDesc" value={formState.description || ''} onChange={(e) => handleInputChange('description', e.target.value)} rows={5} />
+                <Label htmlFor="taskDesc">Detailed Task Description</Label>
+                <Textarea id="taskDesc" value={formState.description || ''} onChange={(e) => handleInputChange('description', e.target.value)} rows={5} disabled={!canManage} />
             </div>
 
             <div>
@@ -182,7 +208,7 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
                     </div>
                      <div>
                         <Label>Priority</Label>
-                        <Select value={formState.priority} onValueChange={v => handleInputChange('priority', v as TaskPriority)}>
+                        <Select value={formState.priority} onValueChange={v => handleInputChange('priority', v as TaskPriority)} disabled={!canManage}>
                             <SelectTrigger><SelectValue/></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="High">High</SelectItem>
@@ -195,7 +221,7 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
                         <Label>Deadline</Label>
                         <Popover>
                           <PopoverTrigger asChild>
-                          <Button variant="outline" className={`w-full justify-start text-left font-normal ${!formState.dueDate && "text-muted-foreground"}`}>
+                          <Button variant="outline" className={`w-full justify-start text-left font-normal ${!formState.dueDate && "text-muted-foreground"}`} disabled={!canManage}>
                               <CalendarIcon className="mr-2 h-4 w-4" />
                               {formState.dueDate ? format(formState.dueDate as Date, "PPP") : <span>Pick a deadline</span>}
                           </Button>
@@ -205,7 +231,7 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
                     </div>
                     <div>
                         <Label>Bucket</Label>
-                        <RadioGroup defaultValue={formState.bucket || 'other'} onValueChange={(val) => handleInputChange('bucket', val)} className="flex space-x-2">
+                        <RadioGroup defaultValue={formState.bucket || 'other'} onValueChange={(val) => handleInputChange('bucket', val)} className="flex space-x-2" disabled={!canManage}>
                            <div className="flex items-center space-x-1"><RadioGroupItem value="a" id="r-a" /><Label htmlFor="r-a">A</Label></div>
                            <div className="flex items-center space-x-1"><RadioGroupItem value="b" id="r-b" /><Label htmlFor="r-b">B</Label></div>
                            <div className="flex items-center space-x-1"><RadioGroupItem value="c" id="r-c" /><Label htmlFor="r-c">C</Label></div>
@@ -232,7 +258,7 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
                             <SelectContent>
                                 <SelectItem value="">Unassigned</SelectItem>
                                 {boardMembers.map(member => (
-                                    <SelectItem key={member.uid} value={member.uid}>{member.fullName}</SelectItem>
+                                    <SelectItem key={member.uid} value={member.uid}>{member.name}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>

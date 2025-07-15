@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
-import { ListChecks, Loader2, PlusCircle, Users } from 'lucide-react';
+import { ListChecks, Loader2, PlusCircle, Users, Users2 } from 'lucide-react';
 import { collection, query, onSnapshot, addDoc, serverTimestamp, where, getDocs, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import TaskBoard from '@/components/tasks/TaskBoard';
@@ -142,7 +142,7 @@ export default function TasksPage() {
             name: newBoardName,
             type: 'general',
             memberUids: [userProfile.uid],
-            members: [{ userId: userProfile.uid, name: userProfile.fullName || userProfile.displayName || 'Me', role: userProfile.role }],
+            members: [{ userId: userProfile.uid, name: userProfile.fullName || userProfile.displayName || 'Me', role: userProfile.role as string}],
             managerUids: [userProfile.uid],
             createdAt: new Date(),
             createdBy: userProfile.uid,
@@ -170,26 +170,34 @@ export default function TasksPage() {
         setNewBoardName('');
         setIsNewBoardModalOpen(false);
         
-        // This part needs adjustment, as serverTimestamp is not immediately available client-side
-        // For immediate feedback, we create a temporary object.
         setCurrentBoard({
           id: newBoardRef.id,
           name: newBoardName,
           type: 'general',
           memberUids: [userProfile.uid],
-          members: [{ userId: userProfile.uid, name: userProfile.fullName || userProfile.displayName, role: userProfile.role }],
+          members: [{ userId: userProfile.uid, name: userProfile.fullName || userProfile.displayName, role: userProfile.role as string }],
           managerUids: [userProfile.uid],
-          createdAt: new Date(), // Use local date for immediate UI update
+          createdAt: new Date(), 
           createdBy: userProfile.uid
         });
 
-    } catch(e) {
+    } catch(e: any) {
         toast({ title: "Error", description: "Failed to create board.", variant: "destructive"});
     }
   };
 
   const handleOpenTaskModal = (task: Task | null) => {
     setEditingTask(task);
+  };
+  
+  const handleTaskUpdate = (updatedTask: Task) => {
+      if (USE_MOCK_DATA) {
+          if (tasks.some(t => t.id === updatedTask.id)) {
+              setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
+          } else {
+              setTasks(prev => [...prev, updatedTask]);
+          }
+      }
   };
 
   const canCreateBoards = userProfile && ['admin', 'overall_head', 'event_representative'].includes(userProfile.role);
@@ -228,7 +236,7 @@ export default function TasksPage() {
                         {boards.map(board => (
                             <button key={board.id} onClick={() => setCurrentBoard(board)} className="p-4 border rounded-lg text-left hover:border-primary transition-colors">
                                 <h3 className="font-bold text-lg">{board.name}</h3>
-                                <p className="text-sm text-muted-foreground">{board.members?.length || board.memberUids.length} members</p>
+                                <p className="text-sm text-muted-foreground"><Users2 className="inline h-4 w-4 mr-1"/>{board.members?.length || board.memberUids.length} members</p>
                             </button>
                         ))}
                     </div>
@@ -248,6 +256,7 @@ export default function TasksPage() {
             members={boardMembers}
             onEditTask={handleOpenTaskModal}
             loading={loadingBoardData}
+            setTasks={setTasks}
           />
         )}
       </main>
@@ -277,6 +286,7 @@ export default function TasksPage() {
         boardMembers={boardMembers}
         allUsers={allUsers}
         canManage={!!(userProfile && currentBoard && (currentBoard.managerUids?.includes(userProfile.uid) || ['admin', 'overall_head'].includes(userProfile.role)))}
+        onTaskUpdate={handleTaskUpdate}
       />
     </div>
   );

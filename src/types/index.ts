@@ -18,8 +18,8 @@ export type TeamStatus = 'pending' | 'approved' | 'disqualified';
 export interface BoardMember {
   userId: string;
   name: string;
-  role: string; // e.g., "Admin", "Organizer", "Team Member"
-  photoURL?: string; // Optional photo URL for avatar
+  role: string;
+  photoURL?: string;
 }
 
 export interface Board {
@@ -28,8 +28,8 @@ export interface Board {
   description?: string;
   type: 'general' | 'event';
   eventId?: string;
-  memberUids: string[]; // Keep this for security rule checks
-  members: BoardMember[]; // Rich member data for UI
+  memberUids: string[];
+  members: BoardMember[];
   managerUids?: string[];
   createdAt: any;
   createdBy: string;
@@ -40,22 +40,22 @@ export interface Subtask {
   id: string;
   text: string;
   completed: boolean;
-  assignedTo?: string; // UID of a user from the parent task's assignedToUserIds
+  assignedTo?: string;
 }
 
 export interface Task {
   id: string;
-  boardId: string; // ID of the board it belongs to
+  boardId: string;
   title: string;
   description?: string;
-  assignedToUserIds: string[]; // UIDs of assigned users
-  creatorId?: string; // UID of the user who created the task
-  dueDate?: string | null; // ISO Date string
+  assignedToUserIds: string[];
+  creatorId?: string;
+  dueDate?: string | null;
   priority: TaskPriority;
   status: TaskStatus;
   pointsOnCompletion?: number;
   completedByUserId?: string | null;
-  completedAt?: any; // serverTimestamp or ISO string
+  completedAt?: any;
   attachments?: { name: string, url: string }[];
   subtasks: Subtask[];
   createdAt: any;
@@ -76,7 +76,7 @@ export interface UserProfileData {
   schoolVerifiedByOrganizer?: boolean;
   standard?: string;
   division?: string | null;
-  role: UserRole;
+  role: UserRole | string;
   photoURL?: string | null;
   department?: string | null; 
   assignedEventUids?: string[];
@@ -88,7 +88,7 @@ export interface UserProfileData {
   createdAt?: any; 
   updatedAt?: any; 
   customData?: Record<string, any>;
-  boardIds?: string[]; // IDs of boards the user is a member of
+  boardIds?: string[];
 }
 
 export interface SubEvent {
