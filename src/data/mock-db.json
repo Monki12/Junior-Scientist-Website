@@ -1,0 +1,223 @@
+
+{
+  "users": [
+    {
+      "id": "user-1",
+      "name": "Alice Wonderland",
+      "email": "alice@example.com",
+      "profilePictureUrl": "https://placehold.co/100x100.png"
+    },
+    {
+      "id": "user-2",
+      "name": "Bob Builder",
+      "email": "bob@example.com",
+      "profilePictureUrl": "https://placehold.co/100x100.png"
+    },
+    {
+      "id": "user-3",
+      "name": "Charlie Chocolate",
+      "email": "charlie@example.com",
+      "profilePictureUrl": "https://placehold.co/100x100.png"
+    },
+    {
+      "id": "user-4",
+      "name": "Diana Prince",
+      "email": "diana@example.com",
+      "profilePictureUrl": "https://placehold.co/100x100.png"
+    },
+    {
+      "id": "user-5",
+      "name": "Eve Moneypenny",
+      "email": "eve@example.com",
+      "profilePictureUrl": "https://placehold.co/100x100.png"
+    }
+  ],
+  "boards": [
+    {
+      "id": "board-1",
+      "name": "Q3 Marketing Campaign",
+      "description": "All tasks related to the upcoming Q3 marketing launch.",
+      "ownerId": "user-1",
+      "memberIds": ["user-1", "user-2", "user-4"],
+      "createdAt": "2025-07-01T10:00:00Z",
+      "updatedAt": "2025-07-01T10:00:00Z"
+    },
+    {
+      "id": "board-2",
+      "name": "Website Redesign Project",
+      "description": "Tracking progress for the new company website.",
+      "ownerId": "user-3",
+      "memberIds": ["user-2", "user-3", "user-5"],
+      "createdAt": "2025-06-15T09:00:00Z",
+      "updatedAt": "2025-06-15T09:00:00Z"
+    },
+    {
+      "id": "board-3",
+      "name": "Internal Tools Development",
+      "description": "Sprint board for developing internal admin tools.",
+      "ownerId": "user-2",
+      "memberIds": ["user-2", "user-5"],
+      "createdAt": "2025-07-10T11:00:00Z",
+      "updatedAt": "2025-07-10T11:00:00Z"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "Draft blog post for new feature",
+      "description": "Create a 500-word blog post announcing the new 'Super-Widget' feature.",
+      "status": "in-progress",
+      "dueDate": "2025-07-25T23:59:59Z",
+      "assignedToId": "user-4",
+      "boardId": "board-1",
+      "priority": "high",
+      "createdAt": "2025-07-15T11:00:00Z",
+      "updatedAt": "2025-07-16T14:20:00Z",
+      "comments": [
+        {
+          "id": "comment-1",
+          "userId": "user-1",
+          "text": "Great start, Diana! Can we add a section on pricing?",
+          "timestamp": "2025-07-16T14:20:00Z"
+        }
+      ]
+    },
+    {
+      "id": "task-2",
+      "title": "Design social media graphics",
+      "description": "Create graphics for Twitter, Facebook, and Instagram for the Q3 campaign.",
+      "status": "to-do",
+      "dueDate": "2025-07-28T23:59:59Z",
+      "assignedToId": null,
+      "boardId": "board-1",
+      "priority": "medium",
+      "createdAt": "2025-07-15T11:05:00Z",
+      "updatedAt": "2025-07-15T11:05:00Z",
+      "comments": []
+    },
+    {
+      "id": "task-3",
+      "title": "Finalize homepage wireframe",
+      "description": "Incorporate feedback from the last review and finalize the wireframe for development.",
+      "status": "completed",
+      "dueDate": "2025-07-10T23:59:59Z",
+      "assignedToId": "user-2",
+      "boardId": "board-2",
+      "priority": "high",
+      "createdAt": "2025-07-05T15:00:00Z",
+      "updatedAt": "2025-07-10T10:00:00Z",
+      "comments": []
+    },
+    {
+      "id": "task-4",
+      "title": "Develop login component",
+      "description": "Build the React component for user login.",
+      "status": "in-progress",
+      "dueDate": "2025-07-22T23:59:59Z",
+      "assignedToId": "user-5",
+      "boardId": "board-2",
+      "priority": "high",
+      "createdAt": "2025-07-11T09:30:00Z",
+      "updatedAt": "2025-07-11T09:30:00Z",
+      "comments": [
+        {
+            "id": "comment-2",
+            "userId": "user-3",
+            "text": "Make sure to handle the 'forgot password' flow.",
+            "timestamp": "2025-07-12T11:00:00Z"
+        },
+        {
+            "id": "comment-3",
+            "userId": "user-5",
+            "text": "Will do!",
+            "timestamp": "2025-07-12T11:05:00Z"
+        }
+      ]
+    },
+    {
+      "id": "task-5",
+      "title": "Set up CI/CD pipeline",
+      "description": null,
+      "status": "to-do",
+      "dueDate": null,
+      "assignedToId": "user-2",
+      "boardId": "board-3",
+      "priority": "medium",
+      "createdAt": "2025-07-12T16:00:00Z",
+      "updatedAt": "2025-07-12T16:00:00Z",
+      "comments": []
+    },
+    {
+        "id": "task-6",
+        "title": "Create user authentication endpoints",
+        "description": "API endpoints for user sign-up, sign-in, and sign-out.",
+        "status": "blocked",
+        "dueDate": "2025-07-20T23:59:59Z",
+        "assignedToId": "user-5",
+        "boardId": "board-3",
+        "priority": "urgent",
+        "createdAt": "2025-07-14T18:00:00Z",
+        "updatedAt": "2025-07-14T18:00:00Z",
+        "comments": [
+          {
+            "id": "comment-4",
+            "userId": "user-2",
+            "text": "Blocked until database schema is finalized.",
+            "timestamp": "2025-07-14T18:05:00Z"
+          }
+        ]
+      },
+      {
+        "id": "task-7",
+        "title": "Test payment gateway integration",
+        "description": "Run through all test cases for the Stripe integration.",
+        "status": "to-do",
+        "dueDate": "2025-08-01T23:59:59Z",
+        "assignedToId": null,
+        "boardId": "board-2",
+        "priority": "medium",
+        "createdAt": "2025-07-18T12:00:00Z",
+        "updatedAt": "2025-07-18T12:00:00Z",
+        "comments": []
+      },
+      {
+        "id": "task-8",
+        "title": "Update landing page copy",
+        "description": "Revise the main headline and feature descriptions on the homepage.",
+        "status": "in-progress",
+        "dueDate": "2025-07-24T23:59:59Z",
+        "assignedToId": "user-4",
+        "boardId": "board-1",
+        "priority": "low",
+        "createdAt": "2025-07-19T10:00:00Z",
+        "updatedAt": "2025-07-19T10:00:00Z",
+        "comments": []
+      },
+      {
+        "id": "task-9",
+        "title": "QA the new mobile responsive views",
+        "description": "Test the website redesign on iOS and Android devices.",
+        "status": "to-do",
+        "dueDate": "2025-07-29T23:59:59Z",
+        "assignedToId": "user-3",
+        "boardId": "board-2",
+        "priority": "high",
+        "createdAt": "2025-07-20T11:00:00Z",
+        "updatedAt": "2025-07-20T11:00:00Z",
+        "comments": []
+      },
+      {
+        "id": "task-10",
+        "title": "Plan the team offsite event",
+        "description": "Research venues and activities for the annual team offsite.",
+        "status": "to-do",
+        "dueDate": null,
+        "assignedToId": "user-1",
+        "boardId": "board-1",
+        "priority": "low",
+        "createdAt": "2025-07-21T14:00:00Z",
+        "updatedAt": "2025-07-21T14:00:00Z",
+        "comments": []
+      }
+  ]
+}
