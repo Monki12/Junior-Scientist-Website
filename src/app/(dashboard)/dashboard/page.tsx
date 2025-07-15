@@ -9,11 +9,13 @@ import Link from 'next/link';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useEffect, useState, useMemo } from 'react';
 import type { SubEvent, UserProfileData, EventRegistration, Task, TaskPriority, Board, BoardMember } from '@/types';
-import { collection, onSnapshot, query, orderBy, limit, where, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, limit, where, getDocs, Timestamp, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { format, isPast } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
+import { nanoid } from 'nanoid';
 
 const OverallHeadDashboard = () => {
   const [stats, setStats] = useState({ events: 0, staff: 0, students: 0, avgParticipants: '0.0' });
@@ -184,30 +186,40 @@ const EventRepDashboard = ({ userProfile }: { userProfile: UserProfileData }) =>
     
     setLoading(true);
     const unsubs: (() => void)[] = [];
+    const initialLoads = { events: false, registrations: false, tasks: false };
 
+    const checkAllLoaded = () => {
+      if (Object.values(initialLoads).every(Boolean)) {
+        setLoading(false);
+      }
+    };
+    
     try {
       const eventsQuery = query(collection(db, 'subEvents'), where('__name__', 'in', assignedEventUids));
       unsubs.push(onSnapshot(eventsQuery, (snapshot) => {
           const eventsList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SubEvent));
           setManagedEvents(eventsList);
           setStats(prev => ({...prev, managedEvents: eventsList.length}));
-      }));
+          if (!initialLoads.events) { initialLoads.events = true; checkAllLoaded(); }
+      }, error => { console.error("Error fetching rep events:", error); if (!initialLoads.events) { initialLoads.events = true; checkAllLoaded(); } }));
 
       const registrationsQuery = query(collection(db, 'event_registrations'), where('subEventId', 'in', assignedEventUids));
       unsubs.push(onSnapshot(registrationsQuery, (snapshot) => {
           setStats(prev => ({...prev, totalParticipants: snapshot.size}));
-      }));
+          if (!initialLoads.registrations) { initialLoads.registrations = true; checkAllLoaded(); }
+      }, error => { console.error("Error fetching rep registrations:", error); if (!initialLoads.registrations) { initialLoads.registrations = true; checkAllLoaded(); }}));
       
       const tasksQuery = query(collection(db, 'tasks'), where('subEventId', 'in', assignedEventUids));
       unsubs.push(onSnapshot(tasksQuery, (snapshot) => {
           const tasksList = snapshot.docs.map(doc => doc.data() as Task);
           const completed = tasksList.filter(t => t.status === 'Completed').length;
           setStats(prev => ({...prev, tasksCompleted: completed, tasksTotal: tasksList.length}));
-          setLoading(false); // Assume this is the last query to finish
-      }));
+          if (!initialLoads.tasks) { initialLoads.tasks = true; checkAllLoaded(); }
+      }, error => { console.error("Error fetching rep tasks:", error); if (!initialLoads.tasks) { initialLoads.tasks = true; checkAllLoaded(); }}));
+
     } catch (error) {
       console.error("Error setting up event rep listeners:", error);
-      setLoading(false);
+      setLoading(false); // Catch synchronous errors during query creation
     }
 
     return () => unsubs.forEach(unsub => unsub());
@@ -307,6 +319,7 @@ const useOrganizerData = (userProfile: UserProfileData) => {
 
         setLoading(true);
 
+        // This query fetches boards where the user is a member
         const boardsQuery = query(collection(db, 'boards'), where('memberUids', 'array-contains', userProfile.uid));
         
         const unsubBoards = onSnapshot(boardsQuery, (boardSnapshot) => {
@@ -316,18 +329,21 @@ const useOrganizerData = (userProfile: UserProfileData) => {
             if (userBoards.length > 0) {
                 const allBoardIds = userBoards.map(b => b.id);
                 
-                // Fetch tasks
+                // This query fetches all tasks belonging to the boards the user is a member of.
+                // It's needed for the "Team Workload" and "Unassigned Tasks" cards.
                 if (allBoardIds.length > 0) {
                     const tasksQuery = query(collection(db, 'tasks'), where('boardId', 'in', allBoardIds));
                     const unsubTasks = onSnapshot(tasksQuery, (taskSnapshot) => {
                         const allTasks = taskSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
                         setData(prev => ({ ...prev, tasks: allTasks }));
-                        setLoading(false);
+                        setLoading(false); // Last listener to load
                     });
-                    // This should be returned by the outer listener's cleanup
+                    // This will be cleaned up by the outer listener's cleanup function
+                    return () => unsubTasks();
                 }
 
             } else {
+                 setData(prev => ({...prev, tasks: []}));
                  setLoading(false);
             }
         }, error => {
@@ -335,6 +351,8 @@ const useOrganizerData = (userProfile: UserProfileData) => {
             setLoading(false);
         });
 
+        // The cleanup function for the board listener.
+        // It will also handle the cleanup of the nested task listener.
         return () => unsubBoards();
     }, [userProfile.uid]);
 
@@ -343,27 +361,43 @@ const useOrganizerData = (userProfile: UserProfileData) => {
 
 
 const OrganizerDashboard = ({ userProfile }: { userProfile: UserProfileData }) => {
-    const { tasks, loading } = useOrganizerData(userProfile);
+    const { toast } = useToast();
+    const { boards, tasks, loading } = useOrganizerData(userProfile);
 
-    const myTasks = useMemo(() => tasks.filter(t => t.assignedToUserIds.includes(userProfile.uid)), [tasks, userProfile.uid]);
-    
-    const myCompletedTasks = myTasks.filter(t => t.status === 'Completed').length;
-    const myTotalTasks = myTasks.length;
-    const myCompletionPercentage = myTotalTasks > 0 ? (myCompletedTasks / myTotalTasks) * 100 : 0;
-    
-    const priorityOrder: { [key in TaskPriority]: number } = { 'High': 1, 'Medium': 2, 'Low': 3 };
-    const upcomingTasks = myTasks
-      .filter(t => t.status !== 'Completed')
-      .sort((a, b) => {
-        const priorityA = priorityOrder[a.priority] || 4;
-        const priorityB = priorityOrder[b.priority] || 4;
-        if (priorityA !== priorityB) return priorityA - priorityB;
+    const { myTasks, myCompletedTasks, myTotalTasks, myCompletionPercentage, upcomingTasks } = useMemo(() => {
+        const myTasks = tasks.filter(t => t.assignedToUserIds.includes(userProfile.uid));
+        const myCompletedTasks = myTasks.filter(t => t.status === 'Completed').length;
+        const myTotalTasks = myTasks.length;
+        const myCompletionPercentage = myTotalTasks > 0 ? (myCompletedTasks / myTotalTasks) * 100 : 0;
         
-        const dateA = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
-        const dateB = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
-        return dateA - dateB;
-      })
-      .slice(0, 3);
+        const priorityOrder: { [key in TaskPriority]: number } = { 'High': 1, 'Medium': 2, 'Low': 3 };
+        const upcomingTasks = myTasks
+          .filter(t => t.status !== 'Completed')
+          .sort((a, b) => {
+            const priorityA = priorityOrder[a.priority] || 4;
+            const priorityB = priorityOrder[b.priority] || 4;
+            if (priorityA !== priorityB) return priorityA - priorityB;
+            
+            const dateA = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+            const dateB = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+            return dateA - dateB;
+          })
+          .slice(0, 3);
+        
+        return { myTasks, myCompletedTasks, myTotalTasks, myCompletionPercentage, upcomingTasks };
+    }, [tasks, userProfile.uid]);
+
+
+    const handleCreateTask = async () => {
+        if (boards.length === 0) {
+            toast({ title: "No Boards", description: "You must be a member of a board to create a task.", variant: "destructive" });
+            return;
+        }
+        // In a real app, this might open a modal to select a board first.
+        // For now, we'll just link to the main tasks page.
+        toast({ title: "Redirecting...", description: "Please create the new task on your desired board."});
+        // Assuming router is available or navigate programmatically
+    };
 
     if (loading) {
         return (
@@ -378,7 +412,6 @@ const OrganizerDashboard = ({ userProfile }: { userProfile: UserProfileData }) =
       <h1 className="text-3xl font-bold text-primary">Organizer Dashboard</h1>
       <div className="flex flex-col gap-6">
         
-        {/* Task Completion Overview */}
         <Card>
           <CardHeader>
             <CardTitle>Your Task Completion</CardTitle>
@@ -394,7 +427,6 @@ const OrganizerDashboard = ({ userProfile }: { userProfile: UserProfileData }) =
           </CardFooter>
         </Card>
         
-        {/* Your Top 3 Urgent Tasks */}
         <Card>
           <CardHeader>
             <CardTitle>Your Top 3 Urgent Tasks</CardTitle>
@@ -619,5 +651,3 @@ export default function DashboardPage() {
 
   return <div className="h-full w-full">{renderDashboardByRole()}</div>;
 }
-
-    
