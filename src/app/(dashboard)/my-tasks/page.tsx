@@ -223,6 +223,7 @@ export default function MyTasksPage() {
           isOpen={!!selectedTask}
           onClose={() => setSelectedTask(null)}
           task={selectedTask}
+          board={null}
           boardMembers={[]} // We don't have board context here, modal should handle this
           allUsers={[]} // Same as above
           canManage={false} // User can't manage from this view, only update their own status

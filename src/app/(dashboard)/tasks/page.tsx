@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import type { Task, UserProfileData, Board, BoardMember } from '@/types';
+import type { Task, UserProfileData, Board, BoardMember, SubEvent } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -164,7 +164,7 @@ export default function TasksPage() {
           name: newBoardName,
           type: 'general',
           memberUids: [userProfile.uid],
-          members: [{ userId: userProfile.uid, name: userProfile.fullName || userProfile.displayName || '', role: userProfile.role }],
+          members: [{ userId: userProfile.uid, name: userProfile.fullName || userProfile.displayName, role: userProfile.role }],
           managerUids: [userProfile.uid],
           createdAt: new Date(), // Use local date for immediate UI update
           createdBy: userProfile.uid

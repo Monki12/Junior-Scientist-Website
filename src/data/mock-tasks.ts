@@ -215,3 +215,47 @@ export const getMockTasksForUser = (userId: string): Task[] => {
     return MOCK_TASKS.filter(task => task.assignedToUserIds.includes(userId));
 }
 
+/**
+ * --- SIMULATING WRITE OPERATIONS (CONCEPT) ---
+ * 
+ * This mock data setup is for reading only. To simulate write operations (Create, Update, Delete)
+ * without a backend, you would manage the state within your React components.
+ * 
+ * Example using React's useState hook:
+ *
+ * const [tasks, setTasks] = useState([]);
+ * 
+ * useEffect(() => {
+ *   // On initial load, fetch the mock data
+ *   setTasks(getMockTasksForBoard('some-board-id'));
+ * }, []);
+ * 
+ * // CREATE:
+ * const handleAddTask = (newTaskData) => {
+ *   const newTask = {
+ *     id: `mock_${Date.now()}`, // Generate a temporary ID
+ *     ...newTaskData,
+ *     createdAt: new Date().toISOString(),
+ *     updatedAt: new Date().toISOString(),
+ *   };
+ *   setTasks(prevTasks => [...prevTasks, newTask]);
+ * };
+ * 
+ * // UPDATE:
+ * const handleUpdateTask = (taskId, updatedData) => {
+ *   setTasks(prevTasks => 
+ *     prevTasks.map(task => 
+ *       task.id === taskId ? { ...task, ...updatedData, updatedAt: new Date().toISOString() } : task
+ *     )
+ *   );
+ * };
+ * 
+ * // DELETE:
+ * const handleDeleteTask = (taskId) => {
+ *   setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
+ * };
+ * 
+ * This approach keeps all changes in the client's memory. When you're ready to integrate with
+ * Firestore, you would replace these `setTasks` calls with your Firestore SDK functions 
+ * (e.g., `addDoc`, `updateDoc`, `deleteDoc`).
+ */
