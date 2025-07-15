@@ -10,9 +10,9 @@ import {
   SidebarHeader,
   SidebarTrigger,
   SidebarGroup,
-  SidebarGroupLabel,
   SidebarMenuSub,
   SidebarMenuSubButton,
+  SidebarMenuSubItem,
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/use-auth';
 import { usePathname, useRouter } from 'next/navigation';
@@ -31,8 +31,8 @@ import {
   Ticket,
   Users2,
   ListTodo,
-  CheckCircle,
   Settings,
+  ChevronDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from './logo';
