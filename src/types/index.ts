@@ -15,13 +15,21 @@ export type EventStatus = 'Planning' | 'Active' | 'Completed' | 'Cancelled' | 'o
 export type RegistrationStatus = 'pending' | 'approved' | 'declined' | 'cancelled';
 export type TeamStatus = 'pending' | 'approved' | 'disqualified';
 
+export interface BoardMember {
+  userId: string;
+  name: string;
+  role: string; // e.g., "Admin", "Organizer", "Team Member"
+  photoURL?: string; // Optional photo URL for avatar
+}
+
 export interface Board {
   id: string;
   name: string;
   description?: string;
   type: 'general' | 'event';
   eventId?: string;
-  memberUids: string[];
+  memberUids: string[]; // Keep this for security rule checks
+  members: BoardMember[]; // Rich member data for UI
   managerUids?: string[];
   createdAt: any;
   createdBy: string;

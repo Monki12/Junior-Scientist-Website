@@ -3,10 +3,10 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import type { Task, UserProfileData, Board, SubEvent } from '@/types';
+import type { Task, UserProfileData, Board, BoardMember } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
 import { ListChecks, Loader2, PlusCircle, Users } from 'lucide-react';
 import { collection, query, onSnapshot, addDoc, serverTimestamp, where, getDocs, doc } from 'firebase/firestore';
@@ -22,7 +22,7 @@ export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [boards, setBoards] = useState<Board[]>([]);
   const [currentBoard, setCurrentBoard] = useState<Board | null>(null);
-  const [boardUsers, setBoardUsers] = useState<UserProfileData[]>([]);
+  const [boardMembers, setBoardMembers] = useState<BoardMember[]>([]);
   
   const [loading, setLoading] = useState(true);
   const [loadingBoardData, setLoadingBoardData] = useState(false);
@@ -95,7 +95,7 @@ export default function TasksPage() {
   useEffect(() => {
     if (!currentBoard) {
       setTasks([]);
-      setBoardUsers([]);
+      setBoardMembers([]);
       return;
     }
 
@@ -107,11 +107,12 @@ export default function TasksPage() {
       setLoadingBoardData(false);
     });
 
-    const boardMemberProfiles = allUsers.filter(u => currentBoard.memberUids.includes(u.uid));
-    setBoardUsers(boardMemberProfiles);
+    // Use the rich `members` array from the board document
+    const membersWithDetails = currentBoard.members || [];
+    setBoardMembers(membersWithDetails);
     
     return () => unsubTasks();
-  }, [currentBoard, allUsers]);
+  }, [currentBoard]);
 
 
   const handleCreateBoard = async () => {
@@ -121,6 +122,7 @@ export default function TasksPage() {
             name: newBoardName,
             type: 'general',
             memberUids: [userProfile.uid],
+            members: [{ userId: userProfile.uid, name: userProfile.fullName || userProfile.displayName, role: userProfile.role }],
             managerUids: [userProfile.uid],
             createdAt: serverTimestamp(),
             createdBy: userProfile.uid,
@@ -135,6 +137,7 @@ export default function TasksPage() {
           name: newBoardName,
           type: 'general',
           memberUids: [userProfile.uid],
+          members: [{ userId: userProfile.uid, name: userProfile.fullName || userProfile.displayName, role: userProfile.role }],
           managerUids: [userProfile.uid],
           createdAt: new Date(),
           createdBy: userProfile.uid
@@ -149,14 +152,6 @@ export default function TasksPage() {
     setEditingTask(task);
   };
 
-   // Effect to open/close modal based on editingTask state
-  useEffect(() => {
-    if (editingTask !== null) {
-      // Logic to open modal, e.g., setIsTaskModalOpen(true);
-    }
-  }, [editingTask]);
-
-  const canManageCurrentBoard = userProfile && currentBoard && (currentBoard.managerUids?.includes(userProfile.uid) || ['admin', 'overall_head'].includes(userProfile.role));
   const canCreateBoards = userProfile && ['admin', 'overall_head', 'event_representative'].includes(userProfile.role);
 
   return (
@@ -171,13 +166,6 @@ export default function TasksPage() {
               <Button variant="link" size="sm" onClick={() => setCurrentBoard(null)} className="p-0 h-auto text-sm">
                 &larr; Back to board selection
               </Button>
-            )}
-        </div>
-        <div className="flex items-center gap-2">
-            {canManageCurrentBoard && (
-                <Button onClick={() => handleOpenTaskModal(null)} disabled={!currentBoard || loadingBoardData}>
-                    <PlusCircle className="mr-2 h-4 w-4" /> Add Task
-                </Button>
             )}
         </div>
       </header>
@@ -200,7 +188,7 @@ export default function TasksPage() {
                         {boards.map(board => (
                             <button key={board.id} onClick={() => setCurrentBoard(board)} className="p-4 border rounded-lg text-left hover:border-primary transition-colors">
                                 <h3 className="font-bold text-lg">{board.name}</h3>
-                                <p className="text-sm text-muted-foreground">{board.memberUids.length} members</p>
+                                <p className="text-sm text-muted-foreground">{board.members?.length || board.memberUids.length} members</p>
                             </button>
                         ))}
                     </div>
@@ -217,7 +205,7 @@ export default function TasksPage() {
           <TaskBoard
             board={currentBoard}
             tasks={tasks}
-            users={boardUsers}
+            members={boardMembers}
             onEditTask={handleOpenTaskModal}
             loading={loadingBoardData}
           />
@@ -246,9 +234,9 @@ export default function TasksPage() {
         onClose={() => setEditingTask(null)}
         task={editingTask}
         board={currentBoard}
-        boardMembers={boardUsers}
+        boardMembers={boardMembers}
         allUsers={allUsers}
-        canManage={!!canManageCurrentBoard}
+        canManage={!!(userProfile && currentBoard && (currentBoard.managerUids?.includes(userProfile.uid) || ['admin', 'overall_head'].includes(userProfile.role)))}
       />
     </div>
   );

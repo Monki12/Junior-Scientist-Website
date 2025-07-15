@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 import { DndContext, closestCorners, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { useToast } from '@/hooks/use-toast';
-import type { Task, UserProfileData, Board } from '@/types';
+import type { Task, Board, BoardMember } from '@/types';
 import TaskColumn from './TaskColumn';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -15,31 +15,32 @@ import { Loader2 } from 'lucide-react';
 interface TaskBoardProps {
   board: Board;
   tasks: Task[];
-  users: UserProfileData[];
+  members: BoardMember[];
   onEditTask: (task: Task | null) => void;
   loading: boolean;
 }
 
-export default function TaskBoard({ board, tasks, users, onEditTask, loading }: TaskBoardProps) {
+export default function TaskBoard({ board, tasks, members, onEditTask, loading }: TaskBoardProps) {
   const { toast } = useToast();
   const { userProfile } = useAuth();
   
   const canManageBoard = userProfile && (board.managerUids?.includes(userProfile.uid) || ['admin', 'overall_head'].includes(userProfile.role));
 
   const columns = useMemo(() => {
-    const unassignedTasks = tasks.filter(task => !task.assignedToUserIds || task.assignedToUserIds.length === 0);
-    const memberColumns = users.map(user => ({
-        id: user.uid,
-        title: user.fullName || user.displayName || 'Unnamed User',
-        tasks: tasks.filter(task => task.assignedToUserIds?.includes(user.uid)),
-        user: user,
+    const unassignedTasks = tasks.filter(task => !task.assignedToUserIds || task.assignedToUserIds.length === 0 || !task.assignedToUserIds[0]);
+    
+    const memberColumns = members.map(member => ({
+        id: member.userId,
+        title: member.name,
+        tasks: tasks.filter(task => task.assignedToUserIds?.includes(member.userId)),
+        member: member,
     }));
 
     return [
-      { id: 'unassigned', title: 'New Tasks', tasks: unassignedTasks, user: null },
+      { id: 'unassigned', title: 'New Tasks', tasks: unassignedTasks, member: null },
       ...memberColumns
     ];
-  }, [tasks, users]);
+  }, [tasks, members]);
 
 
   const sensors = useSensors(
@@ -51,22 +52,19 @@ export default function TaskBoard({ board, tasks, users, onEditTask, loading }: 
     const { active, over } = event;
     if (!active || !over || !userProfile) return;
     
-    // The `id` of a droppable area is the user's UID or "unassigned"
     const targetColumnId = String(over.id);
     const draggedTaskId = String(active.id);
 
     const task = tasks.find(t => t.id === draggedTaskId);
     if (!task) return;
 
-    // Determine the original column, which could be an array of assignees.
     const originalAssignee = task.assignedToUserIds && task.assignedToUserIds.length > 0 ? task.assignedToUserIds[0] : 'unassigned';
     
-    if (originalAssignee === targetColumnId) return; // No change if dropped in the same column.
+    if (originalAssignee === targetColumnId) return;
 
-    // Permissions check
     const isSelfAssign = targetColumnId === userProfile.uid && originalAssignee === 'unassigned';
     if (!canManageBoard && !isSelfAssign) {
-        toast({ title: "Permission Denied", description: "You can only assign tasks from the 'New Tasks' column to yourself.", variant: "destructive"});
+        toast({ title: "Permission Denied", description: "You can only assign tasks from 'New Tasks' to yourself.", variant: "destructive"});
         return;
     }
 
@@ -75,7 +73,6 @@ export default function TaskBoard({ board, tasks, users, onEditTask, loading }: 
         await updateDoc(taskRef, {
             assignedToUserIds: targetColumnId === 'unassigned' ? [] : [targetColumnId],
             updatedAt: serverTimestamp(),
-            // Automatically update status if task is moved from unassigned
             status: task.status === 'Not Started' && targetColumnId !== 'unassigned' ? 'In Progress' : task.status,
         });
         toast({ title: "Task Reassigned", description: `Task moved successfully.`});
@@ -98,8 +95,9 @@ export default function TaskBoard({ board, tasks, users, onEditTask, loading }: 
             id={col.id}
             title={col.title}
             tasks={col.tasks}
-            user={col.user}
+            member={col.member}
             onEditTask={onEditTask}
+            canManageBoard={!!canManageBoard}
           />
         ))}
       </div>
