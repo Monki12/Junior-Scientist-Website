@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import type { Task, Board, UserProfileData, Subtask, TaskStatus, TaskPriority } from '@/types';
+import type { Task, Board, UserProfileData, Subtask, TaskStatus, TaskPriority, BoardMember } from '@/types';
 import { db } from '@/lib/firebase';
 import { doc, updateDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -30,7 +30,7 @@ interface TaskDetailModalProps {
   onClose: () => void;
   task: Task | null; // Null when creating a new task
   board: Board | null;
-  boardMembers: UserProfileData[];
+  boardMembers: BoardMember[];
   allUsers: UserProfileData[];
   canManage: boolean;
   onTaskUpdate: (task: Task) => void;
@@ -73,21 +73,21 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
   
   const handleSaveChanges = async () => {
     if (!board) return;
-    setIsUpdating(true);
     
+    // Ensure title is not empty when creating new task
+    if (!task && !formState.caption?.trim()) {
+        toast({ title: "Caption is required", description: "Please enter a short title for the task.", variant: "destructive" });
+        return;
+    }
+    
+    setIsUpdating(true);
+
     const dataToSave: any = {
       ...formState,
       boardId: board.id,
       dueDate: formState.dueDate ? (formState.dueDate as Date).toISOString() : null,
       updatedAt: serverTimestamp(),
     };
-    
-    // Ensure title is not empty when creating new task
-    if (!task && !dataToSave.caption?.trim()) {
-        toast({ title: "Caption is required", description: "Please enter a short title for the task.", variant: "destructive" });
-        setIsUpdating(false);
-        return;
-    }
     
     if (USE_MOCK_DATA) {
         const mockTask: Task = {
@@ -147,6 +147,7 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
 
   const assignedUser = useMemo(() => {
     if (!formState.assignedToUserIds || formState.assignedToUserIds.length === 0) return null;
+    // In this simplified modal, we use allUsers since boardMembers might not be complete
     return allUsers.find(u => u.uid === formState.assignedToUserIds![0]);
   }, [formState.assignedToUserIds, allUsers]);
 
@@ -164,11 +165,11 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
           <div className="md:col-span-2 space-y-6">
             <div>
                 <Label htmlFor="taskCaption">Caption (Short Title)</Label>
-                <Input id="taskCaption" value={formState.caption || ''} onChange={(e) => handleInputChange('caption', e.target.value)} disabled={!canManage} />
+                <Input id="taskCaption" value={formState.caption || ''} onChange={(e) => handleInputChange('caption', e.target.value)} disabled={!canManage && !!task} />
             </div>
              <div>
                 <Label htmlFor="taskDesc">Detailed Task Description</Label>
-                <Textarea id="taskDesc" value={formState.description || ''} onChange={(e) => handleInputChange('description', e.target.value)} rows={5} disabled={!canManage} />
+                <Textarea id="taskDesc" value={formState.description || ''} onChange={(e) => handleInputChange('description', e.target.value)} rows={5} disabled={!canManage && !!task} />
             </div>
 
             <div>
@@ -208,7 +209,7 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
                     </div>
                      <div>
                         <Label>Priority</Label>
-                        <Select value={formState.priority} onValueChange={v => handleInputChange('priority', v as TaskPriority)} disabled={!canManage}>
+                        <Select value={formState.priority} onValueChange={v => handleInputChange('priority', v as TaskPriority)} disabled={!canManage && !!task}>
                             <SelectTrigger><SelectValue/></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="High">High</SelectItem>
@@ -221,7 +222,7 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
                         <Label>Deadline</Label>
                         <Popover>
                           <PopoverTrigger asChild>
-                          <Button variant="outline" className={`w-full justify-start text-left font-normal ${!formState.dueDate && "text-muted-foreground"}`} disabled={!canManage}>
+                          <Button variant="outline" className={`w-full justify-start text-left font-normal ${!formState.dueDate && "text-muted-foreground"}`} disabled={!canManage && !!task}>
                               <CalendarIcon className="mr-2 h-4 w-4" />
                               {formState.dueDate ? format(formState.dueDate as Date, "PPP") : <span>Pick a deadline</span>}
                           </Button>
@@ -231,7 +232,7 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
                     </div>
                     <div>
                         <Label>Bucket</Label>
-                        <RadioGroup defaultValue={formState.bucket || 'other'} onValueChange={(val) => handleInputChange('bucket', val)} className="flex space-x-2" disabled={!canManage}>
+                        <RadioGroup defaultValue={formState.bucket || 'other'} onValueChange={(val) => handleInputChange('bucket', val)} className="flex space-x-2" disabled={!canManage && !!task}>
                            <div className="flex items-center space-x-1"><RadioGroupItem value="a" id="r-a" /><Label htmlFor="r-a">A</Label></div>
                            <div className="flex items-center space-x-1"><RadioGroupItem value="b" id="r-b" /><Label htmlFor="r-b">B</Label></div>
                            <div className="flex items-center space-x-1"><RadioGroupItem value="c" id="r-c" /><Label htmlFor="r-c">C</Label></div>
@@ -258,7 +259,7 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
                             <SelectContent>
                                 <SelectItem value="">Unassigned</SelectItem>
                                 {boardMembers.map(member => (
-                                    <SelectItem key={member.uid} value={member.uid}>{member.name}</SelectItem>
+                                    <SelectItem key={member.userId} value={member.userId}>{member.name}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
@@ -269,7 +270,7 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
         </div>
         <DialogFooter className="pt-4 border-t">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSaveChanges} disabled={isUpdating || !canManage}>
+          <Button onClick={handleSaveChanges} disabled={isUpdating || (!canManage && !!task)}>
             {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
             {isUpdating ? 'Saving...' : 'Save Changes'}
           </Button>

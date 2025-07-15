@@ -191,23 +191,20 @@ export default function TasksPage() {
   };
   
   const handleTaskUpdate = (updatedTask: Task) => {
-    if (USE_MOCK_DATA) {
-        // If task has an ID, it's an update.
-        if (updatedTask.id && tasks.some(t => t.id === updatedTask.id)) {
-            setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
-        } else {
-            // This is a new task. Give it a mock ID and add it to the state.
-            const newTaskWithId: Task = { 
-                ...updatedTask, 
-                id: `mock_task_${nanoid()}`,
-                assignedToUserIds: [], // New tasks are always unassigned
-                createdAt: new Date().toISOString(),
-                boardId: currentBoard!.id, // Assign to current board
-            };
-            setTasks(prev => [...prev, newTaskWithId]);
-        }
+    // If task has an ID, it's an update.
+    if (updatedTask.id && tasks.some(t => t.id === updatedTask.id)) {
+        setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
+    } else {
+        // This is a new task. Give it a mock ID and add it to the state.
+        const newTaskWithId: Task = { 
+            ...updatedTask, 
+            id: `mock_task_${nanoid()}`,
+            assignedToUserIds: [], // New tasks are always unassigned
+            createdAt: new Date().toISOString(),
+            boardId: currentBoard!.id, // Assign to current board
+        };
+        setTasks(prev => [...prev, newTaskWithId]);
     }
-    // In a real app, onSnapshot from Firebase would handle this automatically for Firestore writes.
   };
 
   const canCreateBoards = userProfile && ['admin', 'overall_head', 'event_representative'].includes(userProfile.role);
@@ -301,4 +298,3 @@ export default function TasksPage() {
     </div>
   );
 }
-
