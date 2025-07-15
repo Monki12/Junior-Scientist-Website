@@ -217,10 +217,16 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
                         <p className="text-sm text-muted-foreground">Unassigned (In "New Tasks")</p>
                      )}
                      {canManage && (
-                        <Select onValueChange={(uid) => handleInputChange('assignedToUserIds', uid ? [uid] : [])} value={formState.assignedToUserIds?.[0] || ''}>
+                        <Select
+                            onValueChange={(uid) => {
+                                const newAssignedIds = uid === 'unassigned' ? [] : [uid];
+                                handleInputChange('assignedToUserIds', newAssignedIds);
+                            }}
+                            value={formState.assignedToUserIds?.[0] || 'unassigned'}
+                        >
                             <SelectTrigger><SelectValue placeholder="Assign to..."/></SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="">Unassigned</SelectItem>
+                                <SelectItem value="unassigned">Unassigned</SelectItem>
                                 {boardMembers.map(member => (
                                     <SelectItem key={member.userId} value={member.userId}>{member.name}</SelectItem>
                                 ))}
