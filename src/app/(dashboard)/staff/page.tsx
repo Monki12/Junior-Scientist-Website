@@ -82,7 +82,7 @@ export default function StaffPage() {
             role: editingUser.role,
             assignedEventUids: editingUser.assignedEventUids || [],
             studentDataEventAccess: editingUser.studentDataEventAccess || {},
-            credibilityScore: Number(editingUser.credibilityScore) || 0,
+            points: Number(editingUser.points) || 0,
         };
         await updateDoc(userRef, updates);
 
@@ -186,14 +186,14 @@ export default function StaffPage() {
         <CardContent>
           <div className="border rounded-md">
             <Table>
-              <TableHeader><TableRow><TableHead>Full Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Credibility</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Full Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Points</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
               <TableBody>
                 {allStaff.map((user) => (
                   <TableRow key={user.uid}>
                     <TableCell className="font-medium">{user.fullName || user.displayName}</TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell><Badge variant="outline" className="capitalize">{user.role?.replace(/_/g, ' ')}</Badge></TableCell>
-                    <TableCell className="font-semibold text-accent">{user.credibilityScore}</TableCell>
+                    <TableCell className="font-semibold text-accent">{user.points || 0}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="sm" onClick={() => handleOpenEditDialog(user)}>
                         <Edit className="mr-2 h-4 w-4"/>Manage
@@ -270,12 +270,12 @@ export default function StaffPage() {
                         </div>
                     )}
                     <div>
-                        <Label htmlFor="credibilityScore">Credibility Score</Label>
+                        <Label htmlFor="points">Points</Label>
                         <Input 
-                            id="credibilityScore" 
+                            id="points" 
                             type="number" 
-                            value={editingUser.credibilityScore} 
-                            onChange={(e) => setEditingUser(u => u ? {...u, credibilityScore: Number(e.target.value)} : null)} 
+                            value={editingUser.points} 
+                            onChange={(e) => setEditingUser(u => u ? {...u, points: Number(e.target.value)} : null)} 
                         />
                     </div>
                     <Button onClick={handleUserUpdate}>Save Changes</Button>

@@ -67,7 +67,6 @@ const getNavLinksForRole = (role: string | undefined) => {
     { href: '/staff', label: 'Manage Staff', icon: Users },
     { href: '/students', label: 'Manage Students', icon: GraduationCap },
     { href: '/ocr-tool', label: 'OCR Scanner', icon: ScanLine },
-    { href: '/leaderboard', label: 'Leaderboard', icon: Trophy },
   ];
   
   const organizerLinks = [

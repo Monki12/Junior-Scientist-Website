@@ -181,8 +181,8 @@ export default function ProfilePage() {
         <CardContent className="space-y-6 pt-6">
             {isOrganizerRole && (
                 <div className="space-y-1 text-center">
-                    <Label>Credibility Score</Label>
-                    <p className="text-4xl font-bold text-accent flex items-center justify-center gap-2"><Award className="h-8 w-8"/> {userProfile.credibilityScore || 0}</p>
+                    <Label>Points Earned</Label>
+                    <p className="text-4xl font-bold text-accent flex items-center justify-center gap-2"><Award className="h-8 w-8"/> {userProfile.points || 0}</p>
                 </div>
             )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">

@@ -16,7 +16,6 @@ import { Progress } from '@/components/ui/progress';
 
 const OverallHeadDashboard = () => {
   const [stats, setStats] = useState({ events: 0, staff: 0, students: 0, avgParticipants: '0.0' });
-  const [topStaff, setTopStaff] = useState<UserProfileData[]>([]);
   const [eventParticipantData, setEventParticipantData] = useState<{name: string, participants: number}[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -69,9 +68,6 @@ const OverallHeadDashboard = () => {
     const staffQuery = query(collection(db, 'users'), where('role', 'in', ['admin', 'overall_head', 'event_representative', 'organizer']));
     const unsubStaff = onSnapshot(staffQuery, (snapshot) => {
         setStats(prev => ({...prev, staff: snapshot.size}));
-        const staffList = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }) as UserProfileData);
-        const leaderboard = staffList.sort((a, b) => (b.credibilityScore || 0) - (a.credibilityScore || 0)).slice(0, 3);
-        setTopStaff(leaderboard);
         if (!initialLoads.staff) { initialLoads.staff = true; checkAllLoaded(); }
     }, error => console.error("Error fetching staff stats: ", error));
 
@@ -143,8 +139,8 @@ const OverallHeadDashboard = () => {
         </Card>
       </div>
       
-      <div className="grid gap-6 lg:grid-cols-7">
-        <Card className="lg:col-span-4">
+      <div className="grid gap-6">
+        <Card>
             <CardHeader>
                 <CardTitle>Top Events by Participant Count</CardTitle>
                 <CardDescription>A look at the most popular events based on registrations.</CardDescription>
@@ -160,27 +156,6 @@ const OverallHeadDashboard = () => {
                         <Bar dataKey="participants" name="Participants" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                     </BarChart>
                 </ResponsiveContainer>
-            </CardContent>
-        </Card>
-         <Card className="lg:col-span-3">
-            <CardHeader>
-                <CardTitle className="flex items-center"><Trophy className="h-5 w-5 mr-2 text-yellow-500"/>Credibility Leaders</CardTitle>
-                <CardDescription>Top performing staff members based on credibility score.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                {topStaff.length > 0 ? topStaff.map((staff, index) => (
-                    <div key={staff.uid} className="flex items-center">
-                        <div className="text-xl font-bold mr-4">#{index + 1}</div>
-                        <div>
-                            <p className="font-semibold">{staff.fullName}</p>
-                            <p className="text-sm text-muted-foreground capitalize">{staff.role?.replace(/_/g, ' ')}</p>
-                        </div>
-                        <div className="ml-auto text-lg font-bold text-accent">{staff.credibilityScore}</div>
-                    </div>
-                )) : <p className="text-sm text-muted-foreground">No staff data available.</p>}
-                <Button asChild variant="outline" className="w-full mt-2">
-                    <Link href="/leaderboard">View Full Leaderboard</Link>
-                </Button>
             </CardContent>
         </Card>
       </div>
@@ -348,7 +323,7 @@ const OrganizerDashboard = ({ userProfile }: { userProfile: UserProfileData }) =
   }
 
   const stats = {
-    credibilityScore: userProfile.credibilityScore || 0,
+    points: userProfile.points || 0,
     tasksTotal: tasks.length,
     tasksCompleted: tasks.filter(t => t.status === 'Completed').length,
   };
@@ -362,12 +337,12 @@ const OrganizerDashboard = ({ userProfile }: { userProfile: UserProfileData }) =
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Credibility Score</CardTitle>
+            <CardTitle className="text-sm font-medium">Points Earned</CardTitle>
             <Trophy className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-accent">{stats.credibilityScore}</div>
-            <p className="text-xs text-muted-foreground">Points from completed tasks</p>
+            <div className="text-2xl font-bold text-accent">{stats.points}</div>
+            <p className="text-xs text-muted-foreground">From completed tasks</p>
           </CardContent>
         </Card>
         <Card>

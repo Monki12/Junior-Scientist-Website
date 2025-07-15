@@ -80,7 +80,6 @@ export interface UserProfileData {
   department?: string | null; 
   assignedEventUids?: string[];
   studentDataEventAccess?: Record<string, boolean>;
-  credibilityScore: number;
   points?: number; 
   phoneNumbers?: string[];
   additionalNumber?: string | null;
