@@ -101,7 +101,12 @@ service cloud.firestore {
     }
     
     match /tasks/{taskId} {
-      allow read: if isMemberOfBoard(resource.data.boardId);
+      function getTaskBoardId(taskDoc) {
+        return taskDoc.data.boardId;
+      }
+      
+      allow read: if isMemberOfBoard(getTaskBoardId(resource)) || (isSignedIn() && request.auth.uid in resource.data.assignedToUserIds);
+      
       allow create: if isMemberOfBoard(request.resource.data.boardId);
 
       allow update: if canManageBoards() || isSelfAssigningTask(resource, request.resource.data) || isAssigneeUpdatingOwnTask(resource, request.resource.data);
@@ -109,7 +114,7 @@ service cloud.firestore {
       allow delete: if canManageBoards();
 
       match /subtasks/{subtaskId} {
-        allow read, write: if isMemberOfBoard(get(/databases/$(database)/documents/tasks/$(taskId)).data.boardId);
+        allow read, write: if isMemberOfBoard(getTaskBoardId(get(/databases/$(database)/documents/tasks/$(taskId))));
       }
     }
     
