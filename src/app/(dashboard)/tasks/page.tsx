@@ -32,6 +32,8 @@ export default function TasksPage() {
   const [newBoardName, setNewBoardName] = useState('');
 
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+
 
   useEffect(() => {
     if (!userProfile?.uid) return;
@@ -51,7 +53,7 @@ export default function TasksPage() {
         unsubUsers();
         unsubBoards();
     }
-  }, [userProfile?.uid, toast]);
+  }, [userProfile?.uid]);
 
   useEffect(() => {
     if (!currentBoard) {
@@ -107,12 +109,12 @@ export default function TasksPage() {
 
   const handleOpenTaskModal = (task: Task | null) => {
     setEditingTask(task);
+    setIsTaskModalOpen(true);
   };
   
   const handleTaskUpdate = async (updatedTask: Task) => {
-    if (!currentBoard) return;
-    onCloseModal();
-
+    if (!currentBoard || !userProfile) return;
+    
     if (updatedTask.id) { // Update existing task
         const taskRef = doc(db, 'tasks', updatedTask.id);
         await updateDoc(taskRef, {
@@ -124,16 +126,18 @@ export default function TasksPage() {
         await addDoc(collection(db, 'tasks'), {
             ...updatedTask,
             boardId: currentBoard.id,
-            creatorId: userProfile?.uid,
+            creatorId: userProfile.uid,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
         });
         toast({ title: "Task Created" });
     }
+    setIsTaskModalOpen(false);
   };
 
   const onCloseModal = () => {
     setEditingTask(null);
+    setIsTaskModalOpen(false);
   };
 
   const canCreateBoards = userProfile && ['admin', 'overall_head', 'event_representative'].includes(userProfile.role);
@@ -213,9 +217,8 @@ export default function TasksPage() {
         </DialogContent>
       </Dialog>
       
-      {editingTask !== undefined && (
-        <TaskDetailModal
-            isOpen={editingTask !== null}
+       <TaskDetailModal
+            isOpen={isTaskModalOpen}
             onClose={onCloseModal}
             task={editingTask}
             board={currentBoard}
@@ -224,7 +227,6 @@ export default function TasksPage() {
             canManage={!!(userProfile && currentBoard && (currentBoard.managerUids?.includes(userProfile.uid) || ['admin', 'overall_head'].includes(userProfile.role)))}
             onTaskUpdate={handleTaskUpdate}
         />
-       )}
     </div>
   );
 }
