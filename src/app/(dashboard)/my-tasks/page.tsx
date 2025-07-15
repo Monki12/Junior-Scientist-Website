@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import type { Task, Board } from '@/types';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { Loader2, ListTodo, Inbox } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -102,6 +102,22 @@ export default function MyTasksPage() {
     };
 
   }, [userProfile, authLoading, toast, router]);
+  
+  const handleTaskUpdate = async (updatedTask: Partial<Task>) => {
+    if (!updatedTask.id) return; // Should not happen in this view
+    try {
+        const taskRef = doc(db, 'tasks', updatedTask.id);
+        await updateDoc(taskRef, {
+            ...updatedTask,
+            updatedAt: serverTimestamp(),
+        });
+        toast({ title: "Task Updated" });
+    } catch(e) {
+        toast({ title: "Update Failed", description: "You might not have permission for this action.", variant: "destructive" });
+        console.error(e);
+    }
+    setSelectedTask(null);
+  };
 
   const filteredTasks = tasks.filter(task => {
     const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
@@ -205,14 +221,11 @@ export default function MyTasksPage() {
           isOpen={!!selectedTask}
           onClose={() => setSelectedTask(null)}
           task={selectedTask}
-          board={null} // Board context is not fully available here, modal must handle this
-          boardMembers={[]} // We don't have board context here, modal should handle this
-          allUsers={[]} // Same as above
-          canManage={false} // User can't manage from this view, only update their own status
-          onTaskUpdate={() => {
-            // This page is read-only for now, but onTaskUpdate needs to be passed
-            toast({ title: 'Read-only View', description: 'Task modifications should be done from the board view.' });
-          }}
+          board={boards.find(b => b.id === selectedTask.boardId) || null}
+          boardMembers={[]} // Not needed as we can't re-assign from this view
+          allUsers={[]} 
+          canManage={false} // User can't manage all fields, but can update their own status
+          onTaskUpdate={handleTaskUpdate}
         />
       )}
     </div>

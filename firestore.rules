@@ -76,11 +76,13 @@ service cloud.firestore {
       let isAssigningSelf = requestData.assignedToUserIds == [request.auth.uid];
       return isCurrentlyUnassigned && isAssigningSelf;
     }
-
+    
     function isAssigneeUpdatingOwnTask(task, requestData) {
       // True if the user is an assignee and is only updating specific fields
       let allowedFields = ['status', 'description', 'subtasks', 'updatedAt', 'completedAt', 'completedByUserId'];
-      return request.auth.uid in task.data.assignedToUserIds && requestData.diff(task.data).affectedKeys().hasOnly(allowedFields);
+      let isAssigned = request.auth.uid in task.data.assignedToUserIds;
+      let isModifyingAllowedFields = requestData.diff(task.data).affectedKeys().hasOnly(allowedFields);
+      return isAssigned && isModifyingAllowedFields;
     }
 
 
@@ -105,12 +107,10 @@ service cloud.firestore {
         return taskDoc.data.boardId;
       }
       
-      allow read: if isMemberOfBoard(getTaskBoardId(resource)) || (isSignedIn() && request.auth.uid in resource.data.assignedToUserIds);
-      
+      allow get: if isMemberOfBoard(getTaskBoardId(resource));
+      allow list: if isMemberOfBoard(getTaskBoardId(resource)) || (isSignedIn() && request.auth.uid in resource.data.assignedToUserIds);
       allow create: if isMemberOfBoard(request.resource.data.boardId);
-
       allow update: if canManageBoards() || isSelfAssigningTask(resource, request.resource.data) || isAssigneeUpdatingOwnTask(resource, request.resource.data);
-
       allow delete: if canManageBoards();
 
       match /subtasks/{subtaskId} {
