@@ -1,0 +1,162 @@
+
+{
+  "info": "This file contains sample data for populating Firestore. You can use this to manually create documents in your Firebase console for testing.",
+  "collections": {
+    "boards": [
+      {
+        "id": "general_board",
+        "data": {
+          "name": "General",
+          "type": "general",
+          "memberUids": ["user1_admin", "user2_overall_head", "user3_organizer", "user4_representative"],
+          "members": [
+            { "userId": "user1_admin", "role": "Admin", "name": "Alice Admin" },
+            { "userId": "user2_overall_head", "role": "Overall Head", "name": "Bob Overall" },
+            { "userId": "user3_organizer", "role": "Organizer", "name": "Charlie Org" },
+            { "userId": "user4_representative", "role": "Representative", "name": "Diana Rep" }
+          ]
+        }
+      },
+      {
+        "id": "event_science_fair",
+        "data": {
+          "name": "Science Fair Event Board",
+          "type": "event",
+          "eventId": "science_fair_2025",
+          "memberUids": ["user1_admin", "user2_overall_head", "user5_event_rep", "user6_team_member"],
+          "members": [
+            { "userId": "user1_admin", "role": "Admin", "name": "Alice Admin" },
+            { "userId": "user2_overall_head", "role": "Overall Head", "name": "Bob Overall" },
+            { "userId": "user5_event_rep", "role": "Event Representative", "name": "Eve Event" },
+            { "userId": "user6_team_member", "role": "Team Member", "name": "Frank Team" }
+          ]
+        }
+      },
+      {
+        "id": "event_art_gala",
+        "data": {
+            "name": "Art Gala Event Board",
+            "type": "event",
+            "eventId": "art_gala_2025",
+            "memberUids": ["user1_admin", "user2_overall_head", "user7_gala_coord", "user8_art_team"],
+            "members": [
+              { "userId": "user1_admin", "role": "Admin", "name": "Alice Admin" },
+              { "userId": "user2_overall_head", "role": "Overall Head", "name": "Bob Overall" },
+              { "userId": "user7_gala_coord", "role": "Event Representative", "name": "Grace Coordinator" },
+              { "userId": "user8_art_team", "role": "Team Member", "name": "Harry Art" }
+            ]
+        }
+      }
+    ],
+    "users": [
+      { "id": "user1_admin", "data": { "fullName": "Alice Admin", "email": "alice@example.com", "role": "admin" } },
+      { "id": "user2_overall_head", "data": { "fullName": "Bob Overall", "email": "bob@example.com", "role": "overall_head" } },
+      { "id": "user3_organizer", "data": { "fullName": "Charlie Org", "email": "charlie@example.com", "role": "organizer" } },
+      { "id": "user4_representative", "data": { "fullName": "Diana Rep", "email": "diana@example.com", "role": "event_representative" } },
+      { "id": "user5_event_rep", "data": { "fullName": "Eve Event", "email": "eve@example.com", "role": "event_representative" } },
+      { "id": "user6_team_member", "data": { "fullName": "Frank Team", "email": "frank@example.com", "role": "student" } },
+      { "id": "user7_gala_coord", "data": { "fullName": "Grace Coordinator", "email": "grace@example.com", "role": "event_representative" } },
+      { "id": "user8_art_team", "data": { "fullName": "Harry Art", "email": "harry@example.com", "role": "student" } }
+    ],
+    "tasks": [
+      {
+        "id": "task_1",
+        "data": {
+          "boardId": "general_board",
+          "description": "Draft the initial project proposal document, including scope, objectives, and key deliverables. Collaborate with department heads.",
+          "bucket": "a",
+          "caption": "Draft Project Proposal",
+          "dueDate": "2025-07-20T23:59:59Z",
+          "assignedToUserIds": [],
+          "status": "Not Started",
+          "priority": "High",
+          "createdAt": "2025-07-15T10:00:00Z"
+        }
+      },
+      {
+        "id": "task_2",
+        "data": {
+          "boardId": "general_board",
+          "description": "Review and approve the final budget allocation for Q3. Ensure all departments have adequate funding.",
+          "bucket": "a",
+          "caption": "Approve Q3 Budget",
+          "dueDate": "2025-07-22T17:00:00Z",
+          "assignedToUserIds": ["user1_admin"],
+          "status": "In Progress",
+          "priority": "High",
+          "createdAt": "2025-07-15T11:00:00Z"
+        }
+      },
+      {
+        "id": "task_3",
+        "data": {
+          "boardId": "general_board",
+          "description": "Schedule and lead the weekly leadership meeting. Prepare agenda and minutes.",
+          "bucket": "b",
+          "caption": "Lead Weekly Meeting",
+          "dueDate": "2025-07-18T10:00:00Z",
+          "assignedToUserIds": ["user1_admin"],
+          "status": "Not Started",
+          "priority": "Medium",
+          "createdAt": "2025-07-15T12:00:00Z"
+        }
+      },
+      {
+        "id": "task_4",
+        "data": {
+          "boardId": "general_board",
+          "description": "Coordinate with external vendors for event supplies. Get quotes and finalize contracts.",
+          "bucket": "a",
+          "caption": "Vendor Coordination",
+          "dueDate": "2025-07-25T18:00:00Z",
+          "assignedToUserIds": ["user2_overall_head"],
+          "status": "Not Started",
+          "priority": "High",
+          "createdAt": "2025-07-15T13:00:00Z"
+        }
+      },
+      {
+        "id": "task_5",
+        "data": {
+          "boardId": "general_board",
+          "description": "Prepare presentation slides for the upcoming stakeholder meeting. Focus on project milestones.",
+          "bucket": "c",
+          "caption": "Prepare Stakeholder Deck",
+          "dueDate": "2025-07-23T14:00:00Z",
+          "assignedToUserIds": ["user2_overall_head"],
+          "status": "In Progress",
+          "priority": "Medium",
+          "createdAt": "2025-07-15T14:00:00Z"
+        }
+      },
+      {
+        "id": "task_6",
+        "data": {
+          "boardId": "general_board",
+          "description": "Organize team-building activity for the month. Research venues and activities.",
+          "bucket": "other",
+          "caption": "Team Building Event",
+          "dueDate": "2025-07-30T16:00:00Z",
+          "assignedToUserIds": ["user3_organizer"],
+          "status": "Not Started",
+          "priority": "Low",
+          "createdAt": "2025-07-15T15:00:00Z"
+        }
+      },
+      {
+        "id": "task_7",
+        "data": {
+          "boardId": "general_board",
+          "description": "Follow up with all new members for onboarding completion.",
+          "bucket": "b",
+          "caption": "Member Onboarding Follow-up",
+          "dueDate": "2025-07-28T11:00:00Z",
+          "assignedToUserIds": ["user4_representative"],
+          "status": "Pending Review",
+          "priority": "Medium",
+          "createdAt": "2025-07-16T09:00:00Z"
+        }
+      }
+    ]
+  }
+}
