@@ -174,36 +174,41 @@ const EventRepDashboard = ({ userProfile }: { userProfile: UserProfileData }) =>
   const [loading, setLoading] = useState(true);
   const [managedEvents, setManagedEvents] = useState<SubEvent[]>([]);
 
-  const assignedEventUids = userProfile.assignedEventUids || [];
+  const assignedEventUids = useMemo(() => userProfile.assignedEventUids || [], [userProfile.assignedEventUids]);
 
   useEffect(() => {
     if (assignedEventUids.length === 0) {
       setLoading(false);
       return;
     }
+    
     setLoading(true);
-
     const unsubs: (() => void)[] = [];
 
-    const eventsQuery = query(collection(db, 'subEvents'), where('__name__', 'in', assignedEventUids));
-    unsubs.push(onSnapshot(eventsQuery, (snapshot) => {
-        const eventsList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SubEvent));
-        setManagedEvents(eventsList);
-        setStats(prev => ({...prev, managedEvents: eventsList.length}));
-    }));
+    try {
+      const eventsQuery = query(collection(db, 'subEvents'), where('__name__', 'in', assignedEventUids));
+      unsubs.push(onSnapshot(eventsQuery, (snapshot) => {
+          const eventsList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SubEvent));
+          setManagedEvents(eventsList);
+          setStats(prev => ({...prev, managedEvents: eventsList.length}));
+      }));
 
-    const registrationsQuery = query(collection(db, 'event_registrations'), where('subEventId', 'in', assignedEventUids));
-    unsubs.push(onSnapshot(registrationsQuery, (snapshot) => {
-        setStats(prev => ({...prev, totalParticipants: snapshot.size}));
-    }));
-    
-    const tasksQuery = query(collection(db, 'tasks'), where('subEventId', 'in', assignedEventUids));
-    unsubs.push(onSnapshot(tasksQuery, (snapshot) => {
-        const tasksList = snapshot.docs.map(doc => doc.data() as Task);
-        const completed = tasksList.filter(t => t.status === 'Completed').length;
-        setStats(prev => ({...prev, tasksCompleted: completed, tasksTotal: tasksList.length}));
-        setLoading(false); // Assume this is the last query to finish
-    }));
+      const registrationsQuery = query(collection(db, 'event_registrations'), where('subEventId', 'in', assignedEventUids));
+      unsubs.push(onSnapshot(registrationsQuery, (snapshot) => {
+          setStats(prev => ({...prev, totalParticipants: snapshot.size}));
+      }));
+      
+      const tasksQuery = query(collection(db, 'tasks'), where('subEventId', 'in', assignedEventUids));
+      unsubs.push(onSnapshot(tasksQuery, (snapshot) => {
+          const tasksList = snapshot.docs.map(doc => doc.data() as Task);
+          const completed = tasksList.filter(t => t.status === 'Completed').length;
+          setStats(prev => ({...prev, tasksCompleted: completed, tasksTotal: tasksList.length}));
+          setLoading(false); // Assume this is the last query to finish
+      }));
+    } catch (error) {
+      console.error("Error setting up event rep listeners:", error);
+      setLoading(false);
+    }
 
     return () => unsubs.forEach(unsub => unsub());
 
@@ -319,7 +324,7 @@ const useOrganizerData = (userProfile: UserProfileData) => {
                         const boardMembers = memberSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfileData));
                         setData(prev => ({ ...prev, members: boardMembers }));
                     });
-                    return () => unsubMembers();
+                    // This should be returned by the outer listener's cleanup
                 }
 
                 // Fetch tasks
@@ -330,7 +335,7 @@ const useOrganizerData = (userProfile: UserProfileData) => {
                         setData(prev => ({ ...prev, tasks: allTasks }));
                         setLoading(false);
                     });
-                    return () => unsubTasks();
+                    // This should be returned by the outer listener's cleanup
                 }
 
             } else {
@@ -709,3 +714,5 @@ export default function DashboardPage() {
 
   return <div className="h-full w-full">{renderDashboardByRole()}</div>;
 }
+
+    
