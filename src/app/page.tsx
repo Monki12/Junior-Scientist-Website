@@ -46,12 +46,16 @@ function BackgroundVisuals() {
 export default function JuniorScientistHomePage() {
   const { authUser, loading } = useAuth();
   const router = useRouter();
-
   const heroRef = useRef<HTMLDivElement>(null);
+
+  // Conditionally apply the scroll effect only when the user is not logged in.
   const { scrollYProgress } = useScroll({
     target: heroRef,
     offset: ["start start", "end start"],
+    // Disable the hook if the user is logged in to prevent hydration errors during redirect
+    layoutEffect: false, 
   });
+
   const y = useTransform(scrollYProgress, [0, 1], ["0%", "50%"]);
 
 
