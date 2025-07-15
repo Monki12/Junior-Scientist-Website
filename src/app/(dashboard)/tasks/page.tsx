@@ -137,7 +137,20 @@ export default function TasksPage() {
     if (!newBoardName.trim() || !userProfile) return;
     
     if (USE_MOCK_DATA) {
-        toast({ title: "Mock Data Mode", description: "Cannot create boards in development."});
+        const newMockBoard: Board = {
+            id: `mock_board_${Date.now()}`,
+            name: newBoardName,
+            type: 'general',
+            memberUids: [userProfile.uid],
+            members: [{ userId: userProfile.uid, name: userProfile.fullName || userProfile.displayName || 'Me', role: userProfile.role }],
+            managerUids: [userProfile.uid],
+            createdAt: new Date(),
+            createdBy: userProfile.uid,
+        };
+        setBoards(prev => [...prev, newMockBoard]);
+        setCurrentBoard(newMockBoard);
+        toast({ title: "Board Created (Mock)", description: `Board "${newBoardName}" has been added to the local view.` });
+        setNewBoardName('');
         setIsNewBoardModalOpen(false);
         return;
     }
