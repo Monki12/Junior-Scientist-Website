@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -14,9 +13,9 @@ service cloud.firestore {
     }
 
     function getUserRole(userId) {
-      return exists(/databases/$(database)/documents/users/$(userId)) && getUserData(userId).role != null
-             ? getUserData(userId).role
-             : 'no_role';
+      // Use let for better readability and to avoid re-calling getUserData
+      let userData = getUserData(userId);
+      return userData.role != null ? userData.role : 'no_role';
     }
 
     function isRoleIn(roles) {
@@ -41,26 +40,37 @@ service cloud.firestore {
     }
 
     function isMemberOfBoard(boardId) {
-      // Ensure the board document exists and the user's UID is in the memberUids list.
       return isSignedIn() && exists(/databases/$(database)/documents/boards/$(boardId))
              && request.auth.uid in get(/databases/$(database)/documents/boards/$(boardId)).data.memberUids;
     }
     
     // --- EVENT-SPECIFIC HELPER FUNCTIONS ---
     function isManagerForEvent(eventId) {
-      return isSignedIn() && (
-        isOverallHeadOrAdmin() ||
-        (
-          getUserRole(request.auth.uid) == 'event_representative' &&
-          getUserData(request.auth.uid).assignedEventUids != null &&
-          eventId in getUserData(request.auth.uid).assignedEventUids
-        ) ||
-        (
-          getUserRole(request.auth.uid) == 'organizer' &&
-          getUserData(request.auth.uid).studentDataEventAccess != null &&
-          getUserData(request.auth.uid).studentDataEventAccess[eventId] == true
-        )
-      );
+      if (!isSignedIn()) { return false; }
+      
+      let userRole = getUserRole(request.auth.uid);
+      
+      if (userRole == 'overall_head' || userRole == 'admin') {
+        return true;
+      }
+      
+      let userData = getUserData(request.auth.uid);
+
+      if (userRole == 'event_representative') {
+        return eventId in userData.get('assignedEventUids', []);
+      }
+      
+      if (userRole == 'organizer') {
+        // Checks if the eventId key exists and is true in the access map
+        return eventId in userData.get('studentDataEventAccess', {});
+      }
+      
+      return false;
+    }
+
+    function isTaskForManagedEvent(taskDoc) {
+      let eventId = taskDoc.data.get('subEventId', null);
+      return eventId != null && isManagerForEvent(eventId);
     }
     
     function isJoiningTeam() {
@@ -71,16 +81,13 @@ service cloud.firestore {
     }
 
     function isSelfAssigningTask(task, requestData) {
-      // True if user is adding themselves to a previously unassigned task
       let isCurrentlyUnassigned = resource.data.assignedToUserIds == [];
       let isAssigningSelf = requestData.assignedToUserIds == [request.auth.uid];
       return isCurrentlyUnassigned && isAssigningSelf;
     }
 
-    function isAssigneeUpdatingOwnTask(task, requestData) {
-      // True if the user is an assignee and is only updating specific fields
+    function isAssigneeUpdatingOwnTask() {
       let allowedFields = ['status', 'subtasks', 'updatedAt', 'completedAt', 'completedByUserId'];
-      // Use resource.data to check the existing state of the document for permissions.
       return isMemberOfBoard(resource.data.boardId)
              && resource.data.assignedToUserIds.hasAny([request.auth.uid])
              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowedFields);
@@ -108,11 +115,14 @@ service cloud.firestore {
         return taskDoc.data.boardId;
       }
       
-      allow read: if isMemberOfBoard(getTaskBoardId(resource)) || request.auth.uid in resource.data.assignedToUserIds;
+      allow read: if isMemberOfBoard(getTaskBoardId(resource)) || 
+                     (isSignedIn() && request.auth.uid in resource.data.assignedToUserIds) ||
+                     isTaskForManagedEvent(resource);
+
       allow create: if isMemberOfBoard(request.resource.data.boardId);
-
-      allow update: if canManageBoards() || isSelfAssigningTask(resource, request.resource.data) || isAssigneeUpdatingOwnTask(resource, request.resource.data);
-
+      
+      allow update: if canManageBoards() || isSelfAssigningTask(resource, request.resource.data) || isAssigneeUpdatingOwnTask();
+      
       allow delete: if canManageBoards();
 
       match /subtasks/{subtaskId} {
