@@ -192,15 +192,21 @@ export default function TasksPage() {
   
   const handleTaskUpdate = (updatedTask: Task) => {
     if (USE_MOCK_DATA) {
-        // If task has an ID, it's an update. If not, it's a new task.
+        // If task has an ID that is already in our state, it's an update.
         if (tasks.some(t => t.id === updatedTask.id)) {
             setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
         } else {
-            // This is a new task, add it to the state.
-            setTasks(prev => [...prev, { ...updatedTask, id: `mock_task_${nanoid()}` }]);
+            // This is a new task. Give it a mock ID and add it to the state.
+            const newTaskWithId = { 
+                ...updatedTask, 
+                id: `mock_task_${nanoid()}`,
+                assignedToUserIds: [], // New tasks are always unassigned
+            };
+            setTasks(prev => [...prev, newTaskWithId]);
         }
     }
-    // In a real app, onSnapshot from Firebase would handle this automatically.
+    // In a real app, onSnapshot from Firebase would handle this automatically for Firestore writes.
+    // Since we are using mock data, we manually update the state here.
   };
 
   const canCreateBoards = userProfile && ['admin', 'overall_head', 'event_representative'].includes(userProfile.role);

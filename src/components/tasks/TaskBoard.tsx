@@ -75,6 +75,7 @@ export default function TaskBoard({ board, tasks, members, onEditTask, loading, 
     
     const newAssignedIds = targetColumnId === 'unassigned' ? [] : [targetColumnId];
 
+    // Optimistic UI update for mock data
     if (USE_MOCK_DATA) {
       setTasks(prevTasks => prevTasks.map(t => 
         t.id === draggedTaskId 
@@ -89,6 +90,7 @@ export default function TaskBoard({ board, tasks, members, onEditTask, loading, 
       return;
     }
 
+    // Firestore update for live data
     try {
         const taskRef = doc(db, "tasks", draggedTaskId);
         await updateDoc(taskRef, {
@@ -96,6 +98,7 @@ export default function TaskBoard({ board, tasks, members, onEditTask, loading, 
             updatedAt: serverTimestamp(),
             status: task.status === 'Not Started' && targetColumnId !== 'unassigned' ? 'In Progress' : task.status,
         });
+        // onSnapshot listener will handle the UI update automatically.
         toast({ title: "Task Reassigned", description: `Task moved successfully.`});
     } catch(e) {
         console.error("Error reassigning task: ", e);
