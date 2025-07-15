@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
 import { ListChecks, Loader2, PlusCircle, Users, Users2 } from 'lucide-react';
-import { collection, query, onSnapshot, addDoc, serverTimestamp, where, getDocs, doc } from 'firebase/firestore';
+import { collection, query, onSnapshot, addDoc, serverTimestamp, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import TaskBoard from '@/components/tasks/TaskBoard';
 import TaskDetailModal from '@/components/tasks/TaskDetailModal';
@@ -45,7 +45,7 @@ export default function TasksPage() {
 
           const eventsRef = collection(db, 'subEvents');
           const eventsSnapshot = await getDocs(eventsRef);
-          const allEvents = eventsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as SubEvent);
+          const allEvents = eventsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as SubEvent));
           
           const boardsRef = collection(db, 'boards');
           const boardsSnapshot = await getDocs(query(boardsRef, where('type', '==', 'event')));
@@ -175,10 +175,10 @@ export default function TasksPage() {
         setNewBoardName('');
         setIsNewBoardModalOpen(false);
         
-        const newBoardData = (await getDoc(newBoardRef)).data();
+        const newBoardDoc = await getDoc(newBoardRef);
         setCurrentBoard({
           id: newBoardRef.id,
-          ...newBoardData
+          ...newBoardDoc.data()
         } as Board);
 
     } catch(e: any) {
@@ -192,21 +192,21 @@ export default function TasksPage() {
   
   const handleTaskUpdate = (updatedTask: Task) => {
     if (USE_MOCK_DATA) {
-        // If task has an ID that is already in our state, it's an update.
-        if (tasks.some(t => t.id === updatedTask.id)) {
+        // If task has an ID, it's an update.
+        if (updatedTask.id && tasks.some(t => t.id === updatedTask.id)) {
             setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
         } else {
             // This is a new task. Give it a mock ID and add it to the state.
-            const newTaskWithId = { 
+            const newTaskWithId: Task = { 
                 ...updatedTask, 
                 id: `mock_task_${nanoid()}`,
                 assignedToUserIds: [], // New tasks are always unassigned
+                createdAt: new Date().toISOString(),
             };
             setTasks(prev => [...prev, newTaskWithId]);
         }
     }
     // In a real app, onSnapshot from Firebase would handle this automatically for Firestore writes.
-    // Since we are using mock data, we manually update the state here.
   };
 
   const canCreateBoards = userProfile && ['admin', 'overall_head', 'event_representative'].includes(userProfile.role);
