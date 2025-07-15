@@ -3,12 +3,11 @@
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { Task, UserProfileData, TaskPriority, TaskStatus } from '@/types';
+import type { Task, TaskPriority, TaskStatus } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { CheckSquare, Clock, Flag, MessageSquare } from 'lucide-react';
+import { CheckSquare, Clock, Flag } from 'lucide-react';
 import { format, parseISO, isPast } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -24,7 +23,7 @@ const priorityStyles: Record<TaskPriority, { iconColor: string; }> = {
 };
 
 const statusStyles: Record<TaskStatus, { barColor: string }> = {
-    'Not Started': { barColor: 'bg-purple-500' },
+    'Not Started': { barColor: 'bg-gray-400' },
     'In Progress': { barColor: 'bg-blue-500' },
     'Pending Review': { barColor: 'bg-yellow-500' },
     'Completed': { barColor: 'bg-green-500' },
@@ -59,11 +58,9 @@ export default function TaskCard({ task, onEditTask }: TaskCardProps) {
       >
         <div className={cn("absolute left-0 top-0 bottom-0 w-1.5", statusStyles[task.status].barColor)}></div>
         <CardContent className="p-3 pl-5 space-y-2">
-            <p className="text-base font-semibold leading-tight">{task.title}</p>
+            <p className="text-base font-semibold leading-tight">{task.caption || task.title}</p>
             
-            {task.description && <p className="text-xs text-muted-foreground line-clamp-2">{task.description}</p>}
-
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
@@ -88,6 +85,7 @@ export default function TaskCard({ task, onEditTask }: TaskCardProps) {
                         <span>{completedSubtasks}/{totalSubtasks}</span>
                     </div>
                 )}
+                {task.bucket && <Badge variant="outline" className="text-xs">{task.bucket}</Badge>}
             </div>
         </CardContent>
       </Card>

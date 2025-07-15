@@ -7,7 +7,7 @@ import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { useToast } from '@/hooks/use-toast';
 import type { Task, UserProfileData, Board } from '@/types';
 import TaskColumn from './TaskColumn';
-import { doc, updateDoc, arrayUnion, arrayRemove, runTransaction, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { Loader2 } from 'lucide-react';
@@ -16,7 +16,7 @@ interface TaskBoardProps {
   board: Board;
   tasks: Task[];
   users: UserProfileData[];
-  onEditTask: (task: Task) => void;
+  onEditTask: (task: Task | null) => void;
   loading: boolean;
 }
 
@@ -51,32 +51,36 @@ export default function TaskBoard({ board, tasks, users, onEditTask, loading }: 
     const { active, over } = event;
     if (!active || !over || !userProfile) return;
     
-    const activeTaskId = String(active.id);
+    // The `id` of a droppable area is the user's UID or "unassigned"
     const targetColumnId = String(over.id);
+    const draggedTaskId = String(active.id);
 
-    const task = tasks.find(t => t.id === activeTaskId);
+    const task = tasks.find(t => t.id === draggedTaskId);
     if (!task) return;
 
-    const originalColumnId = task.assignedToUserIds && task.assignedToUserIds.length > 0 ? task.assignedToUserIds[0] : 'unassigned';
+    // Determine the original column, which could be an array of assignees.
+    const originalAssignee = task.assignedToUserIds && task.assignedToUserIds.length > 0 ? task.assignedToUserIds[0] : 'unassigned';
     
-    if (originalColumnId === targetColumnId) return;
+    if (originalAssignee === targetColumnId) return; // No change if dropped in the same column.
 
     // Permissions check
-    const isSelfAssign = targetColumnId === userProfile.uid && originalColumnId === 'unassigned';
+    const isSelfAssign = targetColumnId === userProfile.uid && originalAssignee === 'unassigned';
     if (!canManageBoard && !isSelfAssign) {
-        toast({ title: "Permission Denied", description: "You can only assign tasks from the backlog to yourself.", variant: "destructive"});
+        toast({ title: "Permission Denied", description: "You can only assign tasks from the 'New Tasks' column to yourself.", variant: "destructive"});
         return;
     }
 
     try {
-        const taskRef = doc(db, "tasks", activeTaskId);
+        const taskRef = doc(db, "tasks", draggedTaskId);
         await updateDoc(taskRef, {
             assignedToUserIds: targetColumnId === 'unassigned' ? [] : [targetColumnId],
             updatedAt: serverTimestamp(),
+            // Automatically update status if task is moved from unassigned
             status: task.status === 'Not Started' && targetColumnId !== 'unassigned' ? 'In Progress' : task.status,
         });
         toast({ title: "Task Reassigned", description: `Task moved successfully.`});
     } catch(e) {
+        console.error("Error reassigning task: ", e);
         toast({ title: "Error", description: "Failed to reassign task.", variant: "destructive"});
     }
   };

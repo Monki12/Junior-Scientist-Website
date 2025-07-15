@@ -19,8 +19,10 @@ export interface Board {
   id: string;
   name: string;
   description?: string;
+  type: 'general' | 'event';
+  eventId?: string;
   memberUids: string[];
-  managerUids?: string[]; // UIDs of users who can manage this board (e.g., event_reps)
+  managerUids?: string[];
   createdAt: any;
   createdBy: string;
   updatedAt?: any;
@@ -50,6 +52,8 @@ export interface Task {
   subtasks: Subtask[];
   createdAt: any;
   updatedAt: any;
+  bucket?: 'a' | 'b' | 'c' | 'other';
+  caption?: string;
 }
 
 export interface UserProfileData {

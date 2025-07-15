@@ -4,12 +4,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { Task, Board, UserProfileData, Subtask, TaskStatus, TaskPriority } from '@/types';
 import { db } from '@/lib/firebase';
-import { doc, updateDoc, serverTimestamp, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { nanoid } from 'nanoid';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -19,12 +19,14 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Loader2, Trash2, PlusCircle, UserPlus, Calendar as CalendarIcon } from 'lucide-react';
+import { Loader2, Trash2, PlusCircle, Calendar as CalendarIcon } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Card } from '../ui/card';
 
 interface TaskDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
-  task: Task | null;
+  task: Task | null; // Null when creating a new task
   board: Board | null;
   boardMembers: UserProfileData[];
   allUsers: UserProfileData[];
@@ -38,21 +40,27 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
   const [newSubtaskText, setNewSubtaskText] = useState('');
 
   useEffect(() => {
-    if (task) {
-      setFormState({
-        ...task,
-        dueDate: task.dueDate ? parseISO(task.dueDate) : null,
-      });
-    } else {
-      // If creating a new task, set defaults
-      setFormState({
-        title: '',
-        description: '',
-        priority: 'Medium',
-        status: 'Not Started',
-        assignedToUserIds: [],
-        subtasks: [],
-      });
+    if (isOpen) {
+      if (task) {
+        // Editing existing task
+        setFormState({
+          ...task,
+          dueDate: task.dueDate && isValid(parseISO(task.dueDate)) ? parseISO(task.dueDate) : null,
+        });
+      } else {
+        // Creating a new task
+        setFormState({
+          title: '',
+          description: '',
+          priority: 'Medium',
+          status: 'Not Started',
+          assignedToUserIds: [],
+          subtasks: [],
+          bucket: 'other',
+          caption: '',
+          dueDate: null,
+        });
+      }
     }
   }, [task, isOpen]);
 
@@ -61,20 +69,32 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
   };
   
   const handleSaveChanges = async () => {
-    if (!task || !formState) return;
+    if (!board) return;
     setIsUpdating(true);
     try {
-        const taskRef = doc(db, 'tasks', task.id);
-        const dataToUpdate = {
+        const dataToSave = {
             ...formState,
+            boardId: board.id,
             dueDate: formState.dueDate ? (formState.dueDate as Date).toISOString() : null,
             updatedAt: serverTimestamp(),
+        };
+
+        if (task) { // Update existing task
+            const taskRef = doc(db, 'tasks', task.id);
+            await updateDoc(taskRef, dataToSave);
+            toast({ title: "Task Updated" });
+        } else { // Create new task
+            await addDoc(collection(db, 'tasks'), {
+              ...dataToSave,
+              createdAt: serverTimestamp(),
+              assignedToUserIds: [], // New tasks are always unassigned initially
+            });
+            toast({ title: "Task Created" });
         }
-        await updateDoc(taskRef, dataToUpdate);
-        toast({ title: "Task Updated" });
         onClose();
-    } catch(e) {
-        toast({ title: "Update Failed", variant: "destructive"});
+    } catch(e: any) {
+        console.error("Error saving task:", e);
+        toast({ title: "Save Failed", description: e.message, variant: "destructive"});
     } finally {
         setIsUpdating(false);
     }
@@ -99,28 +119,29 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
     handleInputChange('subtasks', newSubtasks);
   }
 
-  const assignedUsers = useMemo(() => {
-    return allUsers.filter(u => formState.assignedToUserIds?.includes(u.uid));
+  const assignedUser = useMemo(() => {
+    if (!formState.assignedToUserIds || formState.assignedToUserIds.length === 0) return null;
+    return allUsers.find(u => u.uid === formState.assignedToUserIds![0]);
   }, [formState.assignedToUserIds, allUsers]);
 
-  if (!isOpen || !task) return null;
+  if (!isOpen) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="text-2xl">{formState.title || 'New Task'}</DialogTitle>
-          <DialogDescription>In board: {board?.name}</DialogDescription>
+          <DialogTitle className="text-2xl">{task ? 'Edit Task' : 'Create New Task'}</DialogTitle>
+          <DialogDescription>Board: {board?.name}</DialogDescription>
         </DialogHeader>
         <div className="grid md:grid-cols-3 gap-6 py-4 flex-1 overflow-y-auto pr-4">
           {/* Left/Main Column */}
           <div className="md:col-span-2 space-y-6">
             <div>
-                <Label htmlFor="taskTitle">Title</Label>
-                <Input id="taskTitle" value={formState.title || ''} onChange={(e) => handleInputChange('title', e.target.value)} disabled={!canManage} />
+                <Label htmlFor="taskCaption">Caption (Short Title)</Label>
+                <Input id="taskCaption" value={formState.caption || ''} onChange={(e) => handleInputChange('caption', e.target.value)} disabled={!canManage} />
             </div>
              <div>
-                <Label htmlFor="taskDesc">Description</Label>
+                <Label htmlFor="taskDesc">Detailed Task</Label>
                 <Textarea id="taskDesc" value={formState.description || ''} onChange={(e) => handleInputChange('description', e.target.value)} rows={5} />
             </div>
 
@@ -140,12 +161,11 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
                     </div>
                 </div>
             </div>
-            {/* Attachments and Comments placeholder */}
           </div>
 
           {/* Right Column */}
           <div className="space-y-6">
-              <Card className="p-4">
+              <Card className="p-4 bg-muted/50">
                 <h4 className="font-semibold mb-2">Details</h4>
                 <div className="space-y-4">
                     <div>
@@ -172,38 +192,42 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
                         </Select>
                     </div>
                     <div>
-                        <Label>Due Date</Label>
+                        <Label>Deadline</Label>
                         <Popover>
                           <PopoverTrigger asChild>
                           <Button variant="outline" className={`w-full justify-start text-left font-normal ${!formState.dueDate && "text-muted-foreground"}`}>
                               <CalendarIcon className="mr-2 h-4 w-4" />
-                              {formState.dueDate ? format(formState.dueDate as Date, "PPP") : <span>Pick a due date</span>}
+                              {formState.dueDate ? format(formState.dueDate as Date, "PPP") : <span>Pick a deadline</span>}
                           </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={formState.dueDate as Date} onSelect={date => handleInputChange('dueDate', date)} initialFocus /></PopoverContent>
                       </Popover>
                     </div>
+                    <div>
+                        <Label>Bucket</Label>
+                        <RadioGroup defaultValue={formState.bucket || 'other'} onValueChange={(val) => handleInputChange('bucket', val)} className="flex space-x-2">
+                           <div className="flex items-center space-x-1"><RadioGroupItem value="a" id="r-a" /><Label htmlFor="r-a">A</Label></div>
+                           <div className="flex items-center space-x-1"><RadioGroupItem value="b" id="r-b" /><Label htmlFor="r-b">B</Label></div>
+                           <div className="flex items-center space-x-1"><RadioGroupItem value="c" id="r-c" /><Label htmlFor="r-c">C</Label></div>
+                           <div className="flex items-center space-x-1"><RadioGroupItem value="other" id="r-other" /><Label htmlFor="r-other">Other</Label></div>
+                        </RadioGroup>
+                    </div>
                 </div>
               </Card>
 
-              <Card className="p-4">
-                <h4 className="font-semibold mb-2">People</h4>
+              <Card className="p-4 bg-muted/50">
+                <h4 className="font-semibold mb-2">Assigned To</h4>
                  <div className="space-y-2">
-                    <Label>Assigned To</Label>
-                     {assignedUsers.length > 0 ? (
-                        <div className="space-y-2">
-                            {assignedUsers.map(user => (
-                                <div key={user.uid} className="flex items-center gap-2">
-                                    <Avatar className="h-8 w-8"><AvatarImage src={user.photoURL || undefined} /><AvatarFallback>{(user.fullName||'U')[0]}</AvatarFallback></Avatar>
-                                    <span>{user.fullName}</span>
-                                </div>
-                            ))}
+                     {assignedUser ? (
+                        <div className="flex items-center gap-2">
+                            <Avatar className="h-8 w-8"><AvatarImage src={assignedUser.photoURL || undefined} /><AvatarFallback>{(assignedUser.fullName||'U')[0]}</AvatarFallback></Avatar>
+                            <span>{assignedUser.fullName}</span>
                         </div>
                      ) : (
-                        <p className="text-sm text-muted-foreground">Not assigned</p>
+                        <p className="text-sm text-muted-foreground">Unassigned (In "New Tasks")</p>
                      )}
                      {canManage && (
-                        <Select onValueChange={(uid) => handleInputChange('assignedToUserIds', uid ? [uid] : [])}>
+                        <Select onValueChange={(uid) => handleInputChange('assignedToUserIds', uid ? [uid] : [])} value={formState.assignedToUserIds?.[0] || ''}>
                             <SelectTrigger><SelectValue placeholder="Assign to..."/></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="">Unassigned</SelectItem>
@@ -219,9 +243,9 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
         </div>
         <DialogFooter className="pt-4 border-t">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSaveChanges} disabled={isUpdating}>
+          <Button onClick={handleSaveChanges} disabled={isUpdating || !canManage}>
             {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-            Save Changes
+            {isUpdating ? 'Saving...' : 'Save Changes'}
           </Button>
         </DialogFooter>
       </DialogContent>

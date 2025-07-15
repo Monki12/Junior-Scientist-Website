@@ -3,13 +3,13 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import type { Task, UserProfileData, Board, Subtask } from '@/types';
+import type { Task, UserProfileData, Board, SubEvent } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
-import { ListChecks, Loader2, PlusCircle, Trash2, Users } from 'lucide-react';
-import { collection, query, onSnapshot, addDoc, updateDoc, doc, Unsubscribe, serverTimestamp, where } from 'firebase/firestore';
+import { ListChecks, Loader2, PlusCircle, Users } from 'lucide-react';
+import { collection, query, onSnapshot, addDoc, serverTimestamp, where, getDocs, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import TaskBoard from '@/components/tasks/TaskBoard';
 import TaskDetailModal from '@/components/tasks/TaskDetailModal';
@@ -30,14 +30,53 @@ export default function TasksPage() {
   const [isNewBoardModalOpen, setIsNewBoardModalOpen] = useState(false);
   const [newBoardName, setNewBoardName] = useState('');
 
-  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+
+  // Auto-create event boards if they don't exist
+  useEffect(() => {
+      const syncEventBoards = async () => {
+          if (!userProfile || !['admin', 'overall_head'].includes(userProfile.role)) return;
+
+          const eventsRef = collection(db, 'subEvents');
+          const eventsSnapshot = await getDocs(eventsRef);
+          const allEvents = eventsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as SubEvent);
+          
+          const boardsRef = collection(db, 'boards');
+          const boardsSnapshot = await getDocs(query(boardsRef, where('type', '==', 'event')));
+          const existingEventBoardIds = boardsSnapshot.docs.map(doc => doc.data().eventId);
+
+          for (const event of allEvents) {
+              if (!existingEventBoardIds.includes(event.id)) {
+                  // Create a board for this event
+                  const newBoard = {
+                      name: `${event.title} Board`,
+                      type: 'event',
+                      eventId: event.id,
+                      memberUids: [userProfile.uid, ...event.eventReps, ...event.organizerUids],
+                      managerUids: [userProfile.uid, ...event.eventReps],
+                      createdAt: serverTimestamp(),
+                      createdBy: userProfile.uid
+                  };
+                  await addDoc(boardsRef, newBoard);
+              }
+          }
+      };
+      
+      syncEventBoards();
+  }, [userProfile]);
 
   // Fetch all boards the user is a member of and all potential users
   useEffect(() => {
     if (!userProfile?.uid) return;
     
     setLoading(true);
+
+    const usersQuery = query(collection(db, 'users'));
+    onSnapshot(usersQuery, (snapshot) => {
+        const usersList = snapshot.docs.map(doc => ({...doc.data(), uid: doc.id} as UserProfileData));
+        setAllUsers(usersList);
+    });
+
     const boardsQuery = query(collection(db, 'boards'), where('memberUids', 'array-contains', userProfile.uid));
     const unsubBoards = onSnapshot(boardsQuery, (snapshot) => {
       const userBoards = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Board));
@@ -48,17 +87,8 @@ export default function TasksPage() {
       toast({ title: "Error", description: "Could not fetch your boards.", variant: "destructive" });
       setLoading(false);
     });
-
-    const usersQuery = query(collection(db, 'users'));
-    const unsubUsers = onSnapshot(usersQuery, (snapshot) => {
-        const usersList = snapshot.docs.map(doc => ({...doc.data(), uid: doc.id} as UserProfileData));
-        setAllUsers(usersList);
-    });
-
-    return () => {
-        unsubBoards();
-        unsubUsers();
-    };
+    
+    return () => unsubBoards();
   }, [userProfile?.uid, toast]);
 
   // Fetch tasks and members for the currently selected board
@@ -70,27 +100,18 @@ export default function TasksPage() {
     }
 
     setLoadingBoardData(true);
-    const unsubs: Unsubscribe[] = [];
-
     const tasksQuery = query(collection(db, 'tasks'), where('boardId', '==', currentBoard.id));
-    unsubs.push(onSnapshot(tasksQuery, (snapshot) => {
+    const unsubTasks = onSnapshot(tasksQuery, (snapshot) => {
       const boardTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
       setTasks(boardTasks);
       setLoadingBoardData(false);
-    }));
+    });
 
-    if (currentBoard.memberUids && currentBoard.memberUids.length > 0) {
-      const usersQuery = query(collection(db, 'users'), where('uid', 'in', currentBoard.memberUids));
-      unsubs.push(onSnapshot(usersQuery, (snapshot) => {
-        const users = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfileData));
-        setBoardUsers(users);
-      }));
-    } else {
-        setBoardUsers([]);
-    }
+    const boardMemberProfiles = allUsers.filter(u => currentBoard.memberUids.includes(u.uid));
+    setBoardUsers(boardMemberProfiles);
     
-    return () => unsubs.forEach(unsub => unsub());
-  }, [currentBoard]);
+    return () => unsubTasks();
+  }, [currentBoard, allUsers]);
 
 
   const handleCreateBoard = async () => {
@@ -98,6 +119,7 @@ export default function TasksPage() {
     try {
         const newBoardRef = await addDoc(collection(db, 'boards'), {
             name: newBoardName,
+            type: 'general',
             memberUids: [userProfile.uid],
             managerUids: [userProfile.uid],
             createdAt: serverTimestamp(),
@@ -108,10 +130,10 @@ export default function TasksPage() {
         setNewBoardName('');
         setIsNewBoardModalOpen(false);
         
-        // Automatically select the newly created board
         setCurrentBoard({
           id: newBoardRef.id,
           name: newBoardName,
+          type: 'general',
           memberUids: [userProfile.uid],
           managerUids: [userProfile.uid],
           createdAt: new Date(),
@@ -125,9 +147,15 @@ export default function TasksPage() {
 
   const handleOpenTaskModal = (task: Task | null) => {
     setEditingTask(task);
-    setIsTaskModalOpen(true);
   };
-  
+
+   // Effect to open/close modal based on editingTask state
+  useEffect(() => {
+    if (editingTask !== null) {
+      // Logic to open modal, e.g., setIsTaskModalOpen(true);
+    }
+  }, [editingTask]);
+
   const canManageCurrentBoard = userProfile && currentBoard && (currentBoard.managerUids?.includes(userProfile.uid) || ['admin', 'overall_head'].includes(userProfile.role));
   const canCreateBoards = userProfile && ['admin', 'overall_head', 'event_representative'].includes(userProfile.role);
 
@@ -213,17 +241,15 @@ export default function TasksPage() {
         </DialogContent>
       </Dialog>
       
-      {isTaskModalOpen && currentBoard && (
-          <TaskDetailModal
-            isOpen={isTaskModalOpen}
-            onClose={() => { setIsTaskModalOpen(false); setEditingTask(null); }}
-            task={editingTask}
-            board={currentBoard}
-            boardMembers={boardUsers}
-            allUsers={allUsers}
-            canManage={!!canManageCurrentBoard}
-          />
-      )}
+      <TaskDetailModal
+        isOpen={editingTask !== null}
+        onClose={() => setEditingTask(null)}
+        task={editingTask}
+        board={currentBoard}
+        boardMembers={boardUsers}
+        allUsers={allUsers}
+        canManage={!!canManageCurrentBoard}
+      />
     </div>
   );
 }
