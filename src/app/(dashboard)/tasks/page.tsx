@@ -5,16 +5,18 @@ import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import type { Task, UserProfileData, Board, BoardMember } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
-import { ListChecks, Loader2, PlusCircle, Users, Users2 } from 'lucide-react';
-import { nanoid } from 'nanoid';
+import { ListChecks, Loader2, PlusCircle, Users, Users2, Settings, Trash2 } from 'lucide-react';
 import TaskBoard from '@/components/tasks/TaskBoard';
 import TaskDetailModal from '@/components/tasks/TaskDetailModal';
 import { Input } from '@/components/ui/input';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, where, doc, addDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-
+import { collection, onSnapshot, query, where, doc, addDoc, updateDoc, serverTimestamp, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 export default function TasksPage() {
   const { toast } = useToast();
@@ -34,12 +36,17 @@ export default function TasksPage() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
 
+  const [isManageMembersModalOpen, setIsManageMembersModalOpen] = useState(false);
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
+
 
   useEffect(() => {
     if (!userProfile?.uid) return;
     setLoading(true);
 
-    const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
+    const staffRoles = ['admin', 'overall_head', 'event_representative', 'organizer'];
+    const usersQuery = query(collection(db, 'users'), where('role', 'in', staffRoles));
+    const unsubUsers = onSnapshot(usersQuery, (snapshot) => {
         setAllUsers(snapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as UserProfileData)));
     });
 
@@ -73,6 +80,7 @@ export default function TasksPage() {
         }
     });
     setBoardMembers(members);
+    setSelectedMemberIds(currentBoard.memberUids); // Sync selection with current members
 
     const tasksQuery = query(collection(db, 'tasks'), where('boardId', '==', currentBoard.id));
     const unsubTasks = onSnapshot(tasksQuery, (snapshot) => {
@@ -97,8 +105,7 @@ export default function TasksPage() {
             createdAt: serverTimestamp(),
             createdBy: userProfile.uid,
         };
-        const docRef = await addDoc(collection(db, 'boards'), newBoardData);
-        // The real-time listener will automatically update the UI.
+        await addDoc(collection(db, 'boards'), newBoardData);
         toast({ title: "Board Created", description: `Board "${newBoardName}" has been added.` });
         setNewBoardName('');
     } catch (e: any) {
@@ -114,7 +121,6 @@ export default function TasksPage() {
   const handleTaskUpdate = async (updatedTask: Partial<Task>) => {
     if (!currentBoard || !userProfile) return;
 
-    // If the task has an ID, it's an update operation.
     if (updatedTask.id) {
         const taskRef = doc(db, 'tasks', updatedTask.id);
         await updateDoc(taskRef, {
@@ -122,23 +128,39 @@ export default function TasksPage() {
             updatedAt: serverTimestamp(),
         });
         toast({ title: "Task Updated" });
-    } else { // If the task does NOT have an ID, it's a new task.
+    } else {
+        const { id, ...taskData } = updatedTask;
         const newTaskData: any = {
-            ...updatedTask,
+            ...taskData,
             boardId: currentBoard.id,
             creatorId: userProfile.uid,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
         };
 
-        // Firestore does not allow `undefined` values. The `id` is `undefined` for new tasks.
-        // We must remove it before sending it to Firestore, which will auto-generate its own ID.
-        delete newTaskData.id;
-
         await addDoc(collection(db, 'tasks'), newTaskData);
         toast({ title: "Task Created" });
     }
     setIsTaskModalOpen(false);
+  };
+
+  const handleMemberSelectionChange = (memberId: string, isSelected: boolean) => {
+      setSelectedMemberIds(prev => isSelected ? [...prev, memberId] : prev.filter(id => id !== memberId));
+  };
+
+  const handleSaveMembers = async () => {
+      if (!currentBoard) return;
+      try {
+          const boardRef = doc(db, 'boards', currentBoard.id);
+          await updateDoc(boardRef, {
+              memberUids: selectedMemberIds,
+              updatedAt: serverTimestamp(),
+          });
+          toast({ title: "Members Updated", description: "Board members have been successfully updated." });
+          setIsManageMembersModalOpen(false);
+      } catch (e: any) {
+          toast({ title: "Error", description: `Could not update members: ${e.message}`, variant: "destructive" });
+      }
   };
 
   const onCloseModal = () => {
@@ -147,6 +169,7 @@ export default function TasksPage() {
   };
 
   const canCreateBoards = userProfile && ['admin', 'overall_head', 'event_representative'].includes(userProfile.role);
+  const canManageAllBoards = userProfile && ['admin', 'overall_head'].includes(userProfile.role);
 
   return (
     <div className="flex h-[calc(100vh-8rem)] flex-col space-y-4">
@@ -156,11 +179,19 @@ export default function TasksPage() {
                 <ListChecks className="h-7 w-7" />
                 {currentBoard ? `Board: ${currentBoard.name}` : 'Team Boards'}
             </h1>
-            {currentBoard && (
-              <Button variant="link" size="sm" onClick={() => setCurrentBoard(null)} className="p-0 h-auto text-sm">
-                &larr; Back to board selection
-              </Button>
-            )}
+            <div className="flex items-center gap-4">
+              {currentBoard && (
+                <Button variant="link" size="sm" onClick={() => setCurrentBoard(null)} className="p-0 h-auto text-sm">
+                  &larr; Back to board selection
+                </Button>
+              )}
+               {currentBoard && canManageAllBoards && (
+                  <Button variant="outline" size="sm" onClick={() => setIsManageMembersModalOpen(true)}>
+                      <Settings className="mr-2 h-4 w-4" />
+                      Manage Members
+                  </Button>
+              )}
+            </div>
         </div>
       </header>
       
@@ -233,6 +264,43 @@ export default function TasksPage() {
             canManage={!!(userProfile && currentBoard && (currentBoard.managerUids?.includes(userProfile.uid) || ['admin', 'overall_head'].includes(userProfile.role)))}
             onTaskUpdate={handleTaskUpdate}
         />
+
+        <Dialog open={isManageMembersModalOpen} onOpenChange={setIsManageMembersModalOpen}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Manage Board Members</DialogTitle>
+                    <DialogDescription>Add or remove staff from this board.</DialogDescription>
+                </DialogHeader>
+                <ScrollArea className="h-72 my-4">
+                    <div className="space-y-2 pr-4">
+                        {allUsers.map(user => (
+                            <div key={user.uid} className="flex items-center justify-between p-2 rounded-md hover:bg-muted">
+                               <div className="flex items-center gap-2">
+                                 <Avatar className="h-8 w-8">
+                                    <AvatarImage src={user.photoURL || ''} />
+                                    <AvatarFallback>{(user.fullName||'U')[0]}</AvatarFallback>
+                                 </Avatar>
+                                 <div>
+                                     <p className="text-sm font-medium">{user.fullName}</p>
+                                     <p className="text-xs text-muted-foreground capitalize">{user.role.replace(/_/g, ' ')}</p>
+                                 </div>
+                               </div>
+                                <Checkbox 
+                                    id={`member-${user.uid}`}
+                                    checked={selectedMemberIds.includes(user.uid)}
+                                    onCheckedChange={(checked) => handleMemberSelectionChange(user.uid, !!checked)}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                </ScrollArea>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button onClick={handleSaveMembers}>Save Changes</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
     </div>
   );
 }
