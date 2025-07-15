@@ -95,7 +95,8 @@ service cloud.firestore {
 
     match /boards/{boardId} {
       allow get: if isMemberOfBoard(boardId);
-      allow list: if isSignedIn() && request.auth.uid in resource.data.memberUids;
+      // FIX: Allow a user to list boards only if they are querying for boards they are a member of.
+      allow list: if isSignedIn() && request.query.where.get('memberUids', ['array-contains', '']) == ['array-contains', request.auth.uid];
       allow create, update, delete: if canManageBoards();
     }
     
