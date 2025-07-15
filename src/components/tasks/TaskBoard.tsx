@@ -62,11 +62,12 @@ export default function TaskBoard({ board, tasks, members, onEditTask, loading, 
     const task = tasks.find(t => t.id === draggedTaskId);
     if (!task) return;
 
-    const originalAssignee = task.assignedToUserIds && task.assignedToUserIds.length > 0 ? task.assignedToUserIds[0] : 'unassigned';
+    const originalAssigneeId = task.assignedToUserIds && task.assignedToUserIds.length > 0 ? task.assignedToUserIds[0] : 'unassigned';
     
-    if (originalAssignee === targetColumnId) return;
+    // Prevent re-rendering if dropped in the same column
+    if (originalAssigneeId === targetColumnId) return;
 
-    const isSelfAssign = targetColumnId === userProfile.uid && originalAssignee === 'unassigned';
+    const isSelfAssign = targetColumnId === userProfile.uid && originalAssigneeId === 'unassigned';
     if (!canManageBoard && !isSelfAssign) {
         toast({ title: "Permission Denied", description: "You can only assign tasks from 'New Tasks' to yourself.", variant: "destructive"});
         return;

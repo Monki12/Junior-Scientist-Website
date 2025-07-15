@@ -14,6 +14,8 @@ import { db } from '@/lib/firebase';
 import TaskBoard from '@/components/tasks/TaskBoard';
 import TaskDetailModal from '@/components/tasks/TaskDetailModal';
 import { getMockBoards, getMockTasksForBoard, getMockUsers } from '@/data/mock-tasks';
+import { nanoid } from 'nanoid';
+
 
 // --- DEV FLAG ---
 const USE_MOCK_DATA = process.env.NODE_ENV === 'development';
@@ -56,9 +58,9 @@ export default function TasksPage() {
                       name: `${event.title} Board`,
                       type: 'event',
                       eventId: event.id,
-                      memberUids: [userProfile.uid, ...event.eventReps, ...event.organizerUids],
+                      memberUids: [userProfile.uid, ...(event.eventReps || []), ...(event.organizerUids || [])],
                       members: [{ userId: userProfile.uid, name: userProfile.fullName || userProfile.displayName || '', role: userProfile.role }], // simplified initial member
-                      managerUids: [userProfile.uid, ...event.eventReps],
+                      managerUids: [userProfile.uid, ...(event.eventReps || [])],
                       createdAt: serverTimestamp(),
                       createdBy: userProfile.uid
                   };
@@ -79,6 +81,9 @@ export default function TasksPage() {
         setAllUsers(getMockUsers());
         const { myBoards } = getMockBoards(userProfile.uid);
         setBoards(myBoards);
+        if (myBoards.length > 0) {
+            // setCurrentBoard(myBoards[0]);
+        }
         setLoading(false);
         return;
     }
@@ -138,7 +143,7 @@ export default function TasksPage() {
     
     if (USE_MOCK_DATA) {
         const newMockBoard: Board = {
-            id: `mock_board_${Date.now()}`,
+            id: `mock_board_${nanoid()}`,
             name: newBoardName,
             type: 'general',
             memberUids: [userProfile.uid],
@@ -149,7 +154,7 @@ export default function TasksPage() {
         };
         setBoards(prev => [...prev, newMockBoard]);
         setCurrentBoard(newMockBoard);
-        toast({ title: "Board Created (Mock)", description: `Board "${newBoardName}" has been added to the local view.` });
+        toast({ title: "Board Created (Mock)", description: `Board "${newBoardName}" has been added.` });
         setNewBoardName('');
         setIsNewBoardModalOpen(false);
         return;
@@ -170,16 +175,11 @@ export default function TasksPage() {
         setNewBoardName('');
         setIsNewBoardModalOpen(false);
         
+        const newBoardData = (await getDoc(newBoardRef)).data();
         setCurrentBoard({
           id: newBoardRef.id,
-          name: newBoardName,
-          type: 'general',
-          memberUids: [userProfile.uid],
-          members: [{ userId: userProfile.uid, name: userProfile.fullName || userProfile.displayName, role: userProfile.role as string }],
-          managerUids: [userProfile.uid],
-          createdAt: new Date(), 
-          createdBy: userProfile.uid
-        });
+          ...newBoardData
+        } as Board);
 
     } catch(e: any) {
         toast({ title: "Error", description: "Failed to create board.", variant: "destructive"});
@@ -191,13 +191,16 @@ export default function TasksPage() {
   };
   
   const handleTaskUpdate = (updatedTask: Task) => {
-      if (USE_MOCK_DATA) {
-          if (tasks.some(t => t.id === updatedTask.id)) {
-              setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
-          } else {
-              setTasks(prev => [...prev, updatedTask]);
-          }
-      }
+    if (USE_MOCK_DATA) {
+        // If task has an ID, it's an update. If not, it's a new task.
+        if (tasks.some(t => t.id === updatedTask.id)) {
+            setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
+        } else {
+            // This is a new task, add it to the state.
+            setTasks(prev => [...prev, { ...updatedTask, id: `mock_task_${nanoid()}` }]);
+        }
+    }
+    // In a real app, onSnapshot from Firebase would handle this automatically.
   };
 
   const canCreateBoards = userProfile && ['admin', 'overall_head', 'event_representative'].includes(userProfile.role);
