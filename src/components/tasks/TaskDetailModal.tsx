@@ -69,19 +69,30 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
   
   const handleSaveChanges = async () => {
     if (!board) return;
-    
-    if (!formState.caption?.trim()) {
-        toast({ title: "Caption is required", description: "Please enter a short title for the task.", variant: "destructive" });
-        return;
-    }
-    
     setIsUpdating(true);
 
-    const dataToSave: Partial<Task> = {
-      ...formState,
-      dueDate: formState.dueDate ? (formState.dueDate as Date).toISOString() : null,
-      title: formState.caption || 'Untitled Task', // Ensure title exists
-    };
+    let dataToSave: Partial<Task> = {};
+
+    if (canManage) {
+        if (!formState.caption?.trim()) {
+            toast({ title: "Caption is required", description: "Please enter a short title for the task.", variant: "destructive" });
+            setIsUpdating(false);
+            return;
+        }
+        dataToSave = {
+            ...formState,
+            dueDate: formState.dueDate ? (formState.dueDate as Date).toISOString() : null,
+            title: formState.caption || 'Untitled Task',
+        };
+    } else {
+        // If user cannot manage, they can only update status and subtasks
+        dataToSave = {
+            id: formState.id,
+            status: formState.status,
+            subtasks: formState.subtasks,
+            completedAt: formState.status === 'Completed' && !task?.completedAt ? new Date().toISOString() : task?.completedAt || null,
+        };
+    }
     
     onTaskUpdate(dataToSave);
     setIsUpdating(false);
