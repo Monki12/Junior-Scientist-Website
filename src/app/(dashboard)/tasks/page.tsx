@@ -202,6 +202,7 @@ export default function TasksPage() {
                 id: `mock_task_${nanoid()}`,
                 assignedToUserIds: [], // New tasks are always unassigned
                 createdAt: new Date().toISOString(),
+                boardId: currentBoard!.id, // Assign to current board
             };
             setTasks(prev => [...prev, newTaskWithId]);
         }
@@ -300,3 +301,4 @@ export default function TasksPage() {
     </div>
   );
 }
+
