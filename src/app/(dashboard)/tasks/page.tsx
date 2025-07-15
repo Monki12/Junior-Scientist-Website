@@ -99,7 +99,6 @@ export default function TasksPage() {
         };
         const docRef = await addDoc(collection(db, 'boards'), newBoardData);
         // The real-time listener will automatically update the UI.
-        setCurrentBoard({ ...newBoardData, id: docRef.id, createdAt: new Date() });
         toast({ title: "Board Created", description: `Board "${newBoardName}" has been added.` });
         setNewBoardName('');
     } catch (e: any) {
@@ -112,17 +111,18 @@ export default function TasksPage() {
     setIsTaskModalOpen(true);
   };
   
-  const handleTaskUpdate = async (updatedTask: Task) => {
+  const handleTaskUpdate = async (updatedTask: Partial<Task>) => {
     if (!currentBoard || !userProfile) return;
     
-    if (updatedTask.id) { // Update existing task
+    // If the task has an ID, it's an update operation.
+    if (updatedTask.id) {
         const taskRef = doc(db, 'tasks', updatedTask.id);
         await updateDoc(taskRef, {
             ...updatedTask,
             updatedAt: serverTimestamp(),
         });
         toast({ title: "Task Updated" });
-    } else { // Create new task
+    } else { // If the task does NOT have an ID, it's a new task.
         await addDoc(collection(db, 'tasks'), {
             ...updatedTask,
             boardId: currentBoard.id,

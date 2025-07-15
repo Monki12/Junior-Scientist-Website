@@ -29,7 +29,7 @@ interface TaskDetailModalProps {
   boardMembers: BoardMember[];
   allUsers: UserProfileData[];
   canManage: boolean;
-  onTaskUpdate: (task: Task) => void;
+  onTaskUpdate: (task: Partial<Task>) => void;
 }
 
 export default function TaskDetailModal({ isOpen, onClose, task, board, boardMembers, allUsers, canManage, onTaskUpdate }: TaskDetailModalProps) {
@@ -48,6 +48,7 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
       } else {
         // Defaults for a new task
         setFormState({
+          id: undefined, // Explicitly undefined for new tasks
           title: '',
           caption: '',
           description: '',
@@ -69,26 +70,20 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
   const handleSaveChanges = async () => {
     if (!board) return;
     
-    if (!task && !formState.caption?.trim()) {
+    if (!formState.caption?.trim()) {
         toast({ title: "Caption is required", description: "Please enter a short title for the task.", variant: "destructive" });
         return;
     }
     
     setIsUpdating(true);
 
-    const dataToSave: Task = {
-      ...(task || {}), // Start with existing task data or empty object
-      ...formState,    // Overlay form state
-      id: task?.id || nanoid(), // Use existing ID or generate one
-      boardId: board.id,
+    const dataToSave: Partial<Task> = {
+      ...formState,
       dueDate: formState.dueDate ? (formState.dueDate as Date).toISOString() : null,
-      updatedAt: new Date().toISOString(),
-      createdAt: task?.createdAt || new Date().toISOString(),
       title: formState.caption || 'Untitled Task', // Ensure title exists
-    } as Task;
+    };
     
     onTaskUpdate(dataToSave);
-    // The parent component will handle closing the modal and showing toast
     setIsUpdating(false);
   };
 
