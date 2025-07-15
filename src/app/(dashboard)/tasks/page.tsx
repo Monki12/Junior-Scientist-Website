@@ -17,6 +17,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { nanoid } from 'nanoid';
 
 export default function TasksPage() {
   const { toast } = useToast();
@@ -70,7 +71,14 @@ export default function TasksPage() {
     }
     setLoading(true);
 
-    const members = currentBoard.memberUids.map(uid => {
+    let membersToDisplay = currentBoard.memberUids;
+
+    // If the user is an 'organizer', only show their own column.
+    if (userProfile?.role === 'organizer') {
+        membersToDisplay = currentBoard.memberUids.filter(uid => uid === userProfile.uid);
+    }
+    
+    const members = membersToDisplay.map(uid => {
         const user = allUsers.find(u => u.uid === uid);
         return {
             userId: uid,
@@ -79,6 +87,7 @@ export default function TasksPage() {
             photoURL: user?.photoURL
         }
     });
+
     setBoardMembers(members);
     setSelectedMemberIds(currentBoard.memberUids); // Sync selection with current members
 
@@ -90,7 +99,7 @@ export default function TasksPage() {
 
     return () => unsubTasks();
 
-  }, [currentBoard, allUsers]);
+  }, [currentBoard, allUsers, userProfile?.role, userProfile?.uid]);
 
   const handleCreateBoard = async () => {
     if (!newBoardName.trim() || !userProfile) return;
@@ -121,14 +130,14 @@ export default function TasksPage() {
   const handleTaskUpdate = async (updatedTask: Partial<Task>) => {
     if (!currentBoard || !userProfile) return;
 
-    if (updatedTask.id) {
+    if (updatedTask.id) { // This is an update to an existing task
         const taskRef = doc(db, 'tasks', updatedTask.id);
         await updateDoc(taskRef, {
             ...updatedTask,
             updatedAt: serverTimestamp(),
         });
         toast({ title: "Task Updated" });
-    } else {
+    } else { // This is a new task creation
         const { id, ...taskData } = updatedTask;
         const newTaskData: any = {
             ...taskData,
@@ -137,6 +146,9 @@ export default function TasksPage() {
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
         };
+
+        // Remove the 'id' field before sending to Firestore for creation
+        delete newTaskData.id;
 
         await addDoc(collection(db, 'tasks'), newTaskData);
         toast({ title: "Task Created" });
@@ -169,7 +181,7 @@ export default function TasksPage() {
   };
 
   const canCreateBoards = userProfile && ['admin', 'overall_head', 'event_representative'].includes(userProfile.role);
-  const canManageAllBoards = userProfile && ['admin', 'overall_head'].includes(userProfile.role);
+  const canManageCurrentBoard = userProfile && currentBoard && (currentBoard.managerUids?.includes(userProfile.uid) || ['admin', 'overall_head'].includes(userProfile.role));
 
   return (
     <div className="flex h-[calc(100vh-8rem)] flex-col space-y-4">
@@ -185,7 +197,7 @@ export default function TasksPage() {
                   &larr; Back to board selection
                 </Button>
               )}
-               {currentBoard && canManageAllBoards && (
+               {currentBoard && canManageCurrentBoard && (
                   <Button variant="outline" size="sm" onClick={() => setIsManageMembersModalOpen(true)}>
                       <Settings className="mr-2 h-4 w-4" />
                       Manage Members
