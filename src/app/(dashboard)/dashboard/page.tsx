@@ -296,7 +296,7 @@ const EventRepDashboard = ({ userProfile }: { userProfile: UserProfileData }) =>
 
 
 const useOrganizerData = (userProfile: UserProfileData) => {
-    const [data, setData] = useState<{ boards: Board[], tasks: Task[], members: UserProfileData[] }>({ boards: [], tasks: [], members: [] });
+    const [data, setData] = useState<{ boards: Board[], tasks: Task[] }>({ boards: [], tasks: [] });
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -314,19 +314,8 @@ const useOrganizerData = (userProfile: UserProfileData) => {
             setData(prev => ({ ...prev, boards: userBoards }));
 
             if (userBoards.length > 0) {
-                const allMemberUids = [...new Set(userBoards.flatMap(b => b.memberUids))];
                 const allBoardIds = userBoards.map(b => b.id);
                 
-                // Fetch members
-                if (allMemberUids.length > 0) {
-                    const membersQuery = query(collection(db, 'users'), where('__name__', 'in', allMemberUids));
-                    const unsubMembers = onSnapshot(membersQuery, (memberSnapshot) => {
-                        const boardMembers = memberSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfileData));
-                        setData(prev => ({ ...prev, members: boardMembers }));
-                    });
-                    // This should be returned by the outer listener's cleanup
-                }
-
                 // Fetch tasks
                 if (allBoardIds.length > 0) {
                     const tasksQuery = query(collection(db, 'tasks'), where('boardId', 'in', allBoardIds));
@@ -354,28 +343,10 @@ const useOrganizerData = (userProfile: UserProfileData) => {
 
 
 const OrganizerDashboard = ({ userProfile }: { userProfile: UserProfileData }) => {
-    const { boards, tasks, members, loading } = useOrganizerData(userProfile);
+    const { tasks, loading } = useOrganizerData(userProfile);
 
     const myTasks = useMemo(() => tasks.filter(t => t.assignedToUserIds.includes(userProfile.uid)), [tasks, userProfile.uid]);
-    const unassignedTasks = useMemo(() => tasks.filter(t => t.assignedToUserIds.length === 0), [tasks]);
-    const teamWorkload = useMemo(() => {
-        const workload: { [uid: string]: { name: string, total: number, inProgress: number } } = {};
-        members.forEach(member => {
-            workload[member.uid] = { name: member.fullName || 'Unknown', total: 0, inProgress: 0 };
-        });
-        tasks.forEach(task => {
-            task.assignedToUserIds.forEach(uid => {
-                if (workload[uid]) {
-                    workload[uid].total++;
-                    if (task.status === 'In Progress') {
-                        workload[uid].inProgress++;
-                    }
-                }
-            });
-        });
-        return Object.values(workload).sort((a, b) => b.total - a.total).slice(0, 5); // Top 5
-    }, [tasks, members]);
-
+    
     const myCompletedTasks = myTasks.filter(t => t.status === 'Completed').length;
     const myTotalTasks = myTasks.length;
     const myCompletionPercentage = myTotalTasks > 0 ? (myCompletedTasks / myTotalTasks) * 100 : 0;
@@ -393,8 +364,6 @@ const OrganizerDashboard = ({ userProfile }: { userProfile: UserProfileData }) =
         return dateA - dateB;
       })
       .slice(0, 3);
-      
-    const urgentUnassigned = unassignedTasks.sort((a,b) => (priorityOrder[a.priority] || 4) - (priorityOrder[b.priority] || 4)).slice(0,3);
 
     if (loading) {
         return (
@@ -407,7 +376,7 @@ const OrganizerDashboard = ({ userProfile }: { userProfile: UserProfileData }) =
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-primary">Organizer Dashboard</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="flex flex-col gap-6">
         
         {/* Task Completion Overview */}
         <Card>
@@ -455,70 +424,6 @@ const OrganizerDashboard = ({ userProfile }: { userProfile: UserProfileData }) =
             )}
           </CardContent>
         </Card>
-
-        {/* Unassigned Tasks */}
-        <Card>
-            <CardHeader>
-                <CardTitle>Unassigned Tasks</CardTitle>
-                <CardDescription>Tasks waiting for assignment across your boards.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                 {unassignedTasks.length > 0 ? (
-                    <div>
-                        <p className="text-2xl font-bold text-accent">{unassignedTasks.length} <span className="text-lg font-medium text-muted-foreground">tasks</span></p>
-                        <ul className="space-y-2 mt-3 text-sm">
-                           {urgentUnassigned.map(task => (
-                               <li key={task.id} className="flex justify-between items-center text-muted-foreground">
-                                   <span className="truncate pr-2">{task.caption}</span>
-                                   <Badge variant={task.priority === 'High' ? 'destructive' : 'outline'}>{task.priority}</Badge>
-                               </li>
-                           ))}
-                        </ul>
-                    </div>
-                 ) : (
-                    <div className="text-center py-6 text-muted-foreground">
-                        <Inbox className="h-12 w-12 mx-auto mb-3 text-primary/30" />
-                        <h3 className="text-lg font-semibold text-foreground mb-1">No Unassigned Tasks</h3>
-                        <p className="text-sm">All tasks have an owner.</p>
-                    </div>
-                 )}
-            </CardContent>
-            <CardFooter>
-                <Button asChild variant="secondary" className="w-full"><Link href="/tasks">Assign Tasks</Link></Button>
-            </CardFooter>
-        </Card>
-
-         {/* Team Workload */}
-        <Card className="md:col-span-2 lg:col-span-3">
-            <CardHeader>
-                <CardTitle>Team Workload Overview</CardTitle>
-                <CardDescription>Tasks assigned across all members of your boards.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                {teamWorkload.length > 0 ? (
-                    <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {teamWorkload.map(member => (
-                            <li key={member.name} className="p-3 bg-muted/50 rounded-lg">
-                                <p className="font-semibold text-primary">{member.name}</p>
-                                <p className="text-sm text-muted-foreground">
-                                    <span className="font-bold">{member.total}</span> total tasks assigned
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                     <span className="font-bold">{member.inProgress}</span> tasks in progress
-                                </p>
-                            </li>
-                        ))}
-                    </ul>
-                ) : (
-                    <div className="text-center py-10 text-muted-foreground">
-                        <UserCheckIcon className="h-12 w-12 mx-auto mb-3 text-primary/30" />
-                        <h3 className="text-lg font-semibold text-foreground mb-1">No Team Members Found</h3>
-                        <p className="text-sm">Add members to your boards to see their workload.</p>
-                    </div>
-                )}
-            </CardContent>
-        </Card>
-
       </div>
     </div>
   );
