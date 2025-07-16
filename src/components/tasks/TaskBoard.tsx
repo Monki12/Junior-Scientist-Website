@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { DndContext, closestCorners, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { useToast } from '@/hooks/use-toast';
@@ -9,8 +9,8 @@ import type { Task, Board, BoardMember, UserProfileData } from '@/types';
 import TaskColumn from './TaskColumn';
 import TaskDetailModal from './TaskDetailModal';
 import { useAuth } from '@/hooks/use-auth';
-import { AlertTriangle, ChevronRight, Users, Settings } from 'lucide-react';
-import { doc, updateDoc, serverTimestamp, deleteDoc, addDoc, collection } from 'firebase/firestore';
+import { AlertTriangle, ChevronRight, Users, Settings, X, Search as SearchIcon } from 'lucide-react';
+import { doc, updateDoc, serverTimestamp, deleteDoc, addDoc, collection, arrayUnion, arrayRemove, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -25,8 +25,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
 import { Button } from '../ui/button';
 import { Separator } from '../ui/separator';
+import { Input } from '../ui/input';
+import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
+import { Label } from '../ui/label';
 
 const RoleGroup = ({ 
   title, 
@@ -129,6 +133,129 @@ const RoleGroup = ({
             )}
         </div>
     );
+};
+
+const ManageMembersModal = ({ 
+  isOpen, 
+  onClose, 
+  board, 
+  currentMembers 
+}: { 
+  isOpen: boolean, 
+  onClose: () => void, 
+  board: Board, 
+  currentMembers: BoardMember[] 
+}) => {
+  const { toast } = useToast();
+  const [allStaff, setAllStaff] = useState<UserProfileData[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      const fetchStaff = async () => {
+        const staffRoles = ['admin', 'overall_head', 'event_representative', 'organizer'];
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('role', 'in', staffRoles));
+        const querySnapshot = await getDocs(q);
+        const staffList = querySnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as UserProfileData));
+        setAllStaff(staffList);
+      };
+      fetchStaff();
+    }
+  }, [isOpen]);
+
+  const handleUpdateMembers = async (userId: string, action: 'add' | 'remove') => {
+    setIsUpdating(true);
+    const boardRef = doc(db, 'boards', board.id);
+    try {
+      await updateDoc(boardRef, {
+        memberUids: action === 'add' ? arrayUnion(userId) : arrayRemove(userId),
+      });
+      toast({ title: `Member ${action === 'add' ? 'Added' : 'Removed'}`, description: `The user has been successfully ${action === 'add' ? 'added to' : 'removed from'} the board.` });
+      // The main TaskBoard component will update its members list via its own listener.
+    } catch (error: any) {
+      toast({ title: "Update Failed", description: error.message, variant: 'destructive' });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const filteredStaff = useMemo(() => {
+    const memberIds = new Set(currentMembers.map(m => m.userId));
+    return allStaff.filter(staff => 
+      !memberIds.has(staff.uid) &&
+      (staff.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) || staff.email?.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+  }, [allStaff, currentMembers, searchTerm]);
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Manage Members for &quot;{board.name}&quot;</DialogTitle>
+          <DialogDescription>Add or remove staff from this task board.</DialogDescription>
+        </DialogHeader>
+        <div className="grid grid-cols-2 gap-6 py-4">
+          <div className="space-y-4">
+            <h4 className="font-semibold">Current Members ({currentMembers.length})</h4>
+            <ScrollArea className="h-64 border rounded-md p-2">
+              {currentMembers.length > 0 ? (
+                currentMembers.map(member => (
+                  <div key={member.userId} className="flex items-center justify-between p-2 rounded-md hover:bg-muted">
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={member.photoURL || ''} />
+                        <AvatarFallback>{(member.name || 'U')[0]}</AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm">{member.name}</span>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleUpdateMembers(member.userId, 'remove')} disabled={isUpdating}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-center text-muted-foreground p-4">No members yet.</p>
+              )}
+            </ScrollArea>
+          </div>
+          <div className="space-y-4">
+            <h4 className="font-semibold">Add New Members</h4>
+            <div className="relative">
+              <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Search staff..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" />
+            </div>
+            <ScrollArea className="h-[228px] border rounded-md p-2">
+              {filteredStaff.length > 0 ? (
+                filteredStaff.map(staff => (
+                  <div key={staff.uid} className="flex items-center justify-between p-2 rounded-md hover:bg-muted">
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={staff.photoURL || ''} />
+                        <AvatarFallback>{(staff.fullName || 'U')[0]}</AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm">{staff.fullName}</span>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => handleUpdateMembers(staff.uid, 'add')} disabled={isUpdating}>
+                      Add
+                    </Button>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-center text-muted-foreground p-4">
+                  {searchTerm ? 'No matching staff found.' : 'All available staff are already members.'}
+                </p>
+              )}
+            </ScrollArea>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 };
 
 
@@ -312,6 +439,15 @@ export default function TaskBoard({ board, tasks, members, onBack }: { board: Bo
               canManage={!!canManageBoard}
               onTaskUpdate={handleTaskUpdate}
           />
+          
+           {canManageBoard && (
+              <ManageMembersModal
+                isOpen={isManageMembersModalOpen}
+                onClose={() => setIsManageMembersModalOpen(false)}
+                board={board}
+                currentMembers={members}
+              />
+           )}
 
            <AlertDialog open={!!taskToDelete} onOpenChange={(open) => !open && setTaskToDelete(null)}>
               <AlertDialogContent>
