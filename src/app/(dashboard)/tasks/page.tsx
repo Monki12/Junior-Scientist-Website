@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import type { Task, UserProfileData, Board, BoardMember, UserRole } from '@/types';
+import type { Task, Board, BoardMember, UserRole } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
@@ -12,7 +12,7 @@ import TaskBoard from '@/components/tasks/TaskBoard';
 import TaskDetailModal from '@/components/tasks/TaskDetailModal';
 import { Input } from '@/components/ui/input';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, where, doc, addDoc, updateDoc, serverTimestamp, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, doc, addDoc, updateDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -53,7 +53,12 @@ export default function TasksPage() {
 
     const boardsQuery = query(collection(db, 'boards'), where('memberUids', 'array-contains', userProfile.uid));
     const unsubBoards = onSnapshot(boardsQuery, (snapshot) => {
-        setBoards(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Board)));
+        const boardList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Board));
+        setBoards(boardList);
+        // If there's no current board selected, select the first one by default
+        if (!currentBoard && boardList.length > 0) {
+            setCurrentBoard(boardList[0]);
+        }
         setLoading(false);
     });
     
@@ -72,11 +77,6 @@ export default function TasksPage() {
     setLoading(true);
 
     let membersToDisplay = allUsers.filter(u => currentBoard.memberUids.includes(u.uid));
-
-    // If the user is an 'organizer', only show their own column.
-    if (userProfile?.role === 'organizer') {
-        membersToDisplay = membersToDisplay.filter(u => u.uid === userProfile.uid);
-    }
     
     const members = membersToDisplay.map(user => {
         return {
@@ -98,7 +98,7 @@ export default function TasksPage() {
 
     return () => unsubTasks();
 
-  }, [currentBoard, allUsers, userProfile?.role, userProfile?.uid]);
+  }, [currentBoard, allUsers]);
 
   const handleCreateBoard = async () => {
     if (!newBoardName.trim() || !userProfile) return;
@@ -145,15 +145,21 @@ export default function TasksPage() {
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
         };
-
-        // Remove the 'id' field before sending to Firestore for creation
-        delete newTaskData.id;
-
         await addDoc(collection(db, 'tasks'), newTaskData);
         toast({ title: "Task Created" });
     }
     setIsTaskModalOpen(false);
   };
+
+  const handleTaskDelete = async (taskId: string) => {
+    try {
+        await deleteDoc(doc(db, "tasks", taskId));
+        toast({ title: "Task Deleted", description: "The task has been permanently removed."});
+    } catch (e: any) {
+        toast({ title: "Error", description: "Could not delete task.", variant: "destructive"});
+        console.error("Error deleting task:", e);
+    }
+  }
 
   const handleMemberSelectionChange = (memberId: string, isSelected: boolean) => {
       setSelectedMemberIds(prev => isSelected ? [...prev, memberId] : prev.filter(id => id !== memberId));
@@ -274,6 +280,7 @@ export default function TasksPage() {
             allUsers={allUsers}
             canManage={!!(userProfile && currentBoard && (currentBoard.managerUids?.includes(userProfile.uid) || ['admin', 'overall_head'].includes(userProfile.role)))}
             onTaskUpdate={handleTaskUpdate}
+            onTaskDelete={handleTaskDelete}
         />
 
         <Dialog open={isManageMembersModalOpen} onOpenChange={setIsManageMembersModalOpen}>

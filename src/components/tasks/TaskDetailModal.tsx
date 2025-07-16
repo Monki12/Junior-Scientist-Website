@@ -22,6 +22,16 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card } from '../ui/card';
 import { ScrollArea } from '../ui/scroll-area';
 import { cn } from '@/lib/utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface TaskDetailModalProps {
   isOpen: boolean;
@@ -32,6 +42,7 @@ interface TaskDetailModalProps {
   allUsers: UserProfileData[];
   canManage: boolean;
   onTaskUpdate: (task: Partial<Task>) => void;
+  onTaskDelete: (taskId: string) => void;
 }
 
 const AssigneeSelector = ({ boardMembers, onSelect, disabled }: { boardMembers: BoardMember[], onSelect: (userId: string) => void, disabled: boolean }) => {
@@ -123,9 +134,10 @@ const AssigneeSelector = ({ boardMembers, onSelect, disabled }: { boardMembers: 
 };
 
 
-export default function TaskDetailModal({ isOpen, onClose, task, board, boardMembers, allUsers, canManage, onTaskUpdate }: TaskDetailModalProps) {
+export default function TaskDetailModal({ isOpen, onClose, task, board, boardMembers, allUsers, canManage, onTaskUpdate, onTaskDelete }: TaskDetailModalProps) {
   const { toast } = useToast();
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [formState, setFormState] = useState<Partial<Task>>({});
   const [newSubtaskText, setNewSubtaskText] = useState('');
 
@@ -207,6 +219,12 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
     handleInputChange('subtasks', newSubtasks);
   }
 
+  const handleDeleteClick = () => {
+    if (!task?.id) return;
+    onTaskDelete(task.id);
+    onClose();
+  }
+
   const assignedUser = useMemo(() => {
     if (!formState.assignedToUserIds || formState.assignedToUserIds.length === 0) return null;
     return allUsers.find(u => u.uid === formState.assignedToUserIds![0]);
@@ -215,7 +233,8 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
   if (!isOpen) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <>
+    <Dialog open={isOpen && !isDeleteDialogOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-2xl">{task ? 'Edit Task' : 'Create New Task'}</DialogTitle>
@@ -331,14 +350,41 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
               </Card>
           </div>
         </div>
-        <DialogFooter className="pt-4 border-t">
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSaveChanges} disabled={isUpdating}>
-            {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-            {isUpdating ? 'Saving...' : 'Save Changes'}
-          </Button>
+        <DialogFooter className="pt-4 border-t flex justify-between">
+            <div>
+              {task && canManage && (
+                  <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)}>
+                      <Trash2 className="mr-2 h-4 w-4" /> Delete
+                  </Button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={onClose}>Cancel</Button>
+              <Button onClick={handleSaveChanges} disabled={isUpdating}>
+                {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                {isUpdating ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete the task "{formState.caption}".
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteClick} className="bg-destructive hover:bg-destructive/90">
+                    Yes, Delete Task
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

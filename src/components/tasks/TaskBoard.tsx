@@ -1,47 +1,78 @@
 
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { DndContext, closestCorners, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { useToast } from '@/hooks/use-toast';
 import type { Task, Board, BoardMember, UserRole } from '@/types';
 import TaskColumn from './TaskColumn';
 import { useAuth } from '@/hooks/use-auth';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ChevronRight, Users } from 'lucide-react';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
-interface TaskBoardProps {
-  board: Board;
-  tasks: Task[];
-  members: BoardMember[];
-  onEditTask: (task: Task | null) => void;
-  loading: boolean;
-}
 
-const RoleGroup = ({ title, members, tasks, onEditTask, canManageBoard }: { title: string; members: BoardMember[], tasks: Task[], onEditTask: (task: Task | null) => void, canManageBoard: boolean }) => {
+const RoleGroup = ({ 
+  title, 
+  members, 
+  tasks, 
+  onEditTask, 
+  onDeleteTask, 
+  canManageBoard 
+}: { 
+  title: string; 
+  members: BoardMember[], 
+  tasks: Task[], 
+  onEditTask: (task: Task | null) => void,
+  onDeleteTask: (taskId: string) => void,
+  canManageBoard: boolean 
+}) => {
+    const [isOpen, setIsOpen] = useState(true);
+
     if (members.length === 0) return null;
+
     return (
         <div>
-            <h2 className="text-xl font-bold text-foreground px-4 py-2">{title}</h2>
-            <ScrollArea className="w-full whitespace-nowrap">
-                <div className="flex gap-4 p-4">
-                    {members.map(member => (
-                        <TaskColumn
-                            key={member.userId}
-                            id={member.userId}
-                            title={member.name}
-                            tasks={tasks.filter(task => task.assignedToUserIds?.includes(member.userId))}
-                            member={member}
-                            onEditTask={onEditTask}
-                            canManageBoard={canManageBoard}
-                        />
-                    ))}
-                </div>
-                <ScrollBar orientation="horizontal" />
-            </ScrollArea>
+            <button 
+              className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-muted/80 rounded-t-lg"
+              onClick={() => setIsOpen(!isOpen)}
+            >
+                <ChevronRight className={cn("h-5 w-5 transition-transform", isOpen && "rotate-90")} />
+                <h2 className="text-xl font-bold text-foreground">{title}</h2>
+                <span className="text-sm font-medium text-muted-foreground">({members.length})</span>
+            </button>
+            {isOpen && (
+              <ScrollArea className="w-full whitespace-nowrap">
+                  <div className="flex gap-4 p-4">
+                      {members.map(member => (
+                          <TaskColumn
+                              key={member.userId}
+                              id={member.userId}
+                              title={member.name}
+                              tasks={tasks.filter(task => task.assignedToUserIds?.includes(member.userId))}
+                              member={member}
+                              onEditTask={onEditTask}
+                              onDeleteTask={onDeleteTask}
+                              canManageBoard={canManageBoard}
+                          />
+                      ))}
+                  </div>
+                  <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+            )}
         </div>
     );
 };
@@ -51,6 +82,8 @@ export default function TaskBoard({ board, tasks, members, onEditTask, loading }
   const { toast } = useToast();
   const { userProfile } = useAuth();
   
+  const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
+
   const canManageBoard = userProfile && (board.managerUids?.includes(userProfile.uid) || ['admin', 'overall_head'].includes(userProfile.role));
 
   const { leadership, representatives, organisers, unassignedTasks } = useMemo(() => {
@@ -67,6 +100,28 @@ export default function TaskBoard({ board, tasks, members, onEditTask, loading }
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
+  
+  const handleDeleteTaskConfirm = async () => {
+    if (!taskToDelete || !canManageBoard) {
+        toast({ title: "Error", description: "Task ID missing or insufficient permissions.", variant: "destructive" });
+        setTaskToDelete(null);
+        return;
+    }
+    try {
+        const taskRef = doc(db, 'tasks', taskToDelete);
+        await updateDoc(taskRef, {
+            status: 'Completed', // Or some other status to indicate deletion
+            assignedToUserIds: [], // Unassign
+            description: `(DELETED) ${tasks.find(t=>t.id===taskToDelete)?.description || ''}`
+        });
+        toast({ title: "Task Archived", description: "The task has been archived and unassigned." });
+    } catch (e: any) {
+        toast({ title: "Error Deleting Task", description: e.message, variant: "destructive" });
+    } finally {
+        setTaskToDelete(null);
+    }
+  };
+
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
@@ -118,15 +173,40 @@ export default function TaskBoard({ board, tasks, members, onEditTask, loading }
                     tasks={unassignedTasks}
                     member={null}
                     onEditTask={onEditTask}
+                    onDeleteTask={setTaskToDelete}
                     canManageBoard={!!canManageBoard}
                 />
             </div>
             
             {/* Role-based groups */}
-            <RoleGroup title="Admins & Overall Heads" members={leadership} tasks={tasks} onEditTask={onEditTask} canManageBoard={!!canManageBoard} />
-            <RoleGroup title="Event Representatives" members={representatives} tasks={tasks} onEditTask={onEditTask} canManageBoard={!!canManageBoard} />
-            <RoleGroup title="Organisers" members={organisers} tasks={tasks} onEditTask={onEditTask} canManageBoard={!!canManageBoard} />
+            <RoleGroup title="Admins & Overall Heads" members={leadership} tasks={tasks} onEditTask={onEditTask} onDeleteTask={setTaskToDelete} canManageBoard={!!canManageBoard} />
+            <RoleGroup title="Event Representatives" members={representatives} tasks={tasks} onEditTask={onEditTask} onDeleteTask={setTaskToDelete} canManageBoard={!!canManageBoard} />
+            <RoleGroup title="Organisers" members={organisers} tasks={tasks} onEditTask={onEditTask} onDeleteTask={setTaskToDelete} canManageBoard={!!canManageBoard} />
+
+            {members.length === 0 && (
+                <div className="text-center py-10 text-muted-foreground border-2 border-dashed rounded-lg mx-4">
+                    <Users className="h-12 w-12 mx-auto mb-3 text-primary/30" />
+                    <h3 className="text-lg font-semibold text-foreground mb-1">No Members Added</h3>
+                    <p className="text-sm">Click "Manage Members" to add staff to this board.</p>
+                </div>
+            )}
         </div>
+         <AlertDialog open={!!taskToDelete} onOpenChange={(open) => !open && setTaskToDelete(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will archive the task and unassign it. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteTaskConfirm} className="bg-destructive hover:bg-destructive/90">
+                  Yes, Archive Task
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
     </DndContext>
   );
 }

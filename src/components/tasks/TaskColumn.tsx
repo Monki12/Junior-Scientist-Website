@@ -6,7 +6,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import type { Task, BoardMember } from '@/types';
 import TaskCard from './TaskCard';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useMemo } from 'react';
 import { Button } from '../ui/button';
 import { PlusCircle } from 'lucide-react';
@@ -18,11 +18,12 @@ interface TaskColumnProps {
   tasks: Task[];
   member: BoardMember | null;
   onEditTask: (task: Task | null) => void;
+  onDeleteTask: (taskId: string) => void;
   canManageBoard: boolean;
 }
 
-export default function TaskColumn({ id, title, tasks, member, onEditTask, canManageBoard }: TaskColumnProps) {
-  const { setNodeRef } = useDroppable({ id });
+export default function TaskColumn({ id, title, tasks, member, onEditTask, onDeleteTask, canManageBoard }: TaskColumnProps) {
+  const { setNodeRef, isOver } = useDroppable({ id });
 
   const pendingTasks = useMemo(() => tasks.filter(t => t.status !== 'Completed'), [tasks]);
   const pendingTasksCount = pendingTasks.length;
@@ -32,14 +33,13 @@ export default function TaskColumn({ id, title, tasks, member, onEditTask, canMa
         const bucket = task.bucket || 'other';
         acc[bucket] = (acc[bucket] || 0) + 1;
         return acc;
-    }, {} as Record<string, number>);
+    }, { a: 0, b: 0, c: 0, other: 0 } as Record<string, number>);
   }, [pendingTasks]);
 
 
   return (
     <div
       className="flex flex-col w-72 min-w-72 max-h-full bg-muted/50 rounded-lg shadow-sm"
-      ref={setNodeRef}
     >
       <div className="p-3 border-b sticky top-0 bg-muted/80 backdrop-blur-sm rounded-t-lg z-10 flex justify-between items-center">
         <div className="flex items-center gap-2 overflow-hidden">
@@ -55,41 +55,46 @@ export default function TaskColumn({ id, title, tasks, member, onEditTask, canMa
           </div>
         </div>
         {member && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="text-sm font-bold text-primary cursor-default h-6 w-6 flex items-center justify-center rounded-full bg-primary/20">{pendingTasksCount}</span>
-              </TooltipTrigger>
-              <TooltipContent>
-                <div className="text-sm p-1">
-                  <p className="font-bold mb-1">Pending Tasks: {pendingTasksCount}</p>
-                  <Separator className="my-1"/>
-                  <p>Bucket A: {bucketBreakdown.a || 0}</p>
-                  <p>Bucket B: {bucketBreakdown.b || 0}</p>
-                  <p>Bucket C: {bucketBreakdown.c || 0}</p>
-                  <p>Other: {bucketBreakdown.other || 0}</p>
+          <Popover>
+            <PopoverTrigger asChild>
+               <button className="text-sm font-bold text-primary cursor-pointer h-6 w-6 flex items-center justify-center rounded-full bg-primary/20 hover:bg-primary/30">
+                  {pendingTasksCount}
+                </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-48 text-sm p-2">
+                <div className="space-y-1">
+                  <p className="font-bold mb-1 text-center">Pending Tasks: {pendingTasksCount}</p>
+                  <Separator />
+                  <p>Bucket A: {bucketBreakdown.a}</p>
+                  <p>Bucket B: {bucketBreakdown.b}</p>
+                  <p>Bucket C: {bucketBreakdown.c}</p>
+                  <p>Other: {bucketBreakdown.other}</p>
                 </div>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+              </PopoverContent>
+          </Popover>
         )}
       </div>
-      <SortableContext id={id} items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-        <div className="flex-1 overflow-y-auto p-2 space-y-1">
+      <div
+        ref={setNodeRef}
+        className={`flex-1 overflow-y-auto p-2 space-y-1 transition-colors ${isOver ? 'bg-primary/10' : ''}`}
+      >
+        <SortableContext id={id} items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
           {tasks.map(task => (
             <TaskCard
               key={task.id}
               task={task}
-              onEditTask={() => onEditTask(task)}
+              canManage={canManageBoard}
+              onEditTask={onEditTask}
+              onDeleteTask={onDeleteTask}
             />
           ))}
-          {tasks.length === 0 && (
+        </SortableContext>
+        {tasks.length === 0 && (
              <div className="text-center text-xs text-muted-foreground py-4 border-2 border-dashed border-muted-foreground/20 rounded-md">
                 Drop tasks here
              </div>
           )}
-        </div>
-      </SortableContext>
+      </div>
       {id === 'unassigned' && canManageBoard && (
           <div className="p-2 border-t mt-auto">
               <Button variant="ghost" className="w-full justify-start" onClick={() => onEditTask(null)}>
