@@ -11,7 +11,7 @@ This repository contains the full-stack application for the "Junior Scientist" e
 – Integrated real-time task tracking, live dashboards for dynamic student analytics, and an OCR component for automated input processing.
 – Engineered a responsive UI/UX for seamless data management on both mobile and desktop, featuring a modern, multi-hued design system with distinct light and dark modes.
 
-– **Tools & Technologies:** Firebase Firestore, Node.js, React/Next.js, Tailwind CSS.
+– **Tools & Technologies:** TypeScript, Next.js, React, Firebase Firestore, Genkit, Node.js, Tailwind CSS.
 
 ## Getting Started
 
