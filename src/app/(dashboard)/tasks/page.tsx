@@ -54,6 +54,7 @@ export default function TasksPage() {
         setLoading(false);
     }, (err) => {
       console.error(err);
+      toast({title: "Error", description: "Could not fetch task boards.", variant: "destructive"});
       setLoading(false);
     });
     
@@ -61,7 +62,7 @@ export default function TasksPage() {
         unsubUsers();
         unsubBoards();
     }
-  }, [userProfile?.uid, userProfile?.role]);
+  }, [userProfile?.uid, userProfile?.role, toast]);
 
   useEffect(() => {
     if (!currentBoard) {
@@ -74,11 +75,15 @@ export default function TasksPage() {
     const unsubTasks = onSnapshot(tasksQuery, (snapshot) => {
         setTasks(snapshot.docs.map(doc => ({...doc.data(), id: doc.id} as Task)));
         setLoading(false);
+    }, (err) => {
+        console.error("Error fetching tasks for board:", err);
+        toast({title: "Error", description: `Could not fetch tasks for ${currentBoard.name}.`, variant: "destructive"});
+        setLoading(false);
     });
 
     return () => unsubTasks();
 
-  }, [currentBoard]);
+  }, [currentBoard, toast]);
 
   const boardMembers = useMemo(() => {
     if (!currentBoard) return [];
@@ -126,7 +131,7 @@ export default function TasksPage() {
 
   // Main Conditional Rendering
   if (currentBoard) {
-    return <TaskBoard board={currentBoard} tasks={tasks} members={boardMembers} onBack={() => setCurrentBoard(null)} />;
+    return <TaskBoard board={currentBoard} tasks={tasks} members={boardMembers} onBack={() => setCurrentBoard(null)} allUsers={allUsers}/>;
   }
 
   // Board Selection View
@@ -195,4 +200,3 @@ export default function TasksPage() {
     </div>
   );
 }
-

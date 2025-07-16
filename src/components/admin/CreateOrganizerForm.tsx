@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { db } from '@/lib/firebase'; // Keep 'db' for Firestore operations
 import { initializeApp, deleteApp } from 'firebase/app'; // Import app management functions
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth'; // Import auth functions
-import { doc, setDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, collection, query, where, getDocs, updateDoc, arrayUnion } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -62,8 +62,6 @@ export default function CreateOrganizerForm({ currentAdminRole, onSuccess }: Cre
   const onSubmit = async (data: OrganizerSignupFormData) => {
     setIsSubmitting(true);
 
-    // Create a temporary, secondary Firebase App instance for user creation.
-    // This prevents the admin from being logged out upon new user creation.
     const tempAppName = `auth-worker-${Date.now()}`;
     const tempApp = initializeApp(firebaseConfig, tempAppName);
     const tempAuth = getAuth(tempApp);
@@ -76,17 +74,17 @@ export default function CreateOrganizerForm({ currentAdminRole, onSuccess }: Cre
         setError('collegeRollNumber', { type: 'manual', message: 'This College Roll Number is already registered.' });
         toast({ title: "Registration Failed", description: "The College Roll Number provided is already in use.", variant: "destructive" });
         setIsSubmitting(false);
-        await deleteApp(tempApp); // Clean up temp app on early exit
+        await deleteApp(tempApp); 
         return;
       }
 
-      // Use the temporary auth instance to create the user.
       const userCredential = await createUserWithEmailAndPassword(tempAuth, data.email, data.password);
       const newUserUid = userCredential.user.uid;
 
       const userProfileData = {
         uid: newUserUid,
         fullName: data.fullName,
+        displayName: data.fullName,
         email: data.email,
         role: data.role,
         department: data.department,
@@ -97,12 +95,25 @@ export default function CreateOrganizerForm({ currentAdminRole, onSuccess }: Cre
         updatedAt: serverTimestamp(),
         photoURL: data.photoURL || null,
         additionalNumber: data.additionalNumber || null,
-        subEventsManaged: [],
-        tasks: [],
+        assignedEventUids: [],
+        boardIds: [],
         points: 0,
       };
 
       await setDoc(doc(db, 'users', newUserUid), userProfileData);
+
+      // Automatically add the new staff member to the "general" board
+      const generalBoardQuery = query(collection(db, 'boards'), where('name', '==', 'general'));
+      const generalBoardSnapshot = await getDocs(generalBoardQuery);
+      if (!generalBoardSnapshot.empty) {
+        const generalBoardDoc = generalBoardSnapshot.docs[0];
+        await updateDoc(generalBoardDoc.ref, {
+          memberUids: arrayUnion(newUserUid)
+        });
+      } else {
+        console.warn("Could not find a 'general' board to add the new user to.");
+      }
+
 
       toast({
         title: "Success",
@@ -142,7 +153,6 @@ export default function CreateOrganizerForm({ currentAdminRole, onSuccess }: Cre
       });
     } finally {
       setIsSubmitting(false);
-      // Always delete the temporary app instance to avoid memory leaks.
       await deleteApp(tempApp);
     }
   };

@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import type { SubEvent, UserProfileData } from '@/types';
 import { db, storage } from '@/lib/firebase';
-import { doc, updateDoc, deleteDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { doc, updateDoc, deleteDoc, collection, getDocs, query, where, arrayUnion } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { format, parseISO, isValid } from 'date-fns';
 import Image from 'next/image';
@@ -99,6 +99,30 @@ export function EditEventForm({ event }: EditEventFormProps) {
     setGalleryPreviews(previews => previews.filter((_, i) => i !== index));
   };
 
+  const syncBoardMembers = async (boardId: string, assignedUids: string[]) => {
+    try {
+      const boardRef = doc(db, 'boards', boardId);
+      // Using a loop with arrayUnion is safer than overwriting the whole array
+      // if multiple updates could happen, but here we can just set it.
+      // However, to be more robust, we'll merge the assigned UIDs with existing ones.
+      const boardSnap = await getDocs(query(collection(db, 'boards'), where('eventId', '==', event.id)));
+      if(boardSnap.empty) return; // No board to update
+      
+      const boardDocRef = boardSnap.docs[0].ref;
+      await updateDoc(boardDocRef, {
+        memberUids: arrayUnion(...assignedUids)
+      });
+
+    } catch(error) {
+       console.error("Error syncing board members:", error);
+       toast({
+         title: "Board Sync Warning",
+         description: "Could not automatically add new members to the task board.",
+         variant: "destructive"
+       });
+    }
+  };
+
 
   const handleUpdate = async (e: FormEvent) => {
     e.preventDefault();
@@ -134,6 +158,12 @@ export function EditEventForm({ event }: EditEventFormProps) {
 
         const eventRef = doc(db, 'subEvents', event.id);
         await updateDoc(eventRef, dataToSave);
+        
+        // Sync members to the event's board
+        const allAssignedUids = [...new Set([...dataToSave.organizerUids, ...dataToSave.eventReps])];
+        await syncBoardMembers(event.id, allAssignedUids);
+
+
         toast({ title: "Event Updated", description: "Changes have been saved successfully." });
         router.push(`/events/manage/${dataToSave.slug}`);
     } catch (error: any) {

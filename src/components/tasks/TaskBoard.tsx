@@ -139,31 +139,18 @@ const ManageMembersModal = ({
   isOpen, 
   onClose, 
   board, 
-  currentMembers 
+  currentMembers,
+  allUsers,
 }: { 
   isOpen: boolean, 
   onClose: () => void, 
   board: Board, 
-  currentMembers: BoardMember[] 
+  currentMembers: BoardMember[],
+  allUsers: UserProfileData[],
 }) => {
   const { toast } = useToast();
-  const [allStaff, setAllStaff] = useState<UserProfileData[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
-
-  useEffect(() => {
-    if (isOpen) {
-      const fetchStaff = async () => {
-        const staffRoles = ['admin', 'overall_head', 'event_representative', 'organizer'];
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, where('role', 'in', staffRoles));
-        const querySnapshot = await getDocs(q);
-        const staffList = querySnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as UserProfileData));
-        setAllStaff(staffList);
-      };
-      fetchStaff();
-    }
-  }, [isOpen]);
 
   const handleUpdateMembers = async (userId: string, action: 'add' | 'remove') => {
     setIsUpdating(true);
@@ -173,7 +160,6 @@ const ManageMembersModal = ({
         memberUids: action === 'add' ? arrayUnion(userId) : arrayRemove(userId),
       });
       toast({ title: `Member ${action === 'add' ? 'Added' : 'Removed'}`, description: `The user has been successfully ${action === 'add' ? 'added to' : 'removed from'} the board.` });
-      // The main TaskBoard component will update its members list via its own listener.
     } catch (error: any) {
       toast({ title: "Update Failed", description: error.message, variant: 'destructive' });
     } finally {
@@ -183,11 +169,11 @@ const ManageMembersModal = ({
 
   const filteredStaff = useMemo(() => {
     const memberIds = new Set(currentMembers.map(m => m.userId));
-    return allStaff.filter(staff => 
+    return allUsers.filter(staff => 
       !memberIds.has(staff.uid) &&
       (staff.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) || staff.email?.toLowerCase().includes(searchTerm.toLowerCase()))
     );
-  }, [allStaff, currentMembers, searchTerm]);
+  }, [allUsers, currentMembers, searchTerm]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -259,7 +245,7 @@ const ManageMembersModal = ({
 };
 
 
-export default function TaskBoard({ board, tasks, members, onBack }: { board: Board, tasks: Task[], members: BoardMember[], onBack: () => void }) {
+export default function TaskBoard({ board, tasks, members, onBack, allUsers }: { board: Board, tasks: Task[], members: BoardMember[], onBack: () => void, allUsers: UserProfileData[] }) {
   const { toast } = useToast();
   const { userProfile } = useAuth();
   
@@ -276,13 +262,15 @@ export default function TaskBoard({ board, tasks, members, onBack }: { board: Bo
     const organisers = members.filter(m => m.role === 'organizer');
 
     const memberIds = new Set(members.map(m => m.userId));
-    const unassigned = tasks.filter(task => {
-        // Task is unassigned if it has no assignees OR if its assignee is no longer a board member
-        if (!task.assignedToUserIds || task.assignedToUserIds.length === 0) {
-            return true;
+    const assignedTaskIds = new Set<string>();
+    
+    tasks.forEach(task => {
+        if (task.assignedToUserIds?.some(id => memberIds.has(id))) {
+            assignedTaskIds.add(task.id);
         }
-        return !task.assignedToUserIds.some(assigneeId => memberIds.has(assigneeId));
     });
+
+    const unassigned = tasks.filter(task => !assignedTaskIds.has(task.id));
 
     return { leadership, representatives, organisers, unassignedTasks: unassigned };
   }, [tasks, members]);
@@ -291,7 +279,7 @@ export default function TaskBoard({ board, tasks, members, onBack }: { board: Bo
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8, // Require pointer to move 8px before initiating drag
+        distance: 8,
       },
     }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -443,7 +431,7 @@ export default function TaskBoard({ board, tasks, members, onBack }: { board: Bo
               task={editingTask}
               board={board}
               boardMembers={members}
-              allUsers={[]} 
+              allUsers={allUsers} 
               canManage={!!canManageBoard}
               onTaskUpdate={handleTaskUpdate}
           />
@@ -454,6 +442,7 @@ export default function TaskBoard({ board, tasks, members, onBack }: { board: Bo
                 onClose={() => setIsManageMembersModalOpen(false)}
                 board={board}
                 currentMembers={members}
+                allUsers={allUsers}
               />
            )}
 
