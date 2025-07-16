@@ -8,7 +8,7 @@ This repository contains the full-stack application for the "Junior Scientist" e
 *June 2024 – August 2024*
 
 – Developed a scalable event management platform with robust Role-Based Access Control (RBAC) to support a multi-level organizing hierarchy.
-– Integrated gamified real-time task tracking, live dashboards for dynamic student analytics, and an OCR component for automated input processing.
+– Integrated real-time task tracking, live dashboards for dynamic student analytics, and an OCR component for automated input processing.
 – Engineered a responsive UI/UX for seamless data management on both mobile and desktop, featuring a modern, multi-hued design system with distinct light and dark modes.
 
 – **Tools & Technologies:** Firebase Firestore, Node.js, React/Next.js, Tailwind CSS.
