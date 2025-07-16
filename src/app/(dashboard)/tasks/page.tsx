@@ -7,11 +7,11 @@ import type { Task, Board, BoardMember, UserProfileData } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
-import { ListChecks, Loader2, PlusCircle, Users } from 'lucide-react';
+import { ListChecks, Loader2, PlusCircle, Users, Briefcase } from 'lucide-react';
 import TaskBoard from '@/components/tasks/TaskBoard';
 import { Input } from '@/components/ui/input';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, where, doc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, doc, addDoc, serverTimestamp, Query } from 'firebase/firestore';
 import { Card } from '@/components/ui/card';
 
 export default function TasksPage() {
@@ -39,7 +39,15 @@ export default function TasksPage() {
         setAllUsers(snapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as UserProfileData)));
     });
 
-    const boardsQuery = query(collection(db, 'boards'), where('memberUids', 'array-contains', userProfile.uid));
+    let boardsQuery: Query;
+    if (userProfile.role === 'admin' || userProfile.role === 'overall_head') {
+      // Admins and Overall Heads see all boards
+      boardsQuery = query(collection(db, 'boards'));
+    } else {
+      // Other roles see only boards they are members of
+      boardsQuery = query(collection(db, 'boards'), where('memberUids', 'array-contains', userProfile.uid));
+    }
+
     const unsubBoards = onSnapshot(boardsQuery, (snapshot) => {
         const boardList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Board));
         setBoards(boardList);
@@ -53,7 +61,7 @@ export default function TasksPage() {
         unsubUsers();
         unsubBoards();
     }
-  }, [userProfile?.uid]);
+  }, [userProfile?.uid, userProfile?.role]);
 
   useEffect(() => {
     if (!currentBoard) {
@@ -166,7 +174,10 @@ export default function TasksPage() {
                         onClick={() => setCurrentBoard(board)} 
                         className="p-4 text-left hover:border-primary transition-colors cursor-pointer shadow-soft hover:shadow-md-soft"
                     >
-                        <h3 className="font-bold text-lg text-foreground">{board.name}</h3>
+                        <div className="flex items-start justify-between">
+                            <h3 className="font-bold text-lg text-foreground">{board.name}</h3>
+                            {board.type === 'event' && <Briefcase className="h-4 w-4 text-muted-foreground" title="Event Board" />}
+                        </div>
                         <p className="text-sm text-muted-foreground mt-2 flex items-center gap-1.5">
                           <Users className="h-4 w-4"/>
                           {board.memberUids.length} members
@@ -184,3 +195,4 @@ export default function TasksPage() {
     </div>
   );
 }
+
