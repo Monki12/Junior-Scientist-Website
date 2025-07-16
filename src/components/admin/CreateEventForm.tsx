@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 import { createEventSchema, type CreateEventFormData } from '@/schemas/createEventSchema';
+import { useAuth } from '@/hooks/use-auth';
 
 interface CreateEventFormProps {
   onSuccess?: () => void;
@@ -21,6 +22,7 @@ interface CreateEventFormProps {
 
 export default function CreateEventForm({ onSuccess }: CreateEventFormProps) {
   const { toast } = useToast();
+  const { userProfile } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<CreateEventFormData>({
@@ -34,10 +36,16 @@ export default function CreateEventForm({ onSuccess }: CreateEventFormProps) {
   const { handleSubmit, register, formState: { errors }, control, watch, setValue } = form;
 
   const onSubmit = async (data: CreateEventFormData) => {
+    if (!userProfile) {
+        toast({ title: "Authentication Error", description: "You must be logged in to create an event.", variant: "destructive"});
+        return;
+    }
+
     setIsSubmitting(true);
     try {
       const slug = data.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
 
+      // 1. Create the Event
       const newEventData = {
         title: data.title,
         slug: slug,
@@ -64,21 +72,33 @@ export default function CreateEventForm({ onSuccess }: CreateEventFormProps) {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
+      const eventDocRef = await addDoc(collection(db, 'subEvents'), newEventData);
 
-      await addDoc(collection(db, 'subEvents'), newEventData);
+      // 2. Automatically Create the Corresponding Board
+      const newBoardData = {
+          name: data.title,
+          description: `Task board for the event: ${data.title}`,
+          type: 'event' as const,
+          eventId: eventDocRef.id,
+          memberUids: [userProfile.uid], // Creator is the first member
+          managerUids: [userProfile.uid], // Creator is the first manager
+          createdAt: serverTimestamp(),
+          createdBy: userProfile.uid
+      };
+      await addDoc(collection(db, 'boards'), newBoardData);
 
       toast({
         title: "Event Created Successfully!",
-        description: `The event "${data.title}" has been added. You can now manage it from the edit page.`,
+        description: `The event and its task board have been created.`,
       });
 
       form.reset();
       onSuccess?.();
 
     } catch (error: any) {
-      console.error("Error creating event:", error);
+      console.error("Error creating event and board:", error);
       toast({
-        title: "Event Creation Failed",
+        title: "Creation Failed",
         description: error.message || "An unexpected error occurred. Please try again.",
         variant: "destructive",
       });
