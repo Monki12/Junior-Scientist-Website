@@ -16,7 +16,7 @@ import { Card } from '@/components/ui/card';
 
 export default function TasksPage() {
   const { toast } = useToast();
-  const { userProfile } = useAuth();
+  const { userProfile, loading: authLoading } = useAuth();
 
   const [allUsers, setAllUsers] = useState<UserProfileData[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -30,7 +30,12 @@ export default function TasksPage() {
 
 
   useEffect(() => {
-    if (!userProfile?.uid) return;
+    // Wait until auth is resolved and userProfile is available
+    if (authLoading || !userProfile) {
+      if (!authLoading) setLoading(false); // If auth is done but no profile, stop loading.
+      return;
+    }
+
     setLoading(true);
 
     const staffRoles = ['admin', 'overall_head', 'event_representative', 'organizer'];
@@ -62,7 +67,7 @@ export default function TasksPage() {
         unsubUsers();
         unsubBoards();
     }
-  }, [userProfile?.uid, userProfile?.role, toast]);
+  }, [userProfile, authLoading, toast]);
 
   useEffect(() => {
     if (!currentBoard) {
@@ -125,7 +130,7 @@ export default function TasksPage() {
   }
 
 
-  if (loading && !currentBoard) {
+  if (loading || authLoading) {
       return <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
   }
 
