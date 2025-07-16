@@ -21,6 +21,7 @@ import { Loader2, Users, Search, ShieldAlert, Filter, GraduationCap, PlusCircle,
 import { cn } from '@/lib/utils';
 import { nanoid } from 'nanoid';
 import { Textarea } from '@/components/ui/textarea';
+import StudentCard from '@/components/students/StudentCard';
 
 interface DisplayStudent extends UserProfileData {
   registeredEventNames?: string[];
@@ -407,13 +408,37 @@ export default function StudentsPage() {
             </div>
              <div className="flex items-center gap-2 self-start md:self-center">
                 <Button variant="outline" onClick={() => setIsFilterDialogOpen(true)}><Filter className="mr-2 h-4 w-4" />Filter ({activeFilters.length})</Button>
-                <Button variant="outline" onClick={() => setIsCustomizeDialogOpen(true)}><Settings className="mr-2 h-4 w-4" />Customize Columns</Button>
+                <Button variant="outline" onClick={() => setIsCustomizeDialogOpen(true)}><Settings className="mr-2 h-4 w-4" />Customize</Button>
                 {canManageColumns && <Button onClick={() => setIsAddColumnDialogOpen(true)}><PlusCircle className="mr-2 h-4 w-4" />Add Column</Button>}
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="border rounded-md overflow-x-auto">
+          {/* Responsive Views: Mobile Cards and Desktop Table */}
+          
+          {/* Mobile View: Cards (Visible on small screens) */}
+          <div className="md:hidden space-y-4">
+            {loadingData ? (
+              <div className="text-center py-10"><Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" /></div>
+            ) : filteredStudents.length > 0 ? (
+              filteredStudents.map(student => (
+                <StudentCard 
+                  key={student.uid} 
+                  student={student} 
+                  onStatusChange={(field, value, isCustom) => handleOptimisticUpdate(student.uid, field, value, isCustom)} 
+                />
+              ))
+            ) : (
+              <div className="text-center py-12 text-muted-foreground">
+                <GraduationCap className="h-16 w-16 mx-auto mb-4 text-primary/30" />
+                <h3 className="text-xl font-semibold text-foreground mb-2">No Students Found</h3>
+                <p>No student accounts match your criteria.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Desktop View: Table (Hidden on small screens, visible on md and up) */}
+          <div className="hidden md:block border rounded-md overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -425,16 +450,6 @@ export default function StudentsPage() {
               <TableBody>
                 {loadingData ? (
                     <TableRow><TableCell colSpan={visibleColumns.length} className="text-center py-10"><Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" /></TableCell></TableRow>
-                ) : enrichedStudents.length === 0 ? (
-                    <TableRow>
-                        <TableCell colSpan={visibleColumns.length}>
-                            <div className="text-center py-12 text-muted-foreground">
-                                <GraduationCap className="h-16 w-16 mx-auto mb-4 text-primary/30" />
-                                <h3 className="text-xl font-semibold text-foreground mb-2">No Students Found</h3>
-                                <p>No student accounts have been created yet. Students can sign up on the public site.</p>
-                            </div>
-                        </TableCell>
-                    </TableRow>
                 ) : filteredStudents.length > 0 ? (
                   filteredStudents.map((student) => (
                   <TableRow key={student.uid}>
@@ -468,7 +483,7 @@ export default function StudentsPage() {
                         }
 
                         if (col.id === 'phoneNumbers') return <TableCell key={col.id}>{displayValue(student.phoneNumbers?.[0])}</TableCell>;
-                        if (col.id === 'registeredEventNames') return <TableCell key={col.id}>{displayValue(student.registeredEventNames)}</TableCell>
+                        if (col.id === 'registeredEventNames') return <TableCell key={col.id}>{displayValue(student.registeredEventNames)}</TableCell>;
 
                         return <TableCell key={col.id}>{displayValue(cellValue)}</TableCell>
                     })}
