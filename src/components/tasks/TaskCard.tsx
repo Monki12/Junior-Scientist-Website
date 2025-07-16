@@ -60,8 +60,8 @@ export default function TaskCard({ task, canManage, onEditTask, onInitiateDelete
     <div ref={setNodeRef} style={style} {...attributes}>
       <Popover open={isMenuOpen} onOpenChange={setIsMenuOpen}>
         <PopoverTrigger asChild>
-          <div {...listeners}>
-            <Card className="group mb-2 bg-card/70 hover:bg-card cursor-pointer shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+          <div {...listeners} className="cursor-pointer">
+            <Card className="group mb-2 bg-card/70 hover:bg-card shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
                 <div className={cn("absolute left-0 top-0 bottom-0 w-1.5", statusStyles[task.status]?.barColor || 'bg-gray-400')}></div>
                 <CardContent className="p-3 pl-5 space-y-2">
                     <p className="text-base font-semibold leading-tight">{task.caption || task.title}</p>
