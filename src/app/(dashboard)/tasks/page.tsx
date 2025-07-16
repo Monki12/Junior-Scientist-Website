@@ -5,7 +5,7 @@ import { useEffect, useState, useMemo, FormEvent } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import type { Task, Board, BoardMember, UserProfileData } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
 import { ListChecks, Loader2, PlusCircle, Users } from 'lucide-react';
 import TaskBoard from '@/components/tasks/TaskBoard';
