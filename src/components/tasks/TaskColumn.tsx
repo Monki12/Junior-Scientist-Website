@@ -57,9 +57,9 @@ export default function TaskColumn({ id, title, tasks, member, onEditTask, onIni
         {member && (
           <Popover>
             <PopoverTrigger asChild>
-               <button className="text-sm font-bold text-primary cursor-pointer h-6 w-6 flex items-center justify-center rounded-full bg-primary/20 hover:bg-primary/30">
+               <Button variant="ghost" size="icon" className="text-sm font-bold text-primary cursor-pointer h-6 w-6 flex items-center justify-center rounded-full bg-primary/20 hover:bg-primary/30">
                   {pendingTasksCount}
-                </button>
+                </Button>
             </PopoverTrigger>
             <PopoverContent className="w-48 text-sm p-2">
                 <div className="space-y-1">
@@ -76,7 +76,7 @@ export default function TaskColumn({ id, title, tasks, member, onEditTask, onIni
       </div>
       <div
         ref={setNodeRef}
-        className={`flex-1 overflow-y-auto p-2 space-y-1 transition-colors ${isOver ? 'bg-primary/10' : ''}`}
+        className={`flex-1 overflow-y-auto p-2 space-y-1 transition-colors ${isOver ? 'bg-primary/10 border-2 border-dashed border-primary' : ''}`}
       >
         <SortableContext id={id} items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
           {tasks.map(task => (

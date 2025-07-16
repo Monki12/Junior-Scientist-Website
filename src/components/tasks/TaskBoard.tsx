@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { Task, Board, BoardMember } from '@/types';
 import TaskColumn from './TaskColumn';
 import { useAuth } from '@/hooks/use-auth';
-import { Loader2, ChevronRight, Users } from 'lucide-react';
+import { Loader2, ChevronRight, Users, Users2, AlertTriangle } from 'lucide-react';
 import { doc, updateDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
@@ -24,7 +24,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-
+import { Button } from '../ui/button';
+import { Separator } from '../ui/separator';
 
 const RoleGroup = ({ 
   title, 
@@ -43,8 +44,6 @@ const RoleGroup = ({
 }) => {
     const [isOpen, setIsOpen] = useState(true);
 
-    if (members.length === 0) return null;
-
     const pendingTasksCount = useMemo(() => {
         let count = 0;
         members.forEach(member => {
@@ -52,6 +51,20 @@ const RoleGroup = ({
         });
         return count;
     }, [tasks, members]);
+    
+    if (members.length === 0) {
+      return (
+        <div className="px-4 py-2">
+           <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+              <ChevronRight className="h-5 w-5 transition-transform" />
+              {title}
+            </h2>
+          <div className="text-center py-4 text-sm text-muted-foreground border-2 border-dashed rounded-lg mt-2">
+            No {title.toLowerCase()} in this board.
+          </div>
+        </div>
+      )
+    }
 
     return (
         <div>
@@ -90,7 +103,7 @@ const RoleGroup = ({
 };
 
 
-export default function TaskBoard({ board, tasks, members, onEditTask, loading }: { board: Board, tasks: Task[], members: BoardMember[], onEditTask: (task: Task | null) => void, loading: boolean }) {
+export default function TaskBoard({ board, tasks, members, onEditTask, onInitiateDelete, loading }: { board: Board, tasks: Task[], members: BoardMember[], onEditTask: (task: Task | null) => void, onInitiateDelete: (task: Task) => void, loading: boolean }) {
   const { toast } = useToast();
   const { userProfile } = useAuth();
   
@@ -199,16 +212,21 @@ export default function TaskBoard({ board, tasks, members, onEditTask, loading }
          <AlertDialog open={!!taskToDelete} onOpenChange={(open) => !open && setTaskToDelete(null)}>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This action cannot be undone. This will permanently delete the task "{taskToDelete?.caption}".
-                </AlertDialogDescription>
+                  <div className="flex justify-center">
+                    <AlertTriangle className="h-12 w-12 text-yellow-500 mb-4" />
+                  </div>
+                  <AlertDialogTitle className="text-center text-2xl">Confirm Deletion</AlertDialogTitle>
+                  <AlertDialogDescription className="text-center">
+                      <p>Are you sure you want to delete this task?</p>
+                      <p className="font-semibold text-foreground mt-2">Task: "{taskToDelete?.caption}"</p>
+                      <p className="text-xs text-muted-foreground mt-4">This action cannot be undone.</p>
+                  </AlertDialogDescription>
               </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive hover:bg-destructive/90">
-                  Yes, Delete Task
-                </AlertDialogAction>
+              <AlertDialogFooter className="sm:justify-center">
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                      Delete Task
+                  </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>

@@ -4,10 +4,10 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { Task, TaskPriority, TaskStatus } from '@/types';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { CheckSquare, Clock, Flag, Trash2, Edit, MoreVertical, XCircle } from 'lucide-react';
+import { CheckSquare, Clock, Flag, Trash2, Edit, MoreVertical, XCircle, GripVertical } from 'lucide-react';
 import { format, parseISO, isPast } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Button } from '../ui/button';
@@ -47,9 +47,13 @@ export default function TaskCard({ task, canManage, onEditTask, onInitiateDelete
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
-    zIndex: isDragging ? 10 : 'auto',
+    opacity: isDragging ? 0.7 : 1,
+    boxShadow: isDragging ? '0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.1)' : 'none',
+    transformOrigin: '0 0',
   };
+  
+  const rotationStyle = isDragging ? { transform: `rotate(2deg)` } : {};
+
 
   const completedSubtasks = task.subtasks?.filter(st => st.completed).length || 0;
   const totalSubtasks = task.subtasks?.length || 0;
@@ -57,11 +61,11 @@ export default function TaskCard({ task, canManage, onEditTask, onInitiateDelete
   const isOverdue = dueDate && isPast(dueDate) && task.status !== 'Completed';
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes}>
-      <Card className="group mb-2 bg-card/70 hover:bg-card shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+    <div ref={setNodeRef} style={{...style, ...rotationStyle}} {...attributes}>
+      <Card className="group mb-2 bg-card/70 hover:bg-card shadow-sm hover:shadow-lg transition-shadow relative overflow-hidden cursor-grab active:cursor-grabbing">
         <div className={cn("absolute left-0 top-0 bottom-0 w-1.5", statusStyles[task.status]?.barColor || 'bg-gray-400')}></div>
-        <div className="flex items-center justify-between p-3 pl-5">
-            <div className="flex-grow space-y-2 cursor-grab" {...listeners}>
+        <div className="flex items-start justify-between p-3 pl-5">
+            <div className="flex-grow space-y-2" {...listeners}>
               <p className="text-base font-semibold leading-tight">{task.caption || task.title}</p>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                   <TooltipProvider><Tooltip>
@@ -104,7 +108,7 @@ export default function TaskCard({ task, canManage, onEditTask, onInitiateDelete
                     <MoreVertical className="h-4 w-4" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-48 p-2">
+              <PopoverContent className="w-48 p-2" side="bottom" align="end">
                   <div className="flex flex-col gap-1">
                       <Button variant="ghost" className="w-full justify-start" onClick={() => { onEditTask(task); setIsMenuOpen(false); }}>
                           <Edit className="mr-2 h-4 w-4"/> Edit Task
