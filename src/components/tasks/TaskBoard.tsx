@@ -92,9 +92,9 @@ const RoleGroup = ({
                 <span className="text-sm font-medium text-muted-foreground">({members.length})</span>
                 <Popover>
                     <PopoverTrigger asChild>
-                        <span className="ml-auto text-sm font-bold text-primary h-6 w-6 flex items-center justify-center rounded-full bg-primary/20 cursor-pointer hover:bg-primary/30">
-                            {pendingTasksCount}
-                        </span>
+                       <Button variant="ghost" size="icon" className="ml-auto text-sm font-bold text-primary cursor-pointer h-6 w-6 flex items-center justify-center rounded-full bg-primary/20 hover:bg-primary/30" onClick={(e) => e.stopPropagation()}>
+                          {pendingTasksCount}
+                        </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-48 text-sm p-2">
                          <div className="space-y-1">
@@ -154,7 +154,11 @@ export default function TaskBoard({ board, tasks, members, onBack }: { board: Bo
 
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Require pointer to move 8px before initiating drag
+      },
+    }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
   
@@ -307,7 +311,6 @@ export default function TaskBoard({ board, tasks, members, onBack }: { board: Bo
               allUsers={[]} 
               canManage={!!canManageBoard}
               onTaskUpdate={handleTaskUpdate}
-              onTaskDelete={onInitiateDelete}
           />
 
            <AlertDialog open={!!taskToDelete} onOpenChange={(open) => !open && setTaskToDelete(null)}>
