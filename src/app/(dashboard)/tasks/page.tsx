@@ -23,20 +23,27 @@ export default function TasksPage() {
   const [boards, setBoards] = useState<Board[]>([]);
   const [currentBoard, setCurrentBoard] = useState<Board | null>(null);
   
-  const [loading, setLoading] = useState(true);
+  const [loadingData, setLoadingData] = useState(true);
   const [isCreatingBoard, setIsCreatingBoard] = useState(false);
   const [isCreateBoardModalOpen, setIsCreateBoardModalOpen] = useState(false);
   const [newBoardName, setNewBoardName] = useState('');
 
 
   useEffect(() => {
-    // Wait until auth is resolved and userProfile is available
-    if (authLoading || !userProfile) {
-      if (!authLoading) setLoading(false); // If auth is done but no profile, stop loading.
+    // This effect handles fetching the initial list of boards based on user role.
+    // It will only run when the user's authentication status and profile are resolved.
+    if (authLoading) {
+      // Still waiting for auth state to be determined.
+      return; 
+    }
+
+    if (!userProfile) {
+      // Auth is resolved, but there's no user profile (e.g., not logged in).
+      setLoadingData(false);
       return;
     }
 
-    setLoading(true);
+    setLoadingData(true);
 
     const staffRoles = ['admin', 'overall_head', 'event_representative', 'organizer'];
     const usersQuery = query(collection(db, 'users'), where('role', 'in', staffRoles));
@@ -56,11 +63,11 @@ export default function TasksPage() {
     const unsubBoards = onSnapshot(boardsQuery, (snapshot) => {
         const boardList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Board));
         setBoards(boardList);
-        setLoading(false);
+        setLoadingData(false);
     }, (err) => {
       console.error(err);
       toast({title: "Error", description: "Could not fetch task boards.", variant: "destructive"});
-      setLoading(false);
+      setLoadingData(false);
     });
     
     return () => {
@@ -70,20 +77,18 @@ export default function TasksPage() {
   }, [userProfile, authLoading, toast]);
 
   useEffect(() => {
+    // This effect fetches tasks for the currently selected board.
     if (!currentBoard) {
       setTasks([]);
       return;
     }
-    setLoading(true);
     
     const tasksQuery = query(collection(db, 'tasks'), where('boardId', '==', currentBoard.id));
     const unsubTasks = onSnapshot(tasksQuery, (snapshot) => {
         setTasks(snapshot.docs.map(doc => ({...doc.data(), id: doc.id} as Task)));
-        setLoading(false);
     }, (err) => {
         console.error("Error fetching tasks for board:", err);
         toast({title: "Error", description: `Could not fetch tasks for ${currentBoard.name}.`, variant: "destructive"});
-        setLoading(false);
     });
 
     return () => unsubTasks();
@@ -130,7 +135,7 @@ export default function TasksPage() {
   }
 
 
-  if (loading || authLoading) {
+  if (authLoading || loadingData) {
       return <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
   }
 
