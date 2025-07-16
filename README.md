@@ -2,69 +2,16 @@
 
 This repository contains the full-stack application for the "Junior Scientist" event, designed to manage sub-events, participants, and organizers efficiently. The platform provides a seamless experience for students to register, and for organizers to manage events, tasks, and participant data with advanced tools.
 
-## Table of Contents
+## Project Description
 
-* [Features](#features)
+**Junior Scientist Event Website — Full-Stack Application**
+*June 2024 – August 2024*
 
-* [Technologies Used](#technologies-used)
+– Developed a scalable event management platform with robust Role-Based Access Control (RBAC) to support a multi-level organizing hierarchy.
+– Integrated gamified real-time task tracking, live dashboards for dynamic student analytics, and an OCR component for automated input processing.
+– Engineered a responsive UI/UX for seamless data management on both mobile and desktop, featuring a modern, multi-hued design system with distinct light and dark modes.
 
-* [Getting Started](#getting-started)
-
-  * [Prerequisites](#prerequisites)
-
-  * [Installation](#installation)
-
-  * [Firebase Setup](#firebase-setup)
-
-* [Usage](#usage)
-
-  * [Participant Portal](#participant-portal)
-
-  * [Organizer Portal](#organizer-portal)
-
-* [Project Structure](#project-structure)
-
-## Features
-
-The Junior Scientist Event Website is equipped with a suite of features to streamline event management:
-
-* **Event Browsing & Registration:** Students can easily browse a list of available sub-events and register.
-
-* **Role-Based Access Control (RBAC):** Robust, multi-tiered access control system differentiating between Overalls, Event Heads, Event Representatives, Organizers, and Participants.
-
-* **Organizer & Task Management:** Dedicated tools for Overall Heads and Event Heads to create, assign, and track tasks for organizers and representatives.
-
-* **Gamification:** Awards points for task completion and calculates a credibility score for organizers, enhancing engagement and accountability.
-
-* **Real-time Checklists & Notifications:** Real-time checklists for student data-related tasks to ensure consistency, facilitate follow-ups, and display real-time announcements.
-
-* **Student Data Analytics:** Dashboards provide statistics on participants, including school distribution, common students across multiple events, and sorting/filtering options for data management.
-
-* **OCR Component:** An integrated OCR tool for efficient processing and automatic population of user data from uploaded registration forms.
-
-## Technologies Used
-
-The project leverages a modern and scalable technology stack:
-
-* **Frontend:**
-
-  * React/Next.js: For building a dynamic and responsive user interface.
-
-  * Tailwind CSS: For rapid and efficient styling.
-
-* **Backend & Database:**
-
-  * Node.js: For server-side logic and Firebase interactions.
-
-  * Firebase (Firestore): A NoSQL cloud database for flexible and real-time data storage and synchronization.
-
-  * Firebase Authentication: For secure user authentication.
-
-  * Firebase Cloud Functions (optional, for advanced server-side logic): For trigger-based backend operations.
-
-* **Other:**
-
-  * OCR Component (specific library/API details can be added here if known)
+– **Tools & Technologies:** Firebase Firestore, Node.js, React/Next.js, Tailwind CSS.
 
 ## Getting Started
 
@@ -183,3 +130,5 @@ Follow these instructions to get a copy of the project up and running on your lo
 ├── README.md                   # This file
 ├── tailwind.config.ts          # Tailwind CSS configuration
 └── tsconfig.json               # TypeScript configuration
+
+```
