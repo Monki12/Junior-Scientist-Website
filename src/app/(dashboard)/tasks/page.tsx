@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import type { Task, UserProfileData, Board, BoardMember } from '@/types';
+import type { Task, UserProfileData, Board, BoardMember, UserRole } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
@@ -71,17 +71,16 @@ export default function TasksPage() {
     }
     setLoading(true);
 
-    let membersToDisplay = currentBoard.memberUids;
+    let membersToDisplay = allUsers.filter(u => currentBoard.memberUids.includes(u.uid));
 
     // If the user is an 'organizer', only show their own column.
     if (userProfile?.role === 'organizer') {
-        membersToDisplay = currentBoard.memberUids.filter(uid => uid === userProfile.uid);
+        membersToDisplay = membersToDisplay.filter(u => u.uid === userProfile.uid);
     }
     
-    const members = membersToDisplay.map(uid => {
-        const user = allUsers.find(u => u.uid === uid);
+    const members = membersToDisplay.map(user => {
         return {
-            userId: uid,
+            userId: user.uid,
             name: user?.fullName || 'Unknown User',
             role: user?.role || 'member',
             photoURL: user?.photoURL

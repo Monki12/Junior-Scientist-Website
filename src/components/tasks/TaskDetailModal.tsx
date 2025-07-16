@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import type { Task, Board, UserProfileData, Subtask, TaskStatus, TaskPriority, BoardMember } from '@/types';
+import type { Task, Board, UserProfileData, Subtask, TaskStatus, TaskPriority, BoardMember, UserRole } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { nanoid } from 'nanoid';
 import { format, parseISO, isValid } from 'date-fns';
@@ -17,9 +17,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Loader2, Trash2, PlusCircle, Calendar as CalendarIcon } from 'lucide-react';
+import { Loader2, Trash2, PlusCircle, Calendar as CalendarIcon, Search, ArrowLeft } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card } from '../ui/card';
+import { ScrollArea } from '../ui/scroll-area';
+import { cn } from '@/lib/utils';
 
 interface TaskDetailModalProps {
   isOpen: boolean;
@@ -31,6 +33,95 @@ interface TaskDetailModalProps {
   canManage: boolean;
   onTaskUpdate: (task: Partial<Task>) => void;
 }
+
+const AssigneeSelector = ({ boardMembers, onSelect, disabled }: { boardMembers: BoardMember[], onSelect: (userId: string) => void, disabled: boolean }) => {
+    const [view, setView] = useState<'roles' | 'users'>('roles');
+    const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const ROLES: { name: string, role: UserRole }[] = [
+        { name: 'Admins', role: 'admin' },
+        { name: 'Overall Heads', role: 'overall_head' },
+        { name: 'Event Representatives', role: 'event_representative' },
+        { name: 'Organisers', role: 'organizer' },
+    ];
+
+    const handleRoleSelect = (role: UserRole) => {
+        setSelectedRole(role);
+        setView('users');
+    };
+
+    const handleUserSelect = (userId: string) => {
+        onSelect(userId);
+    };
+
+    const filteredUsers = useMemo(() => {
+        let users = boardMembers;
+        if (view === 'users' && selectedRole) {
+            users = users.filter(u => u.role === selectedRole);
+        }
+        if (searchTerm) {
+            users = users.filter(u => u.name.toLowerCase().includes(searchTerm.toLowerCase()));
+        }
+        return users;
+    }, [view, selectedRole, searchTerm, boardMembers]);
+
+    useEffect(() => {
+        if(!disabled) {
+            setView('roles');
+            setSelectedRole(null);
+            setSearchTerm('');
+        }
+    }, [disabled]);
+    
+
+    return (
+        <div className='space-y-2'>
+            <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input 
+                    placeholder="Search by name..."
+                    value={searchTerm}
+                    onChange={(e) => {
+                        setSearchTerm(e.target.value);
+                        setView('users'); // Switch to user view on search
+                        setSelectedRole(null);
+                    }}
+                    className="pl-9"
+                    disabled={disabled}
+                />
+            </div>
+             {view === 'users' && (
+                <Button variant="ghost" size="sm" onClick={() => { setView('roles'); setSelectedRole(null); setSearchTerm(''); }}>
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Back to Roles
+                </Button>
+            )}
+            <ScrollArea className="h-40 rounded-md border p-2">
+                {view === 'roles' && !searchTerm ? (
+                    ROLES.map(roleInfo => (
+                         <div key={roleInfo.role} onClick={() => handleRoleSelect(roleInfo.role)} className="p-2 rounded-md hover:bg-accent cursor-pointer">
+                           {roleInfo.name}
+                        </div>
+                    ))
+                ) : (
+                    filteredUsers.map(member => (
+                        <div key={member.userId} onClick={() => handleUserSelect(member.userId)} className="flex items-center gap-2 p-2 rounded-md hover:bg-accent cursor-pointer">
+                            <Avatar className="h-8 w-8">
+                                <AvatarImage src={member.photoURL || undefined} />
+                                <AvatarFallback>{(member.name||'U')[0]}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                                <p className="text-sm font-medium">{member.name}</p>
+                                <p className="text-xs text-muted-foreground capitalize">{member.role.replace(/_/g, ' ')}</p>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </ScrollArea>
+        </div>
+    )
+};
+
 
 export default function TaskDetailModal({ isOpen, onClose, task, board, boardMembers, allUsers, canManage, onTaskUpdate }: TaskDetailModalProps) {
   const { toast } = useToast();
@@ -90,7 +181,6 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
             id: formState.id,
             status: formState.status,
             subtasks: formState.subtasks,
-            completedAt: formState.status === 'Completed' && !task?.completedAt ? new Date().toISOString() : task?.completedAt || null,
         };
     }
     
@@ -191,7 +281,7 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
                         <Label>Deadline</Label>
                         <Popover>
                           <PopoverTrigger asChild>
-                          <Button variant="outline" className={`w-full justify-start text-left font-normal ${!formState.dueDate && "text-muted-foreground"}`} disabled={!canManage && !!task}>
+                          <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !formState.dueDate && "text-muted-foreground")} disabled={!canManage && !!task}>
                               <CalendarIcon className="mr-2 h-4 w-4" />
                               {formState.dueDate ? format(formState.dueDate as Date, "PPP") : <span>Pick a deadline</span>}
                           </Button>
@@ -212,34 +302,32 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
               </Card>
 
               <Card className="p-4 bg-muted/50">
-                <h4 className="font-semibold mb-2">Assigned To</h4>
-                 <div className="space-y-2">
-                     {assignedUser ? (
-                        <div className="flex items-center gap-2">
-                            <Avatar className="h-8 w-8"><AvatarImage src={assignedUser.photoURL || undefined} /><AvatarFallback>{(assignedUser.fullName||'U')[0]}</AvatarFallback></Avatar>
-                            <span>{assignedUser.fullName}</span>
-                        </div>
-                     ) : (
-                        <p className="text-sm text-muted-foreground">Unassigned (In "New Tasks")</p>
-                     )}
-                     {canManage && (
-                        <Select
-                            onValueChange={(uid) => {
-                                const newAssignedIds = uid === 'unassigned' ? [] : [uid];
-                                handleInputChange('assignedToUserIds', newAssignedIds);
-                            }}
-                            value={formState.assignedToUserIds?.[0] || 'unassigned'}
-                        >
-                            <SelectTrigger><SelectValue placeholder="Assign to..."/></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="unassigned">Unassigned</SelectItem>
-                                {boardMembers.map(member => (
-                                    <SelectItem key={member.userId} value={member.userId}>{member.name}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                     )}
-                 </div>
+                <Popover>
+                  <PopoverTrigger asChild>
+                      <button className="w-full text-left" disabled={!canManage && !!task}>
+                        <h4 className="font-semibold mb-2">Assigned To</h4>
+                          {assignedUser ? (
+                              <div className="flex items-center gap-2 p-2 border rounded-md bg-background">
+                                  <Avatar className="h-8 w-8"><AvatarImage src={assignedUser.photoURL || undefined} /><AvatarFallback>{(assignedUser.fullName||'U')[0]}</AvatarFallback></Avatar>
+                                  <span>{assignedUser.fullName}</span>
+                              </div>
+                          ) : (
+                              <div className="p-2 border border-dashed rounded-md text-muted-foreground">
+                                  Unassigned
+                              </div>
+                          )}
+                      </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 p-0" align="start">
+                    <AssigneeSelector 
+                        boardMembers={boardMembers} 
+                        onSelect={(userId) => {
+                           handleInputChange('assignedToUserIds', [userId]);
+                        }}
+                        disabled={!canManage && !!task}
+                    />
+                  </PopoverContent>
+                </Popover>
               </Card>
           </div>
         </div>

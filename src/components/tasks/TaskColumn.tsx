@@ -10,6 +10,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useMemo } from 'react';
 import { Button } from '../ui/button';
 import { PlusCircle } from 'lucide-react';
+import { Separator } from '../ui/separator';
 
 interface TaskColumnProps {
   id: string;
@@ -23,26 +24,21 @@ interface TaskColumnProps {
 export default function TaskColumn({ id, title, tasks, member, onEditTask, canManageBoard }: TaskColumnProps) {
   const { setNodeRef } = useDroppable({ id });
 
-  const pendingTasksCount = tasks.filter(t => t.status !== 'Completed').length;
+  const pendingTasks = useMemo(() => tasks.filter(t => t.status !== 'Completed'), [tasks]);
+  const pendingTasksCount = pendingTasks.length;
 
   const bucketBreakdown = useMemo(() => {
-    const breakdown: { [key: string]: number } = { a: 0, b: 0, c: 0, other: 0 };
-    tasks.forEach(task => {
-        if (task.status !== 'Completed' && task.bucket) {
-            const bucketKey = task.bucket as keyof typeof breakdown;
-            if (bucketKey in breakdown) {
-                breakdown[bucketKey]++;
-            } else {
-                breakdown.other++;
-            }
-        }
-    });
-    return breakdown;
-  }, [tasks]);
+    return pendingTasks.reduce((acc, task) => {
+        const bucket = task.bucket || 'other';
+        acc[bucket] = (acc[bucket] || 0) + 1;
+        return acc;
+    }, {} as Record<string, number>);
+  }, [pendingTasks]);
+
 
   return (
     <div
-      className="flex flex-col w-72 min-w-72 h-full bg-muted/50 rounded-lg shadow-sm"
+      className="flex flex-col w-72 min-w-72 max-h-full bg-muted/50 rounded-lg shadow-sm"
       ref={setNodeRef}
     >
       <div className="p-3 border-b sticky top-0 bg-muted/80 backdrop-blur-sm rounded-t-lg z-10 flex justify-between items-center">
@@ -65,12 +61,13 @@ export default function TaskColumn({ id, title, tasks, member, onEditTask, canMa
                 <span className="text-sm font-bold text-primary cursor-default h-6 w-6 flex items-center justify-center rounded-full bg-primary/20">{pendingTasksCount}</span>
               </TooltipTrigger>
               <TooltipContent>
-                <div className="text-sm">
-                  <p className="font-bold mb-1">Pending Task Buckets:</p>
-                  <p>Bucket A: {bucketBreakdown.a} tasks</p>
-                  <p>Bucket B: {bucketBreakdown.b} tasks</p>
-                  <p>Bucket C: {bucketBreakdown.c} tasks</p>
-                  <p>Other: {bucketBreakdown.other} tasks</p>
+                <div className="text-sm p-1">
+                  <p className="font-bold mb-1">Pending Tasks: {pendingTasksCount}</p>
+                  <Separator className="my-1"/>
+                  <p>Bucket A: {bucketBreakdown.a || 0}</p>
+                  <p>Bucket B: {bucketBreakdown.b || 0}</p>
+                  <p>Bucket C: {bucketBreakdown.c || 0}</p>
+                  <p>Other: {bucketBreakdown.other || 0}</p>
                 </div>
               </TooltipContent>
             </Tooltip>
