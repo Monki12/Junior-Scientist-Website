@@ -5,12 +5,12 @@ import { useMemo, useState } from 'react';
 import { DndContext, closestCorners, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { useToast } from '@/hooks/use-toast';
-import type { Task, Board, BoardMember } from '@/types';
+import type { Task, Board, BoardMember, UserProfileData } from '@/types';
 import TaskColumn from './TaskColumn';
 import TaskDetailModal from './TaskDetailModal';
 import { useAuth } from '@/hooks/use-auth';
 import { AlertTriangle, ChevronRight, Users, Settings } from 'lucide-react';
-import { doc, updateDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp, deleteDoc, addDoc, collection } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -52,6 +52,15 @@ const RoleGroup = ({
         });
         return count;
     }, [tasks, members]);
+
+    const bucketBreakdown = useMemo(() => {
+        const userTasks = tasks.filter(task => members.some(m => task.assignedToUserIds.includes(m.userId)));
+        return userTasks.reduce((acc, task) => {
+            const bucket = task.bucket || 'other';
+            acc[bucket] = (acc[bucket] || 0) + 1;
+            return acc;
+        }, { a: 0, b: 0, c: 0, other: 0 } as Record<string, number>);
+    }, [tasks, members]);
     
     if (members.length === 0) {
       return (
@@ -81,9 +90,23 @@ const RoleGroup = ({
                 <ChevronRight className={cn("h-5 w-5 transition-transform", isOpen && "rotate-90")} />
                 <h2 className="text-xl font-bold text-foreground">{title}</h2>
                 <span className="text-sm font-medium text-muted-foreground">({members.length})</span>
-                 <span className="ml-auto text-sm font-bold text-primary h-6 w-6 flex items-center justify-center rounded-full bg-primary/20">
-                  {pendingTasksCount}
-                </span>
+                <Popover>
+                    <PopoverTrigger asChild>
+                        <span className="ml-auto text-sm font-bold text-primary h-6 w-6 flex items-center justify-center rounded-full bg-primary/20 cursor-pointer hover:bg-primary/30">
+                            {pendingTasksCount}
+                        </span>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-48 text-sm p-2">
+                         <div className="space-y-1">
+                          <p className="font-bold mb-1 text-center">Pending Tasks: {pendingTasksCount}</p>
+                          <Separator />
+                          <p>Bucket A: {bucketBreakdown.a}</p>
+                          <p>Bucket B: {bucketBreakdown.b}</p>
+                          <p>Bucket C: {bucketBreakdown.c}</p>
+                          <p>Other: {bucketBreakdown.other}</p>
+                        </div>
+                    </PopoverContent>
+                </Popover>
             </button>
             {isOpen && (
               <ScrollArea className="w-full whitespace-nowrap">
@@ -138,6 +161,10 @@ export default function TaskBoard({ board, tasks, members, onBack }: { board: Bo
   const handleOpenTaskModal = (task: Task | null) => {
     setEditingTask(task);
     setIsTaskModalOpen(true);
+  };
+
+  const onInitiateDelete = (task: Task) => {
+    setTaskToDelete(task);
   };
   
   const handleTaskUpdate = async (updatedTask: Partial<Task>) => {
@@ -252,14 +279,14 @@ export default function TaskBoard({ board, tasks, members, onBack }: { board: Bo
                         tasks={unassignedTasks}
                         member={null}
                         onEditTask={handleOpenTaskModal}
-                        onInitiateDelete={setTaskToDelete}
+                        onInitiateDelete={onInitiateDelete}
                         canManageBoard={!!canManageBoard}
                     />
                 </div>
                 
-                <RoleGroup title="Admins & Overall Heads" members={leadership} tasks={tasks} onEditTask={handleOpenTaskModal} onInitiateDelete={setTaskToDelete} canManageBoard={!!canManageBoard} />
-                <RoleGroup title="Event Representatives" members={representatives} tasks={tasks} onEditTask={handleOpenTaskModal} onInitiateDelete={setTaskToDelete} canManageBoard={!!canManageBoard} />
-                <RoleGroup title="Organisers" members={organisers} tasks={tasks} onEditTask={handleOpenTaskModal} onInitiateDelete={setTaskToDelete} canManageBoard={!!canManageBoard} />
+                <RoleGroup title="Admins & Overall Heads" members={leadership} tasks={tasks} onEditTask={handleOpenTaskModal} onInitiateDelete={onInitiateDelete} canManageBoard={!!canManageBoard} />
+                <RoleGroup title="Event Representatives" members={representatives} tasks={tasks} onEditTask={handleOpenTaskModal} onInitiateDelete={onInitiateDelete} canManageBoard={!!canManageBoard} />
+                <RoleGroup title="Organisers" members={organisers} tasks={tasks} onEditTask={handleOpenTaskModal} onInitiateDelete={onInitiateDelete} canManageBoard={!!canManageBoard} />
 
                 {members.length === 0 && (
                     <div className="text-center py-10 text-muted-foreground border-2 border-dashed rounded-lg mx-4">
@@ -277,12 +304,10 @@ export default function TaskBoard({ board, tasks, members, onBack }: { board: Bo
               task={editingTask}
               board={board}
               boardMembers={members}
-              allUsers={[]}
+              allUsers={[]} 
               canManage={!!canManageBoard}
               onTaskUpdate={handleTaskUpdate}
-              onTaskDelete={() => {
-                if (editingTask) setTaskToDelete(editingTask);
-              }}
+              onTaskDelete={onInitiateDelete}
           />
 
            <AlertDialog open={!!taskToDelete} onOpenChange={(open) => !open && setTaskToDelete(null)}>
