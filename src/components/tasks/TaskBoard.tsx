@@ -5,7 +5,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { DndContext, closestCorners, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { useToast } from '@/hooks/use-toast';
-import type { Task, Board, BoardMember, UserProfileData } from '@/types';
+import type { Task, Board, BoardMember, UserProfileData, UserRole } from '@/types';
 import TaskColumn from './TaskColumn';
 import TaskDetailModal from './TaskDetailModal';
 import { useAuth } from '@/hooks/use-auth';
@@ -271,11 +271,19 @@ export default function TaskBoard({ board, tasks, members, onBack }: { board: Bo
   const canManageBoard = userProfile && (board.managerUids?.includes(userProfile.uid) || ['admin', 'overall_head'].includes(userProfile.role));
 
   const { leadership, representatives, organisers, unassignedTasks } = useMemo(() => {
-    const unassigned = tasks.filter(task => !task.assignedToUserIds || task.assignedToUserIds.length === 0);
     const leadership = members.filter(m => m.role === 'admin' || m.role === 'overall_head');
     const representatives = members.filter(m => m.role === 'event_representative');
     const organisers = members.filter(m => m.role === 'organizer');
-    
+
+    const memberIds = new Set(members.map(m => m.userId));
+    const unassigned = tasks.filter(task => {
+        // Task is unassigned if it has no assignees OR if its assignee is no longer a board member
+        if (!task.assignedToUserIds || task.assignedToUserIds.length === 0) {
+            return true;
+        }
+        return !task.assignedToUserIds.some(assigneeId => memberIds.has(assigneeId));
+    });
+
     return { leadership, representatives, organisers, unassignedTasks: unassigned };
   }, [tasks, members]);
 
