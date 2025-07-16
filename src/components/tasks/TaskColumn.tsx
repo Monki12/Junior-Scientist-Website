@@ -18,11 +18,11 @@ interface TaskColumnProps {
   tasks: Task[];
   member: BoardMember | null;
   onEditTask: (task: Task | null) => void;
-  onDeleteTask: (taskId: string) => void;
+  onInitiateDelete: (task: Task) => void;
   canManageBoard: boolean;
 }
 
-export default function TaskColumn({ id, title, tasks, member, onEditTask, onDeleteTask, canManageBoard }: TaskColumnProps) {
+export default function TaskColumn({ id, title, tasks, member, onEditTask, onInitiateDelete, canManageBoard }: TaskColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id });
 
   const pendingTasks = useMemo(() => tasks.filter(t => t.status !== 'Completed'), [tasks]);
@@ -85,7 +85,7 @@ export default function TaskColumn({ id, title, tasks, member, onEditTask, onDel
               task={task}
               canManage={canManageBoard}
               onEditTask={onEditTask}
-              onDeleteTask={onDeleteTask}
+              onInitiateDelete={onInitiateDelete}
             />
           ))}
         </SortableContext>
