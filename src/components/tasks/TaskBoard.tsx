@@ -7,8 +7,9 @@ import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { useToast } from '@/hooks/use-toast';
 import type { Task, Board, BoardMember } from '@/types';
 import TaskColumn from './TaskColumn';
+import TaskDetailModal from './TaskDetailModal';
 import { useAuth } from '@/hooks/use-auth';
-import { Loader2, ChevronRight, Users, Users2, AlertTriangle } from 'lucide-react';
+import { AlertTriangle, ChevronRight, Users, Settings } from 'lucide-react';
 import { doc, updateDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
@@ -55,13 +56,18 @@ const RoleGroup = ({
     if (members.length === 0) {
       return (
         <div className="px-4 py-2">
-           <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
-              <ChevronRight className="h-5 w-5 transition-transform" />
-              {title}
-            </h2>
-          <div className="text-center py-4 text-sm text-muted-foreground border-2 border-dashed rounded-lg mt-2">
-            No {title.toLowerCase()} in this board.
-          </div>
+           <button 
+              className="w-full flex items-center gap-2 text-left"
+              onClick={() => setIsOpen(!isOpen)}
+            >
+              <ChevronRight className={cn("h-5 w-5 transition-transform", isOpen && "rotate-90")} />
+              <h2 className="text-xl font-bold text-foreground">{title}</h2>
+            </button>
+            {isOpen && (
+              <div className="text-center py-4 text-sm text-muted-foreground border-2 border-dashed rounded-lg mt-2">
+                No {title.toLowerCase()} in this board.
+              </div>
+            )}
         </div>
       )
     }
@@ -103,12 +109,15 @@ const RoleGroup = ({
 };
 
 
-export default function TaskBoard({ board, tasks, members, onEditTask, onInitiateDelete, loading }: { board: Board, tasks: Task[], members: BoardMember[], onEditTask: (task: Task | null) => void, onInitiateDelete: (task: Task) => void, loading: boolean }) {
+export default function TaskBoard({ board, tasks, members, onBack }: { board: Board, tasks: Task[], members: BoardMember[], onBack: () => void }) {
   const { toast } = useToast();
   const { userProfile } = useAuth();
   
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
-
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [isManageMembersModalOpen, setIsManageMembersModalOpen] = useState(false);
+  
   const canManageBoard = userProfile && (board.managerUids?.includes(userProfile.uid) || ['admin', 'overall_head'].includes(userProfile.role));
 
   const { leadership, representatives, organisers, unassignedTasks } = useMemo(() => {
@@ -125,6 +134,36 @@ export default function TaskBoard({ board, tasks, members, onEditTask, onInitiat
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
+  
+  const handleOpenTaskModal = (task: Task | null) => {
+    setEditingTask(task);
+    setIsTaskModalOpen(true);
+  };
+  
+  const handleTaskUpdate = async (updatedTask: Partial<Task>) => {
+    if (!userProfile) return;
+
+    if (updatedTask.id) { // This is an update to an existing task
+        const taskRef = doc(db, 'tasks', updatedTask.id);
+        await updateDoc(taskRef, {
+            ...updatedTask,
+            updatedAt: serverTimestamp(),
+        });
+        toast({ title: "Task Updated" });
+    } else { // This is a new task creation
+        const { id, ...taskData } = updatedTask;
+        const newTaskData: any = {
+            ...taskData,
+            boardId: board.id,
+            creatorId: userProfile.uid,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+        };
+        await addDoc(collection(db, 'tasks'), newTaskData);
+        toast({ title: "Task Created" });
+    }
+    setIsTaskModalOpen(false);
+  };
   
   const handleConfirmDelete = async () => {
     if (!taskToDelete || !canManageBoard) {
@@ -178,58 +217,96 @@ export default function TaskBoard({ board, tasks, members, onEditTask, onInitiat
     }
   };
   
-  if (loading) {
-     return <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
-  }
+  const onCloseModal = () => {
+    setEditingTask(null);
+    setIsTaskModalOpen(false);
+  };
+  
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-        <div className="flex flex-col h-full space-y-4">
-            <div className="px-4">
-                <TaskColumn
-                    id="unassigned"
-                    title="New Tasks"
-                    tasks={unassignedTasks}
-                    member={null}
-                    onEditTask={onEditTask}
-                    onInitiateDelete={setTaskToDelete}
-                    canManageBoard={!!canManageBoard}
-                />
+        <div className="flex h-[calc(100vh-8rem)] flex-col space-y-4">
+          <header className="flex flex-shrink-0 flex-col justify-between gap-4 sm:flex-row sm:items-center">
+            <div className="space-y-2">
+                <Button variant="link" size="sm" onClick={onBack} className="p-0 h-auto text-sm">
+                  &larr; Back to board selection
+                </Button>
+                <h1 className="text-2xl font-bold text-primary flex items-center gap-3">
+                    Board: {board.name}
+                </h1>
             </div>
-            
-            <RoleGroup title="Admins & Overall Heads" members={leadership} tasks={tasks} onEditTask={onEditTask} onInitiateDelete={setTaskToDelete} canManageBoard={!!canManageBoard} />
-            <RoleGroup title="Event Representatives" members={representatives} tasks={tasks} onEditTask={onEditTask} onInitiateDelete={setTaskToDelete} canManageBoard={!!canManageBoard} />
-            <RoleGroup title="Organisers" members={organisers} tasks={tasks} onEditTask={onEditTask} onInitiateDelete={setTaskToDelete} canManageBoard={!!canManageBoard} />
-
-            {members.length === 0 && (
-                <div className="text-center py-10 text-muted-foreground border-2 border-dashed rounded-lg mx-4">
-                    <Users className="h-12 w-12 mx-auto mb-3 text-primary/30" />
-                    <h3 className="text-lg font-semibold text-foreground mb-1">No Members Added</h3>
-                    <p className="text-sm">Click "Manage Members" to add staff to this board.</p>
-                </div>
+            {canManageBoard && (
+                <Button variant="outline" size="sm" onClick={() => setIsManageMembersModalOpen(true)}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    Manage Members
+                </Button>
             )}
+          </header>
+        
+          <main className="flex-1 overflow-auto pb-4">
+             <div className="flex flex-col h-full space-y-4">
+                <div className="px-4">
+                    <TaskColumn
+                        id="unassigned"
+                        title="New Tasks"
+                        tasks={unassignedTasks}
+                        member={null}
+                        onEditTask={handleOpenTaskModal}
+                        onInitiateDelete={setTaskToDelete}
+                        canManageBoard={!!canManageBoard}
+                    />
+                </div>
+                
+                <RoleGroup title="Admins & Overall Heads" members={leadership} tasks={tasks} onEditTask={handleOpenTaskModal} onInitiateDelete={setTaskToDelete} canManageBoard={!!canManageBoard} />
+                <RoleGroup title="Event Representatives" members={representatives} tasks={tasks} onEditTask={handleOpenTaskModal} onInitiateDelete={setTaskToDelete} canManageBoard={!!canManageBoard} />
+                <RoleGroup title="Organisers" members={organisers} tasks={tasks} onEditTask={handleOpenTaskModal} onInitiateDelete={setTaskToDelete} canManageBoard={!!canManageBoard} />
+
+                {members.length === 0 && (
+                    <div className="text-center py-10 text-muted-foreground border-2 border-dashed rounded-lg mx-4">
+                        <Users className="h-12 w-12 mx-auto mb-3 text-primary/30" />
+                        <h3 className="text-lg font-semibold text-foreground mb-1">No Members Added</h3>
+                        <p className="text-sm">Click "Manage Members" to add staff to this board.</p>
+                    </div>
+                )}
+            </div>
+          </main>
+        
+          <TaskDetailModal
+              isOpen={isTaskModalOpen}
+              onClose={onCloseModal}
+              task={editingTask}
+              board={board}
+              boardMembers={members}
+              allUsers={[]}
+              canManage={!!canManageBoard}
+              onTaskUpdate={handleTaskUpdate}
+              onTaskDelete={() => {
+                if (editingTask) setTaskToDelete(editingTask);
+              }}
+          />
+
+           <AlertDialog open={!!taskToDelete} onOpenChange={(open) => !open && setTaskToDelete(null)}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                    <div className="flex justify-center">
+                      <AlertTriangle className="h-12 w-12 text-yellow-500 mb-4" />
+                    </div>
+                    <AlertDialogTitle className="text-center text-2xl">Confirm Deletion</AlertDialogTitle>
+                    <AlertDialogDescription className="text-center">
+                        <p>Are you sure you want to delete this task?</p>
+                        <p className="font-semibold text-foreground mt-2">Task: "{taskToDelete?.caption}"</p>
+                        <p className="text-xs text-muted-foreground mt-4">This action cannot be undone.</p>
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="sm:justify-center">
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                        Delete Task
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+          </AlertDialog>
         </div>
-         <AlertDialog open={!!taskToDelete} onOpenChange={(open) => !open && setTaskToDelete(null)}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                  <div className="flex justify-center">
-                    <AlertTriangle className="h-12 w-12 text-yellow-500 mb-4" />
-                  </div>
-                  <AlertDialogTitle className="text-center text-2xl">Confirm Deletion</AlertDialogTitle>
-                  <AlertDialogDescription className="text-center">
-                      <p>Are you sure you want to delete this task?</p>
-                      <p className="font-semibold text-foreground mt-2">Task: "{taskToDelete?.caption}"</p>
-                      <p className="text-xs text-muted-foreground mt-4">This action cannot be undone.</p>
-                  </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter className="sm:justify-center">
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
-                      Delete Task
-                  </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
     </DndContext>
   );
 }
