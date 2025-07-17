@@ -13,12 +13,12 @@ export default function QuantumThread() {
     restDelta: 0.001
   });
 
+  const threadGradient = "linear-gradient(180deg, hsl(var(--accent)), hsl(var(--primary)))";
+
   return (
-    <>
-      <motion.div
-        className="fixed top-0 left-8 w-1 bg-gradient-to-b from-accent to-primary rounded-full origin-top"
-        style={{ scaleY }}
-      />
-    </>
+    <motion.div
+      className="fixed top-0 left-8 w-1 bg-gradient-to-b from-accent to-primary rounded-full origin-top"
+      style={{ scaleY, pointerEvents: 'none', zIndex: 50 }}
+    />
   );
 }
