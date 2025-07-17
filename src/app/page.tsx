@@ -25,7 +25,6 @@ function BackgroundVisuals() {
     return <div className="absolute inset-0 z-0 overflow-hidden bg-background"></div>;
   }
 
-  // Define colors based on the new design system
   const baseColor = theme === 'dark' ? 'rgba(0, 154, 192, 0.1)' : 'rgba(0, 111, 175, 0.08)'; // Cloisonne/Ocean Blue tones
   const interactiveColor = theme === 'dark' ? 'rgba(0, 204, 188, 0.4)' : 'rgba(0, 204, 188, 0.5)'; // Amazonite
     
@@ -131,10 +130,10 @@ export default function JuniorScientistHomePage() {
           <motion.div
               initial={{ opacity: 0, y: 20, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ duration: 0.8, delay: 1.5, ease: [0.22, 1, 0.36, 1] }} // A 'back.out(1.2)' equivalent
+              transition={{ duration: 0.8, delay: 1.5, ease: [0.22, 1, 0.36, 1] }} 
               className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4"
           >
-              <Button size="lg" asChild>
+              <Button size="lg" asChild className="btn-primary-3d">
                 <Link href="/signup">Get Started</Link>
               </Button>
               <Button size="lg" variant="outline" asChild>

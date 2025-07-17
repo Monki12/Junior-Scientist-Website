@@ -112,10 +112,10 @@
 @layer components {
   /* Cards */
   .card-uniform {
-    @apply rounded-[--radius] shadow-elevation-1 transition-shadow duration-300 dark:shadow-elevation-1-dark;
+    @apply rounded-[--radius] bg-card shadow-soft transition-shadow duration-300 dark:border dark:border-white/10 dark:shadow-md-soft;
   }
   .card-uniform:hover {
-     @apply shadow-elevation-2 dark:shadow-elevation-2-dark;
+     @apply shadow-md-soft dark:shadow-lg dark:border-primary/20;
   }
 
   /* Interactive Buttons with 3D Effect */
