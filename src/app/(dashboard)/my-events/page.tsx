@@ -1,11 +1,11 @@
 
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/hooks/use-auth';
-import type { SubEvent } from '@/types';
+import type { SubEvent, EventRegistration } from '@/types';
 import { db } from '@/lib/firebase';
 import { collection, query, onSnapshot, where, getDocs, Query } from 'firebase/firestore';
 
@@ -23,6 +23,8 @@ export default function MyEventsPage() {
   const [events, setEvents] = useState<SubEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [isCreateEventDialogOpen, setIsCreateEventDialogOpen] = useState(false);
+  
+  const [registrationCounts, setRegistrationCounts] = useState<Record<string, number>>({});
 
   const canCreateEvents = userProfile?.role === 'admin' || userProfile?.role === 'overall_head';
 
@@ -40,10 +42,7 @@ export default function MyEventsPage() {
         eventsQuery = query(collection(db, 'subEvents'), where('__name__', 'in', userProfile.assignedEventUids));
         break;
       case 'organizer':
-         if (!userProfile.boardIds || userProfile.boardIds.length === 0) return null;
-        // This is an indirect way. A better approach might be to store eventUids directly on the organizer.
-        // For now, we assume if they are an organizer of a board, they are an organizer for that event.
-        // This needs a more direct link in the data model for full accuracy.
+        if (!userProfile.boardIds || userProfile.boardIds.length === 0) return null;
         eventsQuery = query(collection(db, 'subEvents'), where('organizerUids', 'array-contains', userProfile.uid));
         break;
       default:
@@ -53,45 +52,45 @@ export default function MyEventsPage() {
   }, [userProfile]);
 
 
-  const fetchEvents = useCallback(async () => {
-      const q = getEventsQuery();
-      if (!q) {
-          setEvents([]);
-          setLoadingEvents(false);
-          return;
-      }
-      try {
-          const snapshot = await getDocs(q);
-          const eventsList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SubEvent));
-          setEvents(eventsList);
-      } catch (error) {
-          console.error("Error fetching events:", error);
-          toast({ title: "Error", description: "Could not fetch your events.", variant: "destructive" });
-      } finally {
-        setLoadingEvents(false);
-      }
-  }, [getEventsQuery, toast]);
-
-
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading || !userProfile) return;
     
     setLoadingEvents(true);
-    fetchEvents(); // Initial fetch
-    
-    // Set up a listener on registrations to re-fetch events when they change
+
+    const q = getEventsQuery();
+    if (!q) {
+        setEvents([]);
+        setLoadingEvents(false);
+        return () => {};
+    }
+
+    const unsubEvents = onSnapshot(q, (snapshot) => {
+        const eventsList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SubEvent));
+        setEvents(eventsList);
+        setLoadingEvents(false);
+    }, (error) => {
+        console.error("Error fetching events:", error);
+        toast({ title: "Error", description: "Could not fetch your events.", variant: "destructive" });
+        setLoadingEvents(false);
+    });
+
     const registrationsQuery = query(collection(db, 'event_registrations'));
-    const unsubscribeRegistrations = onSnapshot(registrationsQuery, () => {
-        // A registration has changed, re-fetch the events to get the latest counts.
-        fetchEvents();
+    const unsubRegistrations = onSnapshot(registrationsQuery, (snapshot) => {
+        const counts: Record<string, number> = {};
+        snapshot.forEach(doc => {
+            const reg = doc.data() as EventRegistration;
+            counts[reg.subEventId] = (counts[reg.subEventId] || 0) + 1;
+        });
+        setRegistrationCounts(counts);
     }, (error) => {
         console.error("Error listening to registrations:", error);
     });
 
     return () => {
-        unsubscribeRegistrations();
+        unsubEvents();
+        unsubRegistrations();
     };
-  }, [userProfile, authLoading, fetchEvents]);
+  }, [userProfile, authLoading, getEventsQuery, toast]);
 
 
   if (authLoading || loadingEvents) {
@@ -154,7 +153,7 @@ export default function MyEventsPage() {
                   </CardHeader>
                   <CardContent>
                     <Badge variant={event.status === 'Active' ? 'default' : 'secondary'}>{event.status || 'Planning'}</Badge>
-                    <p className="text-sm text-muted-foreground mt-2">{event.registeredParticipantCount || 0} participants</p>
+                    <p className="text-sm text-muted-foreground mt-2">{registrationCounts[event.id] || 0} participants</p>
                   </CardContent>
                   <CardFooter>
                     <Button asChild className="w-full">
