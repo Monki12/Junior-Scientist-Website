@@ -94,7 +94,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logOut = async () => {
-    setLoading(true);
+    // Immediately clear local state for instant UI feedback
+    setAuthUser(null);
+    setUserProfile(null);
     await auth.signOut();
   };
 
