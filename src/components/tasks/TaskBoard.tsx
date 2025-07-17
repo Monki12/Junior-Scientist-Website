@@ -326,6 +326,7 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
     if (!userProfile) return;
 
     if (isNew) {
+        // --- LOGIC FOR NEW TASKS ---
         const { id, ...taskData } = updatedTaskData;
         const newTaskData = {
             ...taskData,
@@ -337,13 +338,17 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
         const docRef = await addDoc(collection(db, 'tasks'), newTaskData);
         toast({ title: "Task Created" });
 
+        // Check for new assignee and send notification
         const newAssigneeId = newTaskData.assignedToUserIds?.[0];
         if (newAssigneeId) {
             await createNotification({ ...newTaskData, id: docRef.id }, newAssigneeId);
         }
+
     } else {
+        // --- LOGIC FOR EXISTING TASKS ---
         const originalTask = tasks.find(t => t.id === updatedTaskData.id);
         const taskRef = doc(db, 'tasks', updatedTaskData.id!);
+        
         await updateDoc(taskRef, {
             ...updatedTaskData,
             updatedAt: serverTimestamp(),
@@ -353,10 +358,13 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
         const newAssigneeId = updatedTaskData.assignedToUserIds?.[0];
         const oldAssigneeId = originalTask?.assignedToUserIds?.[0];
 
+        // Send notification ONLY if the assignee has changed to someone new
         if (newAssigneeId && newAssigneeId !== oldAssigneeId) {
             await createNotification(updatedTaskData, newAssigneeId);
         }
     }
+    
+    // Close the modal
     setIsTaskModalOpen(false);
     setEditingTask(null);
   };
@@ -409,7 +417,8 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
         });
         toast({ title: "Task Reassigned", description: `Task moved successfully.`});
 
-        if (newAssignedIds.length > 0 && newAssignedIds[0] !== originalAssigneeId) {
+        // Send notification to the new assignee
+        if (newAssignedIds.length > 0) {
             await createNotification(task, newAssignedIds[0]);
         }
     } catch(e: any) {
