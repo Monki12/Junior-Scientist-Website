@@ -3,12 +3,13 @@
 
 import React, { useRef, useState } from 'react';
 import { motion, useMotionValue, useSpring } from 'framer-motion';
+import Link from 'next/link';
 
 // Spring values for smooth animations
 const springConfig = {
-  damping: 20, // Reduced damping for quicker stop
-  stiffness: 250, // Increased stiffness for faster movement
-  mass: 1, // Reduced mass for lighter, more agile feel
+  damping: 20,
+  stiffness: 250,
+  mass: 1,
 };
 
 interface TiltedFlipCardProps {
@@ -29,62 +30,86 @@ const getCategoryStyles = (
 ) => {
   const styles: {
     bgColor: string;
-    iconFill: string;
     iconFilter?: string;
+    titleColor: string;
+    descriptionColor: string;
+    actionColor: string;
+    eventLinkColor: string;
+    eventLinkHoverColor: string;
+    eventBgColor: string;
+    eventBorderColor: string;
   } = {
     bgColor: '',
-    iconFill: '',
+    titleColor: themeMode === 'light' ? 'text-gray-800' : 'text-gray-50',
+    descriptionColor: themeMode === 'light' ? 'text-gray-600' : 'text-gray-300',
+    actionColor: themeMode === 'light' ? 'text-gray-500' : 'text-gray-400',
+    eventLinkColor: themeMode === 'light' ? 'text-gray-700' : 'text-gray-100',
+    eventLinkHoverColor: '',
+    eventBgColor: '',
+    eventBorderColor: '',
   };
 
   if (themeMode === 'light') {
     switch (category) {
       case 'strategist':
-        styles.bgColor = 'bg-card-strategist-light'; // Blue
-        styles.iconFill = 'var(--icon-strategist-light)';
+        styles.bgColor = 'bg-blue-100';
+        styles.eventLinkHoverColor = 'hover:text-blue-600';
+        styles.eventBgColor = 'bg-blue-50';
+        styles.eventBorderColor = 'border-blue-200';
         break;
       case 'brainiac':
-        styles.bgColor = 'bg-card-brainiac-light'; // Lavender
-        styles.iconFill = 'var(--icon-brainiac-light)';
+        styles.bgColor = 'bg-purple-100';
+        styles.eventLinkHoverColor = 'hover:text-purple-600';
+        styles.eventBgColor = 'bg-purple-50';
+        styles.eventBorderColor = 'border-purple-200';
         break;
       case 'thinker':
-        styles.bgColor = 'bg-card-thinker-light'; // Pink
-        styles.iconFill = 'var(--icon-thinker-light)';
+        styles.bgColor = 'bg-pink-100';
+        styles.eventLinkHoverColor = 'hover:text-pink-600';
+        styles.eventBgColor = 'bg-pink-50';
+        styles.eventBorderColor = 'border-pink-200';
         break;
       case 'innovator':
-        styles.bgColor = 'bg-card-innovator-light'; // Coral
-        styles.iconFill = 'var(--icon-innovator-light)';
+        styles.bgColor = 'bg-orange-100';
+        styles.eventLinkHoverColor = 'hover:text-orange-600';
+        styles.eventBgColor = 'bg-orange-50';
+        styles.eventBorderColor = 'border-orange-200';
         break;
       default:
         styles.bgColor = 'bg-white';
-        styles.iconFill = '#000000';
     }
-  } else {
-    // Dark mode
+  } else { // Dark mode
     switch (category) {
       case 'strategist':
-        styles.bgColor = 'bg-card-strategist-dark';
-        styles.iconFill = 'var(--icon-strategist-dark)';
-        styles.iconFilter = 'drop-shadow(0 0 8px #0471A670)'; // Honolulu Blue glow
+        styles.bgColor = 'bg-[#2E354A]';
+        styles.iconFilter = 'drop-shadow(0 0 8px #0471A670)';
+        styles.eventLinkHoverColor = 'hover:text-blue-300';
+        styles.eventBgColor = 'bg-white/5';
+        styles.eventBorderColor = 'border-white/10';
         break;
       case 'brainiac':
-        styles.bgColor = 'bg-card-brainiac-dark';
-        styles.iconFill = 'var(--icon-brainiac-dark)';
-        styles.iconFilter = 'drop-shadow(0 0 8px #C287E870)'; // Lavender glow
+        styles.bgColor = 'bg-[#322E3A]';
+        styles.iconFilter = 'drop-shadow(0 0 8px #C287E870)';
+        styles.eventLinkHoverColor = 'hover:text-purple-300';
+        styles.eventBgColor = 'bg-white/5';
+        styles.eventBorderColor = 'border-white/10';
         break;
       case 'thinker':
-        styles.bgColor = 'bg-card-thinker-dark';
-        styles.iconFill = 'var(--icon-thinker-dark)';
-        styles.iconFilter = 'drop-shadow(0 0 8px #dd557e70)'; // New Pink glow
+        styles.bgColor = 'bg-[#3A2E33]';
+        styles.iconFilter = 'drop-shadow(0 0 8px #dd557e70)';
+        styles.eventLinkHoverColor = 'hover:text-pink-300';
+        styles.eventBgColor = 'bg-white/5';
+        styles.eventBorderColor = 'border-white/10';
         break;
       case 'innovator':
-        styles.bgColor = 'bg-card-innovator-dark';
-        styles.iconFill = 'var(--icon-innovator-dark)';
-        styles.iconFilter = 'drop-shadow(0 0 8px #FF855270)'; // Coral glow
+        styles.bgColor = 'bg-[#352E2B]';
+        styles.iconFilter = 'drop-shadow(0 0 8px #FF855270)';
+        styles.eventLinkHoverColor = 'hover:text-orange-300';
+        styles.eventBgColor = 'bg-white/5';
+        styles.eventBorderColor = 'border-white/10';
         break;
       default:
-        styles.bgColor = 'bg-gray-800'; // Fallback
-        styles.iconFill = '#FFFFFF';
-        styles.iconFilter = 'none';
+        styles.bgColor = 'bg-gray-800';
     }
   }
   return styles;
@@ -101,8 +126,6 @@ const TiltedFlipCard = ({
   const [isFlipped, setIsFlipped] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
-  const x = useMotionValue(0);
-  const y = useMotionValue(0);
   const rotateX = useSpring(0, springConfig);
   const rotateY = useSpring(0, springConfig);
   const scale = useSpring(1, springConfig);
@@ -111,7 +134,7 @@ const TiltedFlipCard = ({
   const scaleOnHover = 1.03;
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!cardRef.current) return;
+    if (!cardRef.current || isFlipped) return;
 
     const rect = cardRef.current.getBoundingClientRect();
     const offsetX = e.clientX - rect.left - rect.width / 2;
@@ -126,6 +149,7 @@ const TiltedFlipCard = ({
   };
 
   const handleMouseLeave = () => {
+    if (isFlipped) return;
     rotateX.set(0);
     rotateY.set(0);
     scale.set(1);
@@ -133,33 +157,21 @@ const TiltedFlipCard = ({
 
   const handleFlip = () => {
     setIsFlipped(!isFlipped);
+    if(!isFlipped) {
+      rotateX.set(0);
+      rotateY.set(0);
+      scale.set(1.0);
+    }
   };
 
-  const { bgColor, iconFill, iconFilter } = getCategoryStyles(
+  const styles = getCategoryStyles(
     category,
     themeMode
   );
 
-  const titleColor =
-    themeMode === 'light'
-      ? 'text-text-light-primary'
-      : 'text-text-dark-primary';
-  const descriptionColor =
-    themeMode === 'light'
-      ? 'text-text-light-secondary'
-      : 'text-text-dark-secondary';
-  const clickActionColor =
-    themeMode === 'light' ? 'text-gray-500' : 'text-gray-400';
-  const eventItemColor =
-    themeMode === 'light' ? 'text-event-item-light' : 'text-event-item-dark';
-  const eventLinkHoverColor =
-    themeMode === 'light'
-      ? 'hover:text-event-link-hover-light'
-      : 'hover:text-event-link-hover-dark';
-
   const iconBgColor = themeMode === 'light' ? 'bg-white/80' : 'bg-white/5';
   const iconShadow = themeMode === 'light' ? 'shadow-md' : 'shadow-lg';
-  const cardShadow = themeMode === 'light' ? 'shadow-md' : 'shadow-lg';
+  const cardShadow = themeMode === 'light' ? 'shadow-soft' : 'shadow-md-soft';
 
   return (
     <div className="w-full max-w-sm sm:w-[calc(50%-1rem)] lg:w-[calc(25%-1.5rem)] h-96 mx-auto [perspective:1000px]">
@@ -182,7 +194,7 @@ const TiltedFlipCard = ({
         >
           {/* Front of card */}
           <div
-            className={`absolute inset-0 [backface-visibility:hidden] ${bgColor} rounded-2xl p-8 flex flex-col justify-between items-center text-center`}
+            className={`absolute inset-0 [backface-visibility:hidden] ${styles.bgColor} rounded-2xl p-8 flex flex-col justify-between items-center text-center`}
           >
             <div
               className={`relative ${iconBgColor} ${iconShadow} rounded-full p-4 flex justify-center items-center`}
@@ -193,27 +205,26 @@ const TiltedFlipCard = ({
                 alt={`${title} Icon`}
                 className="w-10 h-10"
                 style={{
-                  fill: iconFill,
-                  filter: iconFilter,
+                  filter: styles.iconFilter,
                 }}
               />
             </div>
-            <h3 className={`text-2xl font-bold mb-4 ${titleColor}`}>{title}</h3>
+            <h3 className={`text-2xl font-bold mb-4 ${styles.titleColor}`}>{title}</h3>
             <p
-              className={`text-lg leading-relaxed mb-4 flex-grow ${descriptionColor}`}
+              className={`text-lg leading-relaxed mb-4 flex-grow ${styles.descriptionColor}`}
             >
               {description}
             </p>
-            <div className={`text-sm ${clickActionColor}`}>
+            <div className={`text-sm ${styles.actionColor}`}>
               Click to see events
             </div>
           </div>
 
           {/* Back of card */}
           <div
-            className={`absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] ${bgColor} rounded-2xl p-8 flex flex-col justify-between`}
+            className={`absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] ${styles.bgColor} rounded-2xl p-8 flex flex-col justify-between`}
           >
-            <h3 className={`text-xl font-bold mb-6 text-center ${titleColor}`}>
+            <h3 className={`text-xl font-bold mb-6 text-center ${styles.titleColor}`}>
               Related Events
             </h3>
             <div className="space-y-4 flex-1 flex flex-col justify-center">
@@ -221,28 +232,24 @@ const TiltedFlipCard = ({
                 events.map((event, index) => (
                   <motion.div
                     key={index}
-                    className={`p-4 rounded-lg border transition-all duration-300 ${
-                      themeMode === 'light'
-                        ? 'bg-gray-100 border-gray-300 hover:border-gray-500'
-                        : 'bg-white/10 border-white/20 hover:border-white/50'
-                    }`}
-                    whileHover={{ scale: 1.05 }}
+                    className={`p-3 rounded-lg border transition-all duration-300 ${styles.eventBgColor} ${styles.eventBorderColor}`}
+                    whileHover={{ scale: 1.05, y: -2 }}
                     whileTap={{ scale: 0.95 }}
                   >
-                    <a
+                    <Link
                       href={event.link}
-                      className={`font-medium block ${eventItemColor} ${eventLinkHoverColor}`}
+                      className={`font-medium block ${styles.eventLinkColor} ${styles.eventLinkHoverColor}`}
                       onClick={(e) => e.stopPropagation()}
                     >
                       {event.name}
-                    </a>
+                    </Link>
                   </motion.div>
                 ))
               ) : (
-                <p className={descriptionColor}>No events listed yet.</p>
+                <p className={styles.descriptionColor}>No events listed yet.</p>
               )}
             </div>
-            <div className={`text-sm text-center mt-6 ${clickActionColor}`}>
+            <div className={`text-sm text-center mt-6 ${styles.actionColor}`}>
               Click to flip back
             </div>
           </div>

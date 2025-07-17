@@ -78,7 +78,7 @@ const AnimatedContent = ({
   delay?: number;
 }) => {
   const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, amount: 0.3 });
+  const isInView = useInView(ref, { once: true, amount: 0.2 });
 
   const variants = {
     hidden: {
@@ -204,6 +204,15 @@ export default function PageContent() {
   const [loading, setLoading] = useState(true);
   const { theme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const missionSectionRef = useRef<HTMLDivElement>(null);
+  const missionImageRef = useRef<HTMLDivElement>(null);
+
+  const { scrollYProgress } = useScroll({
+    target: missionSectionRef,
+    offset: ['start end', 'end start']
+  });
+  
+  const imageY = useTransform(scrollYProgress, [0, 1], ['-15%', '15%']);
 
   useEffect(() => {
     // This effect runs once on component mount.
@@ -281,6 +290,7 @@ export default function PageContent() {
     <div className="space-y-24 md:space-y-32 bg-background z-10 relative w-full overflow-x-hidden">
       <section
         id="about-us"
+        ref={missionSectionRef}
         className="w-full py-12 md:py-20 scroll-mt-20"
       >
         <div className="container mx-auto px-4">
@@ -302,15 +312,17 @@ export default function PageContent() {
                 </p>
               </AnimatedContent>
               <AnimatedContent direction="right">
-                <div className="relative aspect-video rounded-xl shadow-lg dark:shadow-primary/20">
-                  <Image
-                    src="https://placehold.co/1280x720.png"
-                    alt="Students collaborating on a science project"
-                    data-ai-hint="students collaborating"
-                    fill
-                    style={{ objectFit: 'cover' }}
-                    className="rounded-xl"
-                  />
+                <div ref={missionImageRef} className="relative aspect-video rounded-xl shadow-md-soft overflow-hidden">
+                   <motion.div style={{y: imageY}} className="absolute inset-0">
+                     <Image
+                        src="https://placehold.co/1280x720.png"
+                        alt="Students collaborating on a science project"
+                        data-ai-hint="students collaborating"
+                        fill
+                        style={{ objectFit: 'cover' }}
+                        className="rounded-xl"
+                      />
+                   </motion.div>
                 </div>
               </AnimatedContent>
             </div>
@@ -330,7 +342,7 @@ export default function PageContent() {
                 </p>
               </AnimatedContent>
               <AnimatedContent direction="left" className="md:order-1">
-                <div className="relative aspect-video rounded-xl shadow-lg dark:shadow-primary/20">
+                <div className="relative aspect-video rounded-xl shadow-md-soft">
                   <Image
                     src="https://placehold.co/1280x720.png"
                     alt="Abstract technology visualization"
@@ -398,10 +410,10 @@ export default function PageContent() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {perks.map((perk, i) => (
               <AnimatedContent key={perk.title} delay={i * 0.2}>
-                <Card className="bg-card shadow-lg dark:shadow-primary/10 hover:shadow-xl dark:hover:shadow-primary/20 transition-all duration-300 p-8 text-center rounded-2xl border border-border/30 hover:border-primary/50 hover:-translate-y-2 h-full">
+                <Card className="bg-card shadow-soft dark:shadow-primary/10 hover:shadow-md-soft transition-all duration-300 p-8 text-center rounded-2xl border border-border/30 hover:border-primary/50 hover:-translate-y-2 h-full">
                   {React.cloneElement(perk.icon, {
                     className:
-                      'h-10 w-10 text-primary mx-auto mb-4 icon-glow',
+                      'h-10 w-10 text-primary mx-auto mb-4',
                   })}
                   <h3 className="text-xl font-bold mt-4 mb-2 text-foreground">
                     {perk.title}
@@ -473,11 +485,9 @@ export default function PageContent() {
       <section className="w-full py-12 md:py-20">
         <div className="container mx-auto px-4 text-center">
           <AnimatedContent>
-            <div className="quote-container">
-              <div className="quote-icon">
-                <MessageSquare className="h-12 w-12 text-primary opacity-70" />
-              </div>
-              <p className="text-2xl md:text-3xl font-medium italic max-w-4xl mx-auto text-foreground">
+            <div className="relative">
+              <MessageSquare className="h-12 w-12 text-primary opacity-20 absolute -top-4 left-1/2 -translate-x-1/2" />
+              <p className="text-2xl md:text-3xl font-medium italic max-w-4xl mx-auto text-foreground relative z-10">
                 "We empower students to explore their potential and shape the
                 future through engaging events."
               </p>

@@ -12,6 +12,7 @@ import { ArrowDown, Loader2 } from "lucide-react";
 import PageContent from "@/components/landing/page-content";
 import { useTheme } from 'next-themes';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 
 const MagnetLines = lazy(() => import('@/components/ui/magnet-lines'));
 
@@ -24,8 +25,9 @@ function BackgroundVisuals() {
     return <div className="absolute inset-0 z-0 overflow-hidden bg-background"></div>;
   }
 
-  const baseColor = theme === 'dark' ? 'rgba(92, 197, 189, 0.1)' : 'rgba(44, 62, 80, 0.08)';
-  const interactiveColor = theme === 'dark' ? 'rgba(92, 197, 189, 0.4)' : 'rgba(92, 197, 189, 0.5)';
+  // Define colors based on the new design system
+  const baseColor = theme === 'dark' ? 'rgba(0, 154, 192, 0.1)' : 'rgba(0, 111, 175, 0.08)'; // Cloisonne/Ocean Blue tones
+  const interactiveColor = theme === 'dark' ? 'rgba(0, 204, 188, 0.4)' : 'rgba(0, 204, 188, 0.5)'; // Amazonite
     
     return (
         <div className="absolute inset-0 z-0 overflow-hidden bg-background">
@@ -48,15 +50,36 @@ export default function JuniorScientistHomePage() {
   const router = useRouter();
   const heroRef = useRef<HTMLDivElement>(null);
 
-  // Conditionally apply the scroll effect only when the user is not logged in.
   const { scrollYProgress } = useScroll({
     target: heroRef,
     offset: ["start start", "end start"],
-    // Disable the hook if the user is logged in to prevent hydration errors during redirect
     layoutEffect: false, 
   });
 
   const y = useTransform(scrollYProgress, [0, 1], ["0%", "50%"]);
+
+  const sentence = {
+    hidden: { opacity: 1 },
+    visible: {
+      opacity: 1,
+      transition: {
+        delayChildren: 0.3,
+        staggerChildren: 0.08,
+      },
+    },
+  }
+
+  const letter = {
+    hidden: { opacity: 0, y: 50 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        ease: "power3.out",
+        duration: 0.6
+      }
+    },
+  }
 
 
   useEffect(() => {
@@ -78,26 +101,37 @@ export default function JuniorScientistHomePage() {
       <section ref={heroRef} className="relative w-full h-screen flex items-center justify-center overflow-hidden">
         <BackgroundVisuals />
         <motion.div style={{ y }} className="relative z-10 flex flex-col items-center justify-center h-full text-center px-4">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-          >
             <Logo className="h-28 w-20 md:h-32 md:w-24 mx-auto mb-4" />
-            <h1 
+            <motion.h1 
+              variants={sentence}
+              initial="hidden"
+              animate="visible"
               className="text-5xl md:text-7xl lg:text-8xl font-extrabold tracking-tight text-foreground font-headline"
             >
-              JUNIOR SCIENTIST
-            </h1>
-            <p className="mt-6 text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
+             {"JUNIOR SCIENTIST".split(" ").map((word, index) => (
+                <span key={word + "-" + index} className="inline-block whitespace-nowrap">
+                  {word.split("").map((char, charIndex) => (
+                    <motion.span key={char + "-" + charIndex} variants={letter} className="inline-block">
+                      {char}
+                    </motion.span>
+                  ))}
+                  {index < "JUNIOR SCIENTIST".split(" ").length - 1 && <span>&nbsp;</span>}
+                </span>
+              ))}
+            </motion.h1>
+            <motion.p 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 1.2, ease: "easeOut" }}
+              className="mt-6 text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto"
+            >
               Ignite Curiosity, Compete with Brilliance, and Lead the Change Across Realms!
-            </p>
-          </motion.div>
+            </motion.p>
 
           <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.8, delay: 0.5, ease: "easeOut" }}
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.8, delay: 1.5, ease: "back.out(1.2)" }}
               className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4"
           >
               <Button size="lg" asChild>
@@ -112,7 +146,7 @@ export default function JuniorScientistHomePage() {
               href="#about-us"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ duration: 0.8, delay: 1, ease: "easeOut" }}
+              transition={{ duration: 0.8, delay: 2, ease: "easeOut" }}
               className="absolute bottom-8 text-sm text-muted-foreground flex flex-col items-center justify-center"
           >
               <p className="mb-1">Scroll to learn more</p>
