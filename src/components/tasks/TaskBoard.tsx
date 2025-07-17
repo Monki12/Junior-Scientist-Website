@@ -311,8 +311,8 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
         await addDoc(collection(db, 'notifications'), {
             userId: assignedUserId,
             type: 'task',
-            title: 'New Task Assigned',
-            message: `You have been assigned a new task: "${task.caption || task.title}" on the "${board.name}" board by ${userProfile.fullName}.`,
+            title: 'Task Assigned',
+            message: `You have been assigned a task: "${task.caption || task.title}" on the "${board.name}" board.`,
             link: '/my-tasks',
             read: false,
             createdAt: serverTimestamp(),
@@ -326,7 +326,6 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
     if (!userProfile) return;
 
     if (isNew) {
-        // --- LOGIC FOR NEW TASKS ---
         const { id, ...taskData } = updatedTaskData;
         const newTaskData = {
             ...taskData,
@@ -338,14 +337,12 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
         const docRef = await addDoc(collection(db, 'tasks'), newTaskData);
         toast({ title: "Task Created" });
 
-        // Check for new assignee and send notification
-        const newAssigneeId = newTaskData.assignedToUserIds?.[0];
-        if (newAssigneeId) {
-            await createNotification({ ...newTaskData, id: docRef.id }, newAssigneeId);
+        const newAssigneeIds = newTaskData.assignedToUserIds || [];
+        for (const assigneeId of newAssigneeIds) {
+            await createNotification({ ...newTaskData, id: docRef.id }, assigneeId);
         }
 
     } else {
-        // --- LOGIC FOR EXISTING TASKS ---
         const originalTask = tasks.find(t => t.id === updatedTaskData.id);
         const taskRef = doc(db, 'tasks', updatedTaskData.id!);
         
@@ -355,16 +352,16 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
         });
         toast({ title: "Task Updated" });
 
-        const newAssigneeId = updatedTaskData.assignedToUserIds?.[0];
-        const oldAssigneeId = originalTask?.assignedToUserIds?.[0];
+        const oldAssigneeIds = new Set(originalTask?.assignedToUserIds || []);
+        const newAssigneeIds = new Set(updatedTaskData.assignedToUserIds || []);
 
-        // Send notification ONLY if the assignee has changed to someone new
-        if (newAssigneeId && newAssigneeId !== oldAssigneeId) {
-            await createNotification(updatedTaskData, newAssigneeId);
+        for (const newId of newAssigneeIds) {
+            if (!oldAssigneeIds.has(newId)) {
+                await createNotification(updatedTaskData, newId);
+            }
         }
     }
     
-    // Close the modal
     setIsTaskModalOpen(false);
     setEditingTask(null);
   };
@@ -400,7 +397,7 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
     
     if (originalAssigneeId === targetColumnId) return;
 
-    const isSelfAssign = targetColumnId === userProfile.uid && !originalAssigneeId;
+    const isSelfAssign = targetColumnId === userProfile.uid && (!task.assignedToUserIds || task.assignedToUserIds.length === 0);
     if (!canManageBoard && !isSelfAssign) {
         toast({ title: "Permission Denied", description: "You can only assign tasks from 'New Tasks' to yourself.", variant: "destructive"});
         return;
@@ -417,8 +414,7 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
         });
         toast({ title: "Task Reassigned", description: `Task moved successfully.`});
 
-        // Send notification to the new assignee
-        if (newAssignedIds.length > 0) {
+        if (newAssignedIds.length > 0 && newAssignedIds[0] !== originalAssigneeId) {
             await createNotification(task, newAssignedIds[0]);
         }
     } catch(e: any) {

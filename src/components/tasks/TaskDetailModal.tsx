@@ -195,6 +195,7 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
             id: formState.id,
             status: formState.status,
             subtasks: formState.subtasks,
+            assignedToUserIds: formState.assignedToUserIds,
         };
         onTaskUpdate(minimalUpdate, isNewTask);
     } else {
