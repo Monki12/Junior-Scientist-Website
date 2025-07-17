@@ -258,20 +258,36 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
   const canManageBoard = userProfile && (board.managerUids?.includes(userProfile.uid) || ['admin', 'overall_head'].includes(userProfile.role));
 
   const { leadership, representatives, organisers, unassignedTasks } = useMemo(() => {
-    const leadership = members.filter(m => m.role === 'admin' || m.role === 'overall_head');
-    const representatives = members.filter(m => m.role === 'event_representative');
-    const organisers = members.filter(m => m.role === 'organizer');
+      const assignedTaskIds = new Set<string>();
+      const leadership: BoardMember[] = [];
+      const representatives: BoardMember[] = [];
+      const organisers: BoardMember[] = [];
 
-    const assignedTaskIds = new Set<string>();
-    tasks.forEach(task => {
-        if (task.assignedToUserIds?.length > 0) {
-            assignedTaskIds.add(task.id);
-        }
-    });
-    
-    const unassigned = tasks.filter(task => !assignedTaskIds.has(task.id));
+      members.forEach(member => {
+          tasks.forEach(task => {
+              if (task.assignedToUserIds?.includes(member.userId)) {
+                  assignedTaskIds.add(task.id);
+              }
+          });
+          if (member.role === 'admin' || member.role === 'overall_head') {
+              leadership.push(member);
+          } else if (member.role === 'event_representative') {
+              representatives.push(member);
+          } else if (member.role === 'organizer') {
+              organisers.push(member);
+          }
+      });
+      
+      const unassigned = tasks.filter(task => {
+          if (!task.assignedToUserIds || task.assignedToUserIds.length === 0) {
+              return true; // Unassigned
+          }
+          // Check if assigned user is still a board member
+          const assignedMemberExists = members.some(m => task.assignedToUserIds.includes(m.userId));
+          return !assignedMemberExists; // Orphaned task
+      });
 
-    return { leadership, representatives, organisers, unassignedTasks: unassigned };
+      return { leadership, representatives, organisers, unassignedTasks: unassigned };
   }, [tasks, members]);
 
 
@@ -314,7 +330,7 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
     if (!userProfile) return;
 
     if (updatedTask.id) { // This is an update to an existing task
-        const existingTask = tasks.find(t => t.id === updatedTask.id);
+        const originalTask = tasks.find(t => t.id === updatedTask.id);
         const taskRef = doc(db, 'tasks', updatedTask.id);
         await updateDoc(taskRef, {
             ...updatedTask,
@@ -322,9 +338,8 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
         });
         toast({ title: "Task Updated" });
 
-        // Check if assignee has changed
         const newAssignee = updatedTask.assignedToUserIds?.[0];
-        const oldAssignee = existingTask?.assignedToUserIds?.[0];
+        const oldAssignee = originalTask?.assignedToUserIds?.[0];
         if (newAssignee && newAssignee !== oldAssignee) {
             createNotification(updatedTask as Task, newAssignee);
         }
