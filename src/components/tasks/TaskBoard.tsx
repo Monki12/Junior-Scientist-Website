@@ -343,7 +343,7 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
 
         const newAssignee = newTaskData.assignedToUserIds?.[0];
         if (newAssignee) {
-            createNotification({ ...newTaskData, id: docRef.id } as Task, newAssignee);
+            createNotification({ ...newTaskData, id: docRef.id }, newAssignee);
         }
     } else { // This is an update to an existing task
         const originalTask = tasks.find(t => t.id === updatedTask.id);
@@ -357,10 +357,11 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
         const newAssignee = updatedTask.assignedToUserIds?.[0];
         const oldAssignee = originalTask?.assignedToUserIds?.[0];
         if (newAssignee && newAssignee !== oldAssignee) {
-            createNotification(updatedTask as Task, newAssignee);
+            createNotification(updatedTask, newAssignee);
         }
     }
     setIsTaskModalOpen(false);
+    setEditingTask(null);
   };
   
   const handleConfirmDelete = async () => {

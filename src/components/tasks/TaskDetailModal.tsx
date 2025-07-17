@@ -199,7 +199,7 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
     }
     
     // Pass the entire form state for new tasks
-    onTaskUpdate(isNewTask ? dataToSave : {id: formState.id, ...dataToSave}, isNewTask);
+    onTaskUpdate(dataToSave, isNewTask);
     setIsUpdating(false);
   };
 
