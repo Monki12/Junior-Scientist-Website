@@ -1,13 +1,13 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/hooks/use-auth';
 import type { SubEvent } from '@/types';
 import { db } from '@/lib/firebase';
-import { collection, query, onSnapshot, where } from 'firebase/firestore';
+import { collection, query, onSnapshot, where, getDocs, Query } from 'firebase/firestore';
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,41 +26,73 @@ export default function MyEventsPage() {
 
   const canCreateEvents = userProfile?.role === 'admin' || userProfile?.role === 'overall_head';
 
-  useEffect(() => {
-    if (!userProfile) return;
+  const getEventsQuery = useCallback(() => {
+    if (!userProfile) return null;
 
-    setLoadingEvents(true);
-
-    let eventsQuery;
+    let eventsQuery: Query;
     switch(userProfile.role) {
       case 'admin':
       case 'overall_head':
         eventsQuery = query(collection(db, 'subEvents'));
         break;
       case 'event_representative':
-        eventsQuery = query(collection(db, 'subEvents'), where('eventReps', 'array-contains', userProfile.uid));
+        if (!userProfile.assignedEventUids || userProfile.assignedEventUids.length === 0) return null;
+        eventsQuery = query(collection(db, 'subEvents'), where('__name__', 'in', userProfile.assignedEventUids));
         break;
       case 'organizer':
+         if (!userProfile.boardIds || userProfile.boardIds.length === 0) return null;
+        // This is an indirect way. A better approach might be to store eventUids directly on the organizer.
+        // For now, we assume if they are an organizer of a board, they are an organizer for that event.
+        // This needs a more direct link in the data model for full accuracy.
         eventsQuery = query(collection(db, 'subEvents'), where('organizerUids', 'array-contains', userProfile.uid));
         break;
       default:
-        setEvents([]);
-        setLoadingEvents(false);
-        return;
+        return null;
     }
+    return eventsQuery;
+  }, [userProfile]);
 
-    const unsubscribe = onSnapshot(eventsQuery, (snapshot) => {
-      const eventsList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SubEvent));
-      setEvents(eventsList);
-      setLoadingEvents(false);
+
+  const fetchEvents = useCallback(async () => {
+      const q = getEventsQuery();
+      if (!q) {
+          setEvents([]);
+          setLoadingEvents(false);
+          return;
+      }
+      try {
+          const snapshot = await getDocs(q);
+          const eventsList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SubEvent));
+          setEvents(eventsList);
+      } catch (error) {
+          console.error("Error fetching events:", error);
+          toast({ title: "Error", description: "Could not fetch your events.", variant: "destructive" });
+      } finally {
+        setLoadingEvents(false);
+      }
+  }, [getEventsQuery, toast]);
+
+
+  useEffect(() => {
+    if (authLoading) return;
+    
+    setLoadingEvents(true);
+    fetchEvents(); // Initial fetch
+    
+    // Set up a listener on registrations to re-fetch events when they change
+    const registrationsQuery = query(collection(db, 'event_registrations'));
+    const unsubscribeRegistrations = onSnapshot(registrationsQuery, () => {
+        // A registration has changed, re-fetch the events to get the latest counts.
+        fetchEvents();
     }, (error) => {
-      console.error("Error fetching events:", error);
-      toast({ title: "Error", description: "Could not fetch your events.", variant: "destructive" });
-      setLoadingEvents(false);
+        console.error("Error listening to registrations:", error);
     });
 
-    return () => unsubscribe();
-  }, [userProfile, toast]);
+    return () => {
+        unsubscribeRegistrations();
+    };
+  }, [userProfile, authLoading, fetchEvents]);
+
 
   if (authLoading || loadingEvents) {
     return (
