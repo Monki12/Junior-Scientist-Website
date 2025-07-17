@@ -205,8 +205,7 @@ export default function PageContent() {
   const { theme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const missionSectionRef = useRef<HTMLDivElement>(null);
-  const missionImageRef = useRef<HTMLDivElement>(null);
-
+  
   const { scrollYProgress } = useScroll({
     target: missionSectionRef,
     offset: ['start end', 'end start']
@@ -312,7 +311,7 @@ export default function PageContent() {
                 </p>
               </AnimatedContent>
               <AnimatedContent direction="right">
-                <div ref={missionImageRef} className="relative aspect-video rounded-xl shadow-md-soft overflow-hidden">
+                <div className="relative aspect-video rounded-xl shadow-md-soft overflow-hidden">
                    <motion.div style={{y: imageY}} className="absolute inset-0">
                      <Image
                         src="https://placehold.co/1280x720.png"
@@ -342,15 +341,17 @@ export default function PageContent() {
                 </p>
               </AnimatedContent>
               <AnimatedContent direction="left" className="md:order-1">
-                <div className="relative aspect-video rounded-xl shadow-md-soft">
-                  <Image
-                    src="https://placehold.co/1280x720.png"
-                    alt="Abstract technology visualization"
-                    data-ai-hint="data visualization"
-                    fill
-                    style={{ objectFit: 'cover' }}
-                    className="rounded-xl"
-                  />
+                <div className="relative aspect-video rounded-xl shadow-md-soft overflow-hidden">
+                   <motion.div style={{y: imageY}} className="absolute inset-0">
+                     <Image
+                        src="https://placehold.co/1280x720.png"
+                        alt="Abstract technology visualization"
+                        data-ai-hint="data visualization"
+                        fill
+                        style={{ objectFit: 'cover' }}
+                        className="rounded-xl"
+                      />
+                   </motion.div>
                 </div>
               </AnimatedContent>
             </div>
