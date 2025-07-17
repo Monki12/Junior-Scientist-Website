@@ -13,7 +13,6 @@ import PageContent from "@/components/landing/page-content";
 import { useTheme } from 'next-themes';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import QuantumThread from '@/components/landing/QuantumThread';
 
 const MagnetLines = lazy(() => import('@/components/ui/magnet-lines'));
 
@@ -98,7 +97,6 @@ export default function JuniorScientistHomePage() {
 
   return (
     <div className="flex flex-col items-center text-foreground -mt-[4rem]">
-      <QuantumThread />
       <section ref={heroRef} className="relative w-full h-screen flex items-center justify-center overflow-hidden">
         <BackgroundVisuals />
         <motion.div style={{ y }} className="relative z-10 flex flex-col items-center justify-center h-full text-center px-4">
