@@ -311,7 +311,6 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
 
   const createNotification = async (task: Partial<Task>, assignedUserId: string) => {
     if (!assignedUserId || !userProfile) return;
-    // Don't notify someone for assigning a task to themselves
     if (assignedUserId === userProfile.uid) return;
     try {
         await addDoc(collection(db, 'notifications'), {
@@ -347,7 +346,7 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
         if (newAssignee) {
             createNotification({ ...newTaskData, id: docRef.id }, newAssignee);
         }
-    } else { // This is an update to an existing task
+    } else {
         const originalTask = tasks.find(t => t.id === updatedTask.id);
         const taskRef = doc(db, 'tasks', updatedTask.id!);
         await updateDoc(taskRef, {

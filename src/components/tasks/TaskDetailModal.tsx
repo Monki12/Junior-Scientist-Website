@@ -175,31 +175,32 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
     if (!board) return;
     setIsUpdating(true);
 
-    let dataToSave: Partial<Task> = {};
     const isNewTask = !formState.id;
 
-    if (canManage) {
-        if (!formState.caption?.trim()) {
-            toast({ title: "Caption is required", description: "Please enter a short title for the task.", variant: "destructive" });
-            setIsUpdating(false);
-            return;
-        }
-        dataToSave = {
-            ...formState,
-            dueDate: formState.dueDate ? (formState.dueDate as Date).toISOString() : null,
-            title: formState.caption || 'Untitled Task',
-        };
-    } else {
-        // If user cannot manage, they can only update status and subtasks
-        dataToSave = {
+    if (canManage && !formState.caption?.trim()) {
+        toast({ title: "Caption is required", description: "Please enter a short title for the task.", variant: "destructive" });
+        setIsUpdating(false);
+        return;
+    }
+
+    const dataToSave: Partial<Task> = {
+        ...formState,
+        dueDate: formState.dueDate ? (formState.dueDate as Date).toISOString() : null,
+        title: formState.caption || 'Untitled Task',
+    };
+    
+    // For non-managers, only allow updating status and subtasks
+    if (!canManage) {
+        const minimalUpdate: Partial<Task> = {
             id: formState.id,
             status: formState.status,
             subtasks: formState.subtasks,
         };
+        onTaskUpdate(minimalUpdate, isNewTask);
+    } else {
+        onTaskUpdate(dataToSave, isNewTask);
     }
     
-    // Pass the entire form state for new tasks
-    onTaskUpdate(dataToSave, isNewTask);
     setIsUpdating(false);
   };
 
