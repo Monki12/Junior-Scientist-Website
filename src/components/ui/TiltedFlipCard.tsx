@@ -79,34 +79,27 @@ const getCategoryStyles = (
         styles.bgColor = 'bg-white';
     }
   } else { // Dark mode
+    // Apply a subtle blue gradient to all cards in dark mode for uniformity
+    styles.bgColor = 'bg-gradient-to-b from-[rgba(0,111,175,0.2)] to-[rgba(0,111,175,0.4)]';
+    styles.eventBgColor = 'bg-white/5';
+    styles.eventBorderColor = 'border-white/10';
+
     switch (category) {
       case 'strategist':
-        styles.bgColor = 'bg-[#2E354A]';
         styles.iconFilter = 'drop-shadow(0 0 8px #0471A670)';
         styles.eventLinkHoverColor = 'hover:text-blue-300';
-        styles.eventBgColor = 'bg-white/5';
-        styles.eventBorderColor = 'border-white/10';
         break;
       case 'brainiac':
-        styles.bgColor = 'bg-[#322E3A]';
         styles.iconFilter = 'drop-shadow(0 0 8px #C287E870)';
         styles.eventLinkHoverColor = 'hover:text-purple-300';
-        styles.eventBgColor = 'bg-white/5';
-        styles.eventBorderColor = 'border-white/10';
         break;
       case 'thinker':
-        styles.bgColor = 'bg-[#3A2E33]';
         styles.iconFilter = 'drop-shadow(0 0 8px #dd557e70)';
         styles.eventLinkHoverColor = 'hover:text-pink-300';
-        styles.eventBgColor = 'bg-white/5';
-        styles.eventBorderColor = 'border-white/10';
         break;
       case 'innovator':
-        styles.bgColor = 'bg-[#352E2B]';
         styles.iconFilter = 'drop-shadow(0 0 8px #FF855270)';
         styles.eventLinkHoverColor = 'hover:text-orange-300';
-        styles.eventBgColor = 'bg-white/5';
-        styles.eventBorderColor = 'border-white/10';
         break;
       default:
         styles.bgColor = 'bg-gray-800';

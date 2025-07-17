@@ -312,7 +312,7 @@ export default function PageContent() {
               </AnimatedContent>
               <AnimatedContent direction="right">
                 <div className="relative aspect-video rounded-xl shadow-md-soft overflow-hidden">
-                   <motion.div style={{y: imageY}} className="absolute inset-0">
+                  <motion.div style={{y: imageY}} className="absolute inset-0">
                      <Image
                         src="https://placehold.co/1280x720.png"
                         alt="Students collaborating on a science project"
@@ -411,7 +411,7 @@ export default function PageContent() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {perks.map((perk, i) => (
               <AnimatedContent key={perk.title} delay={i * 0.2}>
-                <Card className="bg-card shadow-soft dark:shadow-primary/10 hover:shadow-md-soft transition-all duration-300 p-8 text-center rounded-2xl border border-border/30 hover:border-primary/50 hover:-translate-y-2 h-full">
+                <Card className="bg-gradient-to-b from-[rgba(0,111,175,0.4)] to-[rgba(0,111,175,0.6)] dark:from-[rgba(0,111,175,0.2)] dark:to-[rgba(0,111,175,0.4)] shadow-soft dark:shadow-primary/10 hover:shadow-md-soft transition-all duration-300 p-8 text-center rounded-2xl border border-border/30 hover:border-primary/50 hover:-translate-y-2 h-full">
                   {React.cloneElement(perk.icon, {
                     className:
                       'h-10 w-10 text-primary mx-auto mb-4',
