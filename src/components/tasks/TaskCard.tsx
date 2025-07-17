@@ -49,10 +49,8 @@ export default function TaskCard({ task, canManage, onEditTask, onInitiateDelete
     transition,
     opacity: isDragging ? 0.7 : 1,
     boxShadow: isDragging ? '0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.1)' : 'none',
+    ...isDragging && { transform: `rotate(2deg) ${CSS.Transform.toString(transform)}` },
   };
-  
-  const rotationStyle = isDragging ? { transform: `rotate(2deg)` } : {};
-
 
   const completedSubtasks = task.subtasks?.filter(st => st.completed).length || 0;
   const totalSubtasks = task.subtasks?.length || 0;
@@ -60,7 +58,7 @@ export default function TaskCard({ task, canManage, onEditTask, onInitiateDelete
   const isOverdue = dueDate && isPast(dueDate) && task.status !== 'Completed';
 
   return (
-    <div ref={setNodeRef} style={{...style, ...rotationStyle}} {...attributes} className="relative group">
+    <div ref={setNodeRef} style={style} {...attributes} className="relative group">
       <Card className="shadow-sm hover:shadow-lg transition-shadow relative overflow-hidden cursor-grab active:cursor-grabbing">
         <div className={cn("absolute left-0 top-0 bottom-0 w-1.5", statusStyles[task.status]?.barColor || 'bg-gray-400')}></div>
         <div className="flex items-start justify-between p-3 pl-5">
