@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -293,17 +294,43 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
   const onInitiateDelete = (task: Task) => {
     setTaskToDelete(task);
   };
+
+  const createNotification = async (task: Task, assignedUserId: string) => {
+    if (!assignedUserId) return;
+    try {
+        await addDoc(collection(db, 'notifications'), {
+            userId: assignedUserId,
+            type: 'task',
+            title: 'New Task Assigned',
+            message: `You have been assigned a new task: "${task.caption}" on the "${board.name}" board.`,
+            link: '/tasks',
+            read: false,
+            createdAt: serverTimestamp(),
+        });
+    } catch (error) {
+        console.error("Error creating notification:", error);
+    }
+  };
   
   const handleTaskUpdate = async (updatedTask: Partial<Task>) => {
     if (!userProfile) return;
 
     if (updatedTask.id) { // This is an update to an existing task
+        const existingTask = tasks.find(t => t.id === updatedTask.id);
         const taskRef = doc(db, 'tasks', updatedTask.id);
         await updateDoc(taskRef, {
             ...updatedTask,
             updatedAt: serverTimestamp(),
         });
         toast({ title: "Task Updated" });
+
+        // Check if assignee has changed
+        const newAssignee = updatedTask.assignedToUserIds?.[0];
+        const oldAssignee = existingTask?.assignedToUserIds?.[0];
+        if (newAssignee && newAssignee !== oldAssignee) {
+            createNotification(updatedTask as Task, newAssignee);
+        }
+
     } else { // This is a new task creation
         const { id, ...taskData } = updatedTask;
         const newTaskData: any = {
@@ -313,8 +340,13 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
         };
-        await addDoc(collection(db, 'tasks'), newTaskData);
+        const docRef = await addDoc(collection(db, 'tasks'), newTaskData);
         toast({ title: "Task Created" });
+
+        const newAssignee = newTaskData.assignedToUserIds?.[0];
+        if (newAssignee) {
+            createNotification({ ...newTaskData, id: docRef.id } as Task, newAssignee);
+        }
     }
     setIsTaskModalOpen(false);
   };
@@ -366,6 +398,10 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
             updatedAt: serverTimestamp(),
         });
         toast({ title: "Task Reassigned", description: `Task moved successfully.`});
+
+        if (newAssignedIds.length > 0 && newAssignedIds[0] !== originalAssigneeId) {
+            createNotification(task, newAssignedIds[0]);
+        }
     } catch(e: any) {
         toast({ title: "Error Reassigning Task", description: e.message, variant: "destructive" });
     }
