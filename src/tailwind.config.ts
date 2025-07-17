@@ -1,4 +1,3 @@
-
 import type { Config } from 'tailwindcss';
 
 export default {
@@ -20,8 +19,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        body: ['var(--font-inter)', 'sans-serif'],
-        headline: ['var(--font-inter)', 'sans-serif'],
+        body: ['Inter', 'sans-serif'],
+        headline: ['Inter', 'sans-serif'],
       },
       colors: {
         border: 'hsl(var(--border))',
@@ -57,67 +56,31 @@ export default {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
-        sidebar: {
-          DEFAULT: 'hsl(var(--background))',
-          foreground: 'hsl(var(--foreground))',
-          primary: 'hsl(var(--primary))',
-          'primary-foreground': 'hsl(var(--primary-foreground))',
-          accent: 'hsl(var(--accent))',
-          'accent-foreground': 'hsl(var(--accent-foreground))',
-          border: 'hsl(var(--border))',
-          ring: 'hsl(var(--ring))',
-        },
-        // --- NEW ENHANCED CARD BACKGROUNDS ---
-        // Light Mode Card Backgrounds
-        'card-strategist-light': '#D0E0FF', // Soft light blue
-        'card-brainiac-light': '#E9DFFF', // Soft light lavender
-        'card-thinker-light': '#FBE0FB',    // Light Pink for thinker (new color #dd557e is too dark for bg)
-        'card-innovator-light': '#FFE8D9',  // Soft light coral
-
-        // Dark Mode Card Backgrounds (Subtle Tints)
-        'card-strategist-dark': '#2E354A', // Dark blue-grey
-        'card-brainiac-dark': '#322E3A', // Dark purplish-grey
-        'card-thinker-dark': '#3A2E33', // Dark pinkish-grey
-        'card-innovator-dark': '#352E2B', // Dark brownish-grey
-        'card-dark': '#2B303D', // Fallback Dark Gray
-
-        // --- ICON FILL COLORS (Unified) ---
-        'icon-strategist': '#0471A6', // Honolulu Blue
-        'icon-brainiac': '#C287E8', // Lavender (floral)
-        'icon-thinker': '#dd557e', // New Pink
-        'icon-innovator': '#FF8552', // Coral
-
-        // --- TEXT COLORS ---
-        'text-dark-primary': '#FFFFFF',
-        'text-dark-secondary': '#C0C0C0',
-        'text-light-primary': '#333333',
-        'text-light-secondary': '#666666',
-        'event-item-dark': '#E0E0E0',
-        'event-item-light': '#444444',
-        'event-link-hover-dark': '#6ECFF6',
-        'event-link-hover-light': '#0471A6',
       },
       borderRadius: {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
       },
+      boxShadow: {
+        // --- Elevation System ---
+        // Light Mode Shadows
+        'elevation-1': '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+        'elevation-2': '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+        'elevation-3': '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+        // Dark Mode "Glow" Shadows
+        'elevation-1-dark': '0 1px 2px 0 hsl(var(--primary) / 0.05)',
+        'elevation-2-dark': '0 0 15px -3px hsl(var(--primary) / 0.1), 0 0 4px -2px hsl(var(--primary) / 0.1)',
+        'elevation-3-dark': '0 0 25px -3px hsl(var(--primary) / 0.2), 0 0 8px -4px hsl(var(--primary) / 0.2)',
+      },
       keyframes: {
         'accordion-down': {
-          from: {
-            height: '0',
-          },
-          to: {
-            height: 'var(--radix-accordion-content-height)',
-          },
+          from: { height: '0' },
+          to: { height: 'var(--radix-accordion-content-height)' },
         },
         'accordion-up': {
-          from: {
-            height: 'var(--radix-accordion-content-height)',
-          },
-          to: {
-            height: '0',
-          },
+          from: { height: 'var(--radix-accordion-content-height)' },
+          to: { height: '0' },
         },
         'fade-in': {
           from: { opacity: '0' },
@@ -133,11 +96,6 @@ export default {
         'accordion-up': 'accordion-up 0.2s ease-out',
         'fade-in': 'fade-in 0.3s ease-out',
         'fade-in-up': 'fade-in-up 0.4s ease-out forwards',
-      },
-      boxShadow: {
-        soft: '0 4px 15px -1px hsl(var(--primary) / 0.1), 0 2px 8px -1px hsl(var(--primary) / 0.08)',
-        'md-soft':
-          '0 10px 25px -3px hsl(var(--primary) / 0.1), 0 4px 10px -2px hsl(var(--primary) / 0.05)',
       },
     },
   },
