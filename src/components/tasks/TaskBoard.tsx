@@ -309,14 +309,14 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
     setTaskToDelete(task);
   };
 
-  const createNotification = async (task: Task, assignedUserId: string) => {
+  const createNotification = async (task: Partial<Task>, assignedUserId: string) => {
     if (!assignedUserId) return;
     try {
         await addDoc(collection(db, 'notifications'), {
             userId: assignedUserId,
             type: 'task',
             title: 'New Task Assigned',
-            message: `You have been assigned a new task: "${task.caption}" on the "${board.name}" board.`,
+            message: `You have been assigned a new task: "${task.caption || task.title}" on the "${board.name}" board.`,
             link: '/my-tasks',
             read: false,
             createdAt: serverTimestamp(),
@@ -326,25 +326,10 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
     }
   };
   
-  const handleTaskUpdate = async (updatedTask: Partial<Task>) => {
+  const handleTaskUpdate = async (updatedTask: Partial<Task>, isNew: boolean) => {
     if (!userProfile) return;
 
-    if (updatedTask.id) { // This is an update to an existing task
-        const originalTask = tasks.find(t => t.id === updatedTask.id);
-        const taskRef = doc(db, 'tasks', updatedTask.id);
-        await updateDoc(taskRef, {
-            ...updatedTask,
-            updatedAt: serverTimestamp(),
-        });
-        toast({ title: "Task Updated" });
-
-        const newAssignee = updatedTask.assignedToUserIds?.[0];
-        const oldAssignee = originalTask?.assignedToUserIds?.[0];
-        if (newAssignee && newAssignee !== oldAssignee) {
-            createNotification(updatedTask as Task, newAssignee);
-        }
-
-    } else { // This is a new task creation
+    if (isNew) {
         const { id, ...taskData } = updatedTask;
         const newTaskData: any = {
             ...taskData,
@@ -359,6 +344,20 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
         const newAssignee = newTaskData.assignedToUserIds?.[0];
         if (newAssignee) {
             createNotification({ ...newTaskData, id: docRef.id } as Task, newAssignee);
+        }
+    } else { // This is an update to an existing task
+        const originalTask = tasks.find(t => t.id === updatedTask.id);
+        const taskRef = doc(db, 'tasks', updatedTask.id!);
+        await updateDoc(taskRef, {
+            ...updatedTask,
+            updatedAt: serverTimestamp(),
+        });
+        toast({ title: "Task Updated" });
+
+        const newAssignee = updatedTask.assignedToUserIds?.[0];
+        const oldAssignee = originalTask?.assignedToUserIds?.[0];
+        if (newAssignee && newAssignee !== oldAssignee) {
+            createNotification(updatedTask as Task, newAssignee);
         }
     }
     setIsTaskModalOpen(false);

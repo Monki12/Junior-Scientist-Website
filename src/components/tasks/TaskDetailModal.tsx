@@ -44,7 +44,7 @@ interface TaskDetailModalProps {
   boardMembers: BoardMember[];
   allUsers: UserProfileData[];
   canManage: boolean;
-  onTaskUpdate: (task: Partial<Task>) => void;
+  onTaskUpdate: (task: Partial<Task>, isNew: boolean) => void;
 }
 
 const AssigneeSelector = ({ boardMembers, onSelect, disabled }: { boardMembers: BoardMember[], onSelect: (userId: string) => void, disabled: boolean }) => {
@@ -176,6 +176,7 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
     setIsUpdating(true);
 
     let dataToSave: Partial<Task> = {};
+    const isNewTask = !formState.id;
 
     if (canManage) {
         if (!formState.caption?.trim()) {
@@ -197,7 +198,7 @@ export default function TaskDetailModal({ isOpen, onClose, task, board, boardMem
         };
     }
     
-    onTaskUpdate(dataToSave);
+    onTaskUpdate(dataToSave, isNewTask);
     setIsUpdating(false);
   };
 
