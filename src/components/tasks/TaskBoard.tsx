@@ -310,13 +310,15 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
   };
 
   const createNotification = async (task: Partial<Task>, assignedUserId: string) => {
-    if (!assignedUserId) return;
+    if (!assignedUserId || !userProfile) return;
+    // Don't notify someone for assigning a task to themselves
+    if (assignedUserId === userProfile.uid) return;
     try {
         await addDoc(collection(db, 'notifications'), {
             userId: assignedUserId,
             type: 'task',
             title: 'New Task Assigned',
-            message: `You have been assigned a new task: "${task.caption || task.title}" on the "${board.name}" board.`,
+            message: `You have been assigned a new task: "${task.caption || task.title}" on the "${board.name}" board by ${userProfile.fullName}.`,
             link: '/my-tasks',
             read: false,
             createdAt: serverTimestamp(),
