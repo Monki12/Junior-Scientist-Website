@@ -75,7 +75,7 @@ export default function JuniorScientistHomePage() {
       opacity: 1,
       y: 0,
       transition: {
-        ease: "power3.out",
+        ease: "easeOut",
         duration: 0.6
       }
     },
@@ -131,7 +131,7 @@ export default function JuniorScientistHomePage() {
           <motion.div
               initial={{ opacity: 0, y: 20, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ duration: 0.8, delay: 1.5, ease: "back.out(1.2)" }}
+              transition={{ duration: 0.8, delay: 1.5, ease: [0.22, 1, 0.36, 1] }} // A 'back.out(1.2)' equivalent
               className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4"
           >
               <Button size="lg" asChild>
