@@ -258,17 +258,11 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
   const canManageBoard = userProfile && (board.managerUids?.includes(userProfile.uid) || ['admin', 'overall_head'].includes(userProfile.role));
 
   const { leadership, representatives, organisers, unassignedTasks } = useMemo(() => {
-      const assignedTaskIds = new Set<string>();
       const leadership: BoardMember[] = [];
       const representatives: BoardMember[] = [];
       const organisers: BoardMember[] = [];
 
       members.forEach(member => {
-          tasks.forEach(task => {
-              if (task.assignedToUserIds?.includes(member.userId)) {
-                  assignedTaskIds.add(task.id);
-              }
-          });
           if (member.role === 'admin' || member.role === 'overall_head') {
               leadership.push(member);
           } else if (member.role === 'event_representative') {
@@ -278,12 +272,13 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
           }
       });
       
+      const assignedUserIds = new Set(members.flatMap(m => m.userId));
       const unassigned = tasks.filter(task => {
           if (!task.assignedToUserIds || task.assignedToUserIds.length === 0) {
               return true; // Unassigned
           }
           // Check if assigned user is still a board member
-          const assignedMemberExists = members.some(m => task.assignedToUserIds.includes(m.userId));
+          const assignedMemberExists = task.assignedToUserIds.every(id => assignedUserIds.has(id));
           return !assignedMemberExists; // Orphaned task
       });
 
@@ -311,7 +306,7 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
 
   const createNotification = async (task: Partial<Task>, assignedUserId: string) => {
     if (!assignedUserId || !userProfile) return;
-    if (assignedUserId === userProfile.uid) return;
+    if (assignedUserId === userProfile.uid) return; // Don't notify self
     try {
         await addDoc(collection(db, 'notifications'), {
             userId: assignedUserId,
@@ -327,12 +322,12 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
     }
   };
   
-  const handleTaskUpdate = async (updatedTask: Partial<Task>, isNew: boolean) => {
+  const handleTaskUpdate = async (updatedTaskData: Partial<Task>, isNew: boolean) => {
     if (!userProfile) return;
 
     if (isNew) {
-        const { id, ...taskData } = updatedTask;
-        const newTaskData: any = {
+        const { id, ...taskData } = updatedTaskData;
+        const newTaskData = {
             ...taskData,
             boardId: board.id,
             creatorId: userProfile.uid,
@@ -342,23 +337,24 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
         const docRef = await addDoc(collection(db, 'tasks'), newTaskData);
         toast({ title: "Task Created" });
 
-        const newAssignee = newTaskData.assignedToUserIds?.[0];
-        if (newAssignee) {
-            createNotification({ ...newTaskData, id: docRef.id }, newAssignee);
+        const newAssigneeId = newTaskData.assignedToUserIds?.[0];
+        if (newAssigneeId) {
+            await createNotification({ ...newTaskData, id: docRef.id }, newAssigneeId);
         }
     } else {
-        const originalTask = tasks.find(t => t.id === updatedTask.id);
-        const taskRef = doc(db, 'tasks', updatedTask.id!);
+        const originalTask = tasks.find(t => t.id === updatedTaskData.id);
+        const taskRef = doc(db, 'tasks', updatedTaskData.id!);
         await updateDoc(taskRef, {
-            ...updatedTask,
+            ...updatedTaskData,
             updatedAt: serverTimestamp(),
         });
         toast({ title: "Task Updated" });
 
-        const newAssignee = updatedTask.assignedToUserIds?.[0];
-        const oldAssignee = originalTask?.assignedToUserIds?.[0];
-        if (newAssignee && newAssignee !== oldAssignee) {
-            createNotification(updatedTask, newAssignee);
+        const newAssigneeId = updatedTaskData.assignedToUserIds?.[0];
+        const oldAssigneeId = originalTask?.assignedToUserIds?.[0];
+
+        if (newAssigneeId && newAssigneeId !== oldAssigneeId) {
+            await createNotification(updatedTaskData, newAssigneeId);
         }
     }
     setIsTaskModalOpen(false);
@@ -392,11 +388,11 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
     const task = tasks.find(t => t.id === draggedTaskId);
     if (!task) return;
 
-    const originalAssigneeId = task.assignedToUserIds && task.assignedToUserIds.length > 0 ? task.assignedToUserIds[0] : 'unassigned';
+    const originalAssigneeId = task.assignedToUserIds?.[0];
     
     if (originalAssigneeId === targetColumnId) return;
 
-    const isSelfAssign = targetColumnId === userProfile.uid && originalAssigneeId === 'unassigned';
+    const isSelfAssign = targetColumnId === userProfile.uid && !originalAssigneeId;
     if (!canManageBoard && !isSelfAssign) {
         toast({ title: "Permission Denied", description: "You can only assign tasks from 'New Tasks' to yourself.", variant: "destructive"});
         return;
@@ -414,7 +410,7 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
         toast({ title: "Task Reassigned", description: `Task moved successfully.`});
 
         if (newAssignedIds.length > 0 && newAssignedIds[0] !== originalAssigneeId) {
-            createNotification(task, newAssignedIds[0]);
+            await createNotification(task, newAssignedIds[0]);
         }
     } catch(e: any) {
         toast({ title: "Error Reassigning Task", description: e.message, variant: "destructive" });
