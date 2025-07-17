@@ -33,6 +33,7 @@ import {
 import TiltedFlipCard from '@/components/ui/TiltedFlipCard';
 import { useTheme } from 'next-themes';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 interface AnimatedNumberProps {
   to: number;
@@ -107,14 +108,6 @@ const AnimatedContent = ({
 };
 
 function GallerySection() {
-  const galleryRef = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({
-    target: galleryRef,
-    offset: ['start end', 'end start'],
-  });
-
-  const x = useTransform(scrollYProgress, [0, 1], ['10%', '-20%']);
-
   const galleryImages = [
     {
       src: 'https://placehold.co/1280x853.png',
@@ -141,46 +134,43 @@ function GallerySection() {
       alt: 'Kids coding class',
       dataAiHint: 'students coding',
     },
+    {
+      src: 'https://placehold.co/1280x853.png',
+      alt: 'Group of students learning about rockets',
+      dataAiHint: 'students rocket',
+    },
   ];
 
   return (
-    <section
-      ref={galleryRef}
-      className="gallery-section h-[100vh] relative overflow-hidden"
-    >
-      <AnimatedContent>
+    <section className="w-full py-12 md:py-20">
+       <AnimatedContent>
         <h2 className="text-3xl md:text-4xl font-bold text-center mb-2 text-foreground">
           Moments of Brilliance
         </h2>
-        <p className="text-lg text-muted-foreground text-center mt-2 max-w-xl mx-auto mb-16">
-          Explore our vibrant community in action.
+        <p className="text-lg text-muted-foreground text-center mt-2 max-w-xl mx-auto mb-12">
+          Explore our vibrant community in action. Scroll horizontally to see more.
         </p>
       </AnimatedContent>
-      <motion.div
-        style={{ x }}
-        className="gallery-strip absolute top-1/2 left-0 -translate-y-1/2 flex items-center gap-10 will-change-transform"
-      >
-        {galleryImages.map((image, index) => (
-          <motion.div
-            key={index}
-            className="gallery-item"
-            initial={{ opacity: 0, y: 100 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: index * 0.1, ease: 'easeOut' }}
-            viewport={{ once: true }}
-          >
-            <Image
-              src={image.src}
-              alt={image.alt}
-              fill
-              style={{ objectFit: 'cover' }}
-              data-ai-hint={image.dataAiHint}
-            />
-          </motion.div>
-        ))}
-      </motion.div>
-      <div className="scroll-hint absolute bottom-8 text-muted-foreground">
-        Scroll to explore more moments
+      <div className="relative">
+        <ScrollArea className="w-full whitespace-nowrap rounded-lg">
+          <div className="flex w-max space-x-4 p-4">
+            {galleryImages.map((image, index) => (
+              <figure key={index} className="shrink-0">
+                <div className="overflow-hidden rounded-lg w-80 h-96 relative shadow-lg">
+                  <Image
+                    src={image.src}
+                    alt={image.alt}
+                    fill
+                    style={{ objectFit: 'cover' }}
+                    data-ai-hint={image.dataAiHint}
+                    className="transition-transform duration-300 ease-in-out hover:scale-105"
+                  />
+                </div>
+              </figure>
+            ))}
+          </div>
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
       </div>
     </section>
   );
