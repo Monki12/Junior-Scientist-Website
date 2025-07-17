@@ -262,15 +262,13 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
     const representatives = members.filter(m => m.role === 'event_representative');
     const organisers = members.filter(m => m.role === 'organizer');
 
-    const memberIds = new Set(members.map(m => m.userId));
     const assignedTaskIds = new Set<string>();
-    
     tasks.forEach(task => {
-        if (task.assignedToUserIds?.some(id => memberIds.has(id))) {
+        if (task.assignedToUserIds?.length > 0) {
             assignedTaskIds.add(task.id);
         }
     });
-
+    
     const unassigned = tasks.filter(task => !assignedTaskIds.has(task.id));
 
     return { leadership, representatives, organisers, unassignedTasks: unassigned };
@@ -303,7 +301,7 @@ export default function TaskBoard({ board, tasks, members, onBack, allUsers }: {
             type: 'task',
             title: 'New Task Assigned',
             message: `You have been assigned a new task: "${task.caption}" on the "${board.name}" board.`,
-            link: '/tasks',
+            link: '/my-tasks',
             read: false,
             createdAt: serverTimestamp(),
         });
