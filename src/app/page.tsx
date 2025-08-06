@@ -85,7 +85,7 @@ export default function JuniorScientistHomePage() {
     if (!loading && authUser) {
       router.replace('/dashboard');
     }
-  }, [loading, authUser, router]);
+  }, [loading, authUser]);
 
   if (loading || authUser) {
     return (
