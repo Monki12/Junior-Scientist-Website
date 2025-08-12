@@ -21,7 +21,6 @@ import {
   Users,
   Calendar,
   ClipboardList,
-  Trophy,
   UserCircle,
   GraduationCap,
   LogOut,
@@ -29,9 +28,6 @@ import {
   ScanLine,
   Search,
   Ticket,
-  Users2,
-  ListTodo,
-  Settings,
   ChevronDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';

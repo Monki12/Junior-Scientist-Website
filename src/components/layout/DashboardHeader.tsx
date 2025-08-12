@@ -37,7 +37,6 @@ export default function DashboardHeader() {
     '/my-events': 'Event Management',
     '/my-registrations': 'My Registrations',
     '/tasks': 'Task Management',
-    '/leaderboard': 'Leaderboard',
     '/profile': 'My Profile',
     '/ocr-tool': 'OCR Scanner',
     '/notifications': 'Notifications',
