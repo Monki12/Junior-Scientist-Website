@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
@@ -523,9 +524,9 @@ export default function PageContent() {
               </a>
             </Button>
           </AnimatedContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-4xl mx-auto mb-10">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 max-w-6xl mx-auto mb-10">
             <AnimatedContent delay={0.4}>
-              <Card className="p-4 bg-card shadow-soft border-border/30 rounded-lg">
+              <Card className="p-4 bg-card shadow-soft border-border/30 rounded-lg h-full flex flex-col justify-center">
                 <h4 className="font-semibold text-md text-foreground">
                   Aman Sharma
                 </h4>
@@ -538,7 +539,7 @@ export default function PageContent() {
               </Card>
             </AnimatedContent>
             <AnimatedContent delay={0.5}>
-              <Card className="p-4 bg-card shadow-soft border-border/30 rounded-lg">
+              <Card className="p-4 bg-card shadow-soft border-border/30 rounded-lg h-full flex flex-col justify-center">
                 <h4 className="font-semibold text-md text-foreground">
                   Manasvi
                 </h4>
@@ -551,7 +552,7 @@ export default function PageContent() {
               </Card>
             </AnimatedContent>
             <AnimatedContent delay={0.6}>
-              <Card className="p-4 bg-card shadow-soft border-border/30 rounded-lg">
+              <Card className="p-4 bg-card shadow-soft border-border/30 rounded-lg h-full flex flex-col justify-center">
                 <h4 className="font-semibold text-md text-foreground">
                   Taha Motorwala
                 </h4>
@@ -563,8 +564,8 @@ export default function PageContent() {
                 </a>
               </Card>
             </AnimatedContent>
-            <AnimatedContent delay={0.7} className="sm:col-start-1 lg:col-start-auto">
-              <Card className="p-4 bg-card shadow-soft border-border/30 rounded-lg">
+            <AnimatedContent delay={0.7}>
+              <Card className="p-4 bg-card shadow-soft border-border/30 rounded-lg h-full flex flex-col justify-center">
                 <h4 className="font-semibold text-md text-foreground">
                   Soumya Mundhada
                 </h4>
@@ -577,7 +578,7 @@ export default function PageContent() {
               </Card>
             </AnimatedContent>
             <AnimatedContent delay={0.8}>
-              <Card className="p-4 bg-card shadow-soft border-border/30 rounded-lg">
+              <Card className="p-4 bg-card shadow-soft border-border/30 rounded-lg h-full flex flex-col justify-center">
                 <h4 className="font-semibold text-md text-foreground">
                   Tanas Adhikari
                 </h4>
