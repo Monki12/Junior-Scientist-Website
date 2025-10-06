@@ -110,35 +110,26 @@ const AnimatedContent = ({
 function GallerySection() {
   const galleryImages = [
     {
-      src: 'https://placehold.co/1280x853.png',
+      src: '/images/img0.jpg',
       alt: 'Science fair project',
       dataAiHint: 'science fair',
     },
     {
-      src: 'https://placehold.co/1280x853.png',
+      src: '/images/img1.jpg',
       alt: 'Girl uses a microscope',
       dataAiHint: 'student microscope',
     },
     {
-      src: 'https://placehold.co/1920x1280.png',
+      src: '/images/img2.jpg',
       alt: 'chemistry experiment',
       dataAiHint: 'student experiment',
     },
     {
-      src: 'https://placehold.co/1280x853.png',
+      src: '/images/img3.jpg',
       alt: 'Robot at a STEM camp',
       dataAiHint: 'student robot',
     },
-    {
-      src: 'https://placehold.co/1280x853.png',
-      alt: 'Kids coding class',
-      dataAiHint: 'students coding',
-    },
-    {
-      src: 'https://placehold.co/1280x853.png',
-      alt: 'Group of students learning about rockets',
-      dataAiHint: 'students rocket',
-    },
+    
   ];
 
   return (
@@ -374,7 +365,7 @@ export default function PageContent() {
             <AnimatedContent delay={0}>
               <div className="p-6">
                 <Users2 className="h-12 w-12 text-primary mx-auto mb-4" />
-                <AnimatedNumber to={50} suffix="+" />
+                <AnimatedNumber to={100} suffix="+" />
                 <p className="text-muted-foreground mt-2">Partner Schools</p>
               </div>
             </AnimatedContent>
@@ -388,9 +379,9 @@ export default function PageContent() {
             <AnimatedContent delay={0.4}>
               <div className="p-6">
                 <Zap className="h-12 w-12 text-primary mx-auto mb-4" />
-                <AnimatedNumber to={15000} suffix="+" />
+                <AnimatedNumber to={2000} suffix="+" />
                 <p className="text-muted-foreground mt-2">
-                  Expected Participants
+                  Participation
                 </p>
               </div>
             </AnimatedContent>
@@ -488,7 +479,7 @@ export default function PageContent() {
           <AnimatedContent>
             <div className="relative">
               <MessageSquare className="h-12 w-12 text-primary opacity-20 absolute -top-4 left-1/2 -translate-x-1/2" />
-              <p className="text-2xl md:text-3xl font-medium italic max-w-4xl mx-auto text-foreground relative z-10">
+              <p className="text-2xl md:text-3xl font-medium italic max-w-4xl mx-auto text-foreground relative z-10 pt-4">
                 "We empower students to explore their potential and shape the
                 future through engaging events."
               </p>
