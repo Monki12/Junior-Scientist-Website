@@ -502,7 +502,7 @@ export default function SubEventDetailPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="py-4 text-center">
-              <Image src="/images/qr.png" alt="Payment QR Code" width={250} height={250} className="mx-auto border-4 border-primary rounded-lg" data-ai-hint="payment qr" />
+              <Image src="/images/ayush_qr.png" alt="Payment QR Code" width={250} height={250} className="mx-auto border-4 border-primary rounded-lg" data-ai-hint="payment qr" />
               <p className="mt-4 text-muted-foreground text-sm">Scan the QR code with your payment app.</p>
             </div>
             <DialogFooter>
