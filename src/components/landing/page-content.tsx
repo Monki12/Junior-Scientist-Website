@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
@@ -524,30 +523,69 @@ export default function PageContent() {
               </a>
             </Button>
           </AnimatedContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-xl mx-auto mb-10">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-4xl mx-auto mb-10">
             <AnimatedContent delay={0.4}>
               <Card className="p-4 bg-card shadow-soft border-border/30 rounded-lg">
                 <h4 className="font-semibold text-md text-foreground">
-                  Support: Ayush
+                  Aman Sharma
                 </h4>
                 <a
-                  href="tel:+919022887167"
+                  href="tel:+918591665502"
                   className="flex items-center justify-center text-sm text-muted-foreground hover:text-primary"
                 >
-                  <Phone className="h-4 w-4 mr-2" /> +91 90228 87167
+                  <Phone className="h-4 w-4 mr-2" /> +91 85916 65502
                 </a>
               </Card>
             </AnimatedContent>
             <AnimatedContent delay={0.5}>
               <Card className="p-4 bg-card shadow-soft border-border/30 rounded-lg">
                 <h4 className="font-semibold text-md text-foreground">
-                  Partnerships: Aditi
+                  Manasvi
                 </h4>
                 <a
-                  href="tel:+918010214560"
+                  href="tel:+918421676578"
                   className="flex items-center justify-center text-sm text-muted-foreground hover:text-primary"
                 >
-                  <Phone className="h-4 w-4 mr-2" /> +91 80102 14560
+                  <Phone className="h-4 w-4 mr-2" /> +91 84216 76578
+                </a>
+              </Card>
+            </AnimatedContent>
+            <AnimatedContent delay={0.6}>
+              <Card className="p-4 bg-card shadow-soft border-border/30 rounded-lg">
+                <h4 className="font-semibold text-md text-foreground">
+                  Taha Motorwala
+                </h4>
+                <a
+                  href="tel:+918928240729"
+                  className="flex items-center justify-center text-sm text-muted-foreground hover:text-primary"
+                >
+                  <Phone className="h-4 w-4 mr-2" /> +91 89282 40729
+                </a>
+              </Card>
+            </AnimatedContent>
+            <AnimatedContent delay={0.7} className="sm:col-start-1 lg:col-start-auto">
+              <Card className="p-4 bg-card shadow-soft border-border/30 rounded-lg">
+                <h4 className="font-semibold text-md text-foreground">
+                  Soumya Mundhada
+                </h4>
+                <a
+                  href="tel:+918956015115"
+                  className="flex items-center justify-center text-sm text-muted-foreground hover:text-primary"
+                >
+                  <Phone className="h-4 w-4 mr-2" /> +91 89560 15115
+                </a>
+              </Card>
+            </AnimatedContent>
+            <AnimatedContent delay={0.8}>
+              <Card className="p-4 bg-card shadow-soft border-border/30 rounded-lg">
+                <h4 className="font-semibold text-md text-foreground">
+                  Tanas Adhikari
+                </h4>
+                <a
+                  href="tel:+919337450499"
+                  className="flex items-center justify-center text-sm text-muted-foreground hover:text-primary"
+                >
+                  <Phone className="h-4 w-4 mr-2" /> +91 93374 50499
                 </a>
               </Card>
             </AnimatedContent>
