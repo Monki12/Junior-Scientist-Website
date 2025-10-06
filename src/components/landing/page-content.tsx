@@ -479,7 +479,7 @@ export default function PageContent() {
           <AnimatedContent>
             <div className="relative">
               <MessageSquare className="h-12 w-12 text-primary opacity-20 absolute -top-4 left-1/2 -translate-x-1/2" />
-              <p className="text-2xl md:text-3xl font-medium italic max-w-4xl mx-auto text-foreground relative z-10 pt-4">
+              <p className="text-2xl md:text-3xl font-medium italic max-w-4xl mx-auto text-foreground relative z-10 pt-8">
                 "We empower students to explore their potential and shape the
                 future through engaging events."
               </p>
