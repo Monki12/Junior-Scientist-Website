@@ -314,7 +314,7 @@ export default function PageContent() {
                 <div className="relative aspect-video rounded-xl shadow-md-soft overflow-hidden">
                   <motion.div style={{y: imageY}} className="absolute inset-0">
                      <Image
-                        src="https://placehold.co/1280x720.png"
+                        src="/images/img2.jpg"
                         alt="Students collaborating on a science project"
                         data-ai-hint="students collaborating"
                         fill
@@ -344,7 +344,7 @@ export default function PageContent() {
                 <div className="relative aspect-video rounded-xl shadow-md-soft overflow-hidden">
                    <motion.div style={{y: imageY}} className="absolute inset-0">
                      <Image
-                        src="https://placehold.co/1280x720.png"
+                        src="/images/img0.jpg"
                         alt="Abstract technology visualization"
                         data-ai-hint="data visualization"
                         fill
