@@ -136,7 +136,7 @@ export default {
       boxShadow: {
         soft: '0 4px 15px -1px hsl(var(--primary) / 0.1), 0 2px 8px -1px hsl(var(--primary) / 0.08)',
         'md-soft':
-          '0 10px 25px -3px hsl(var(--primary) / 0.1), 0 4px 10px -2px hsl(var(--primary) / 0.05)',
+          '0 8px 16px -4px hsl(var(--primary) / 0.1), 0 4px 6px -2px hsl(var(--primary) / 0.05)',
       },
     },
   },
