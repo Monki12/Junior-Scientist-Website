@@ -30,6 +30,7 @@ export default function CreateEventForm({ onSuccess }: CreateEventFormProps) {
     defaultValues: {
       title: '',
       shortDescription: '',
+      registrationFee: 0,
     },
   });
 
@@ -68,6 +69,7 @@ export default function CreateEventForm({ onSuccess }: CreateEventFormProps) {
         status: 'Planning' as const,
         venue: 'TBD',
         registeredParticipantCount: 0,
+        registrationFee: data.registrationFee || 0,
         isFeatured: false,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -141,6 +143,12 @@ export default function CreateEventForm({ onSuccess }: CreateEventFormProps) {
             placeholder="A brief, one-sentence summary of the event."
           />
           {errors.shortDescription && <p className="text-destructive text-sm mt-1">{errors.shortDescription.message}</p>}
+        </div>
+
+        <div>
+          <Label htmlFor="registrationFee">Registration Fee (₹)</Label>
+          <Input id="registrationFee" type="number" {...register('registrationFee')} disabled={isSubmitting} placeholder="e.g., 100" />
+          {errors.registrationFee && <p className="text-destructive text-sm mt-1">{errors.registrationFee.message}</p>}
         </div>
         
         <Button type="submit" className="w-full" disabled={isSubmitting}>

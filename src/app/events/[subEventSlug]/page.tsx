@@ -50,6 +50,8 @@ export default function SubEventDetailPage() {
   const [joinTeamFormData, setJoinTeamFormData] = useState<JoinTeamFormData>({ teamCodeOrName: '' });
   const [foundTeams, setFoundTeams] = useState<EventTeam[]>([]);
   const [searchingTeams, setSearchingTeams] = useState(false);
+  
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
 
   useEffect(() => {
     if (subEventSlug) {
@@ -136,6 +138,8 @@ export default function SubEventDetailPage() {
     }
 
     setLoadingAction(true);
+    setIsPaymentDialogOpen(false); // Close payment dialog
+
     try {
       const registrationData: Omit<EventRegistration, 'id'> = {
         userId: currentUserId,
@@ -157,7 +161,7 @@ export default function SubEventDetailPage() {
       const docRef = await addDoc(collection(db, 'event_registrations'), registrationData);
       setUserRegistration({ ...registrationData, id: docRef.id, registeredAt: new Date().toISOString(), lastUpdatedAt: new Date().toISOString() }); // Simulate timestamp
 
-      toast({ title: 'Registered successfully!', description: 'Your individual registration is pending approval.' });
+      toast({ title: 'Registration Submitted!', description: 'Your registration is pending payment verification.' });
       setRegistrationStatus('registered_individual');
     } catch (error: any) {
       console.error("Error registering individually:", error);
@@ -187,6 +191,8 @@ export default function SubEventDetailPage() {
     }
 
     setLoadingAction(true);
+    setIsCreateTeamDialogOpen(false);
+    setIsPaymentDialogOpen(false);
     try {
       const teamRef = doc(collection(db, 'event_teams'));
       const teamData: Omit<EventTeam, 'id'> = {
@@ -221,8 +227,8 @@ export default function SubEventDetailPage() {
       const regDocRef = await addDoc(collection(db, 'event_registrations'), registrationData);
       setUserRegistration({ ...registrationData, id: regDocRef.id, registeredAt: new Date().toISOString(), lastUpdatedAt: new Date().toISOString() });
       
-      toast({ title: 'Team created and registered!', description: 'You are the team leader. Share your team name.' });
-      setIsCreateTeamDialogOpen(false);
+      toast({ title: 'Team created & registered!', description: 'Your registration is pending payment verification. Share your team name!' });
+      
       setRegistrationStatus('registered_team_leader');
       setUserTeam({ id: teamRef.id, ...teamData, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
     } catch (error: any) {
@@ -280,6 +286,8 @@ export default function SubEventDetailPage() {
     }
 
     setLoadingAction(true);
+    setIsJoinTeamDialogOpen(false);
+    setIsPaymentDialogOpen(false);
     try {
       const teamDocRef = doc(db, 'event_teams', teamToJoin.id);
       await updateDoc(teamDocRef, {
@@ -308,8 +316,8 @@ export default function SubEventDetailPage() {
       const regDocRef = await addDoc(collection(db, 'event_registrations'), registrationData);
       setUserRegistration({ ...registrationData, id: regDocRef.id, registeredAt: new Date().toISOString(), lastUpdatedAt: new Date().toISOString() });
 
-      toast({ title: `Successfully joined ${teamToJoin.teamName}!`, description: 'Your registration is pending approval.' });
-      setIsJoinTeamDialogOpen(false);
+      toast({ title: `Successfully joined ${teamToJoin.teamName}!`, description: 'Your registration is pending payment verification.' });
+      
       setRegistrationStatus('registered_team_member');
       setUserTeam({ ...teamToJoin, memberUids: [...teamToJoin.memberUids, currentUserId], teamSize: teamToJoin.memberUids.length + 1, updatedAt: new Date().toISOString() });
     } catch (error: any) {
@@ -319,6 +327,29 @@ export default function SubEventDetailPage() {
       setLoadingAction(false);
     }
   };
+
+  const openPaymentDialog = () => {
+    setIsPaymentDialogOpen(true);
+  }
+
+  const registrationAction = () => {
+    if ((event.registrationFee || 0) > 0) {
+      openPaymentDialog();
+    } else {
+      handleIndividualRegistration();
+    }
+  }
+  
+  const teamRegistrationAction = (action: 'create' | 'join') => {
+    if ((event.registrationFee || 0) > 0) {
+      openPaymentDialog();
+      // We will proceed to the specific action from the payment dialog
+    } else {
+      if(action === 'create') setIsCreateTeamDialogOpen(true)
+      if(action === 'join') setIsJoinTeamDialogOpen(true)
+    }
+  }
+
 
   if (authLoading || loadingEvent || !event) {
     return <div className="flex justify-center items-center min-h-[calc(100vh-10rem)] text-xl text-muted-foreground"><Loader2 className="h-8 w-8 animate-spin mr-2" />Loading event details...</div>;
@@ -400,6 +431,12 @@ export default function SubEventDetailPage() {
                 Registration Deadline: <strong>{new Date(event.deadline).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</strong>
               </p>
             )}
+             {(event.registrationFee || 0) > 0 && (
+              <p className="flex items-center text-md text-foreground">
+                <Ticket className="mr-2 h-5 w-5 text-accent" />
+                Registration Fee: <strong>₹{event.registrationFee}</strong> {event.isTeamBased ? ' per team' : ' per person'}
+              </p>
+            )}
 
             {!currentUserId ? (
               <Button size="lg" asChild className="w-full md:w-auto bg-accent hover:bg-accent/90 text-accent-foreground text-lg py-3 px-6">
@@ -413,17 +450,17 @@ export default function SubEventDetailPage() {
                 <>
                   {event.isTeamBased ? (
                     <div className="space-y-4 md:space-y-0 md:flex md:gap-3">
-                      <Button onClick={() => setIsCreateTeamDialogOpen(true)} disabled={loadingAction} className="w-full md:w-auto bg-primary hover:bg-primary/90">
+                      <Button onClick={() => teamRegistrationAction('create')} disabled={loadingAction} className="w-full md:w-auto bg-primary hover:bg-primary/90">
                         {loadingAction ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4"/>} Create New Team
                       </Button>
-                      <Button onClick={() => setIsJoinTeamDialogOpen(true)} disabled={loadingAction} variant="outline" className="w-full md:w-auto">
+                      <Button onClick={() => teamRegistrationAction('join')} disabled={loadingAction} variant="outline" className="w-full md:w-auto">
                         {loadingAction ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4"/>} Join Existing Team
                       </Button>
                     </div>
                   ) : (
                     <Button 
                       size="lg" 
-                      onClick={handleIndividualRegistration} 
+                      onClick={registrationAction} 
                       disabled={loadingAction}
                       className="w-full md:w-auto bg-green-500 hover:bg-green-600 text-white text-lg py-3 px-6"
                     >
@@ -455,6 +492,28 @@ export default function SubEventDetailPage() {
           </CardContent>
         </Card>
       </article>
+
+       <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Payment for &quot;{event.title}&quot;</DialogTitle>
+              <DialogDescription>
+                Please complete the payment of ₹{event.registrationFee} using the QR code below. After payment, click &quot;Done&quot; to submit your registration.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4 text-center">
+              <Image src="/images/qr.png" alt="Payment QR Code" width={250} height={250} className="mx-auto border-4 border-primary rounded-lg" data-ai-hint="payment qr" />
+              <p className="mt-4 text-muted-foreground text-sm">Scan the QR code with your payment app.</p>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsPaymentDialogOpen(false)} disabled={loadingAction}>Cancel</Button>
+              <Button type="button" onClick={event.isTeamBased ? () => { setIsCreateTeamDialogOpen(true); setIsPaymentDialogOpen(false)} : handleIndividualRegistration} disabled={loadingAction}>
+                {loadingAction ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                Done, Proceed to Register
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+       </Dialog>
 
       <Dialog open={isCreateTeamDialogOpen} onOpenChange={setIsCreateTeamDialogOpen}>
         <DialogContent>

@@ -110,6 +110,7 @@ export interface SubEvent {
   venue?: string;
   registeredParticipantCount?: number;
   isFeatured?: boolean;
+  registrationFee?: number;
   customData?: Record<string, any>;
   createdAt?: any;
   updatedAt?: any;

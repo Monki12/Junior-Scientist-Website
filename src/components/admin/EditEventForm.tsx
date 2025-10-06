@@ -51,6 +51,7 @@ export function EditEventForm({ event }: EditEventFormProps) {
     organizerUids: event.organizerUids || [],
     eventReps: event.eventReps || [],
     galleryImages: event.galleryImages || [],
+    registrationFee: event.registrationFee || 0,
   });
   const [allStaff, setAllStaff] = useState<UserProfileData[]>([]);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -154,6 +155,7 @@ export function EditEventForm({ event }: EditEventFormProps) {
             slug: slug,
             mainImage: { ...formData.mainImage, src: mainImageUrl, dataAiHint: mainImageDataAiHint },
             galleryImages: uploadedGalleryUrls,
+            registrationFee: Number(formData.registrationFee) || 0,
         };
 
         const eventRef = doc(db, 'subEvents', event.id);
@@ -222,6 +224,10 @@ export function EditEventForm({ event }: EditEventFormProps) {
             <div>
               <Label htmlFor="venue">Venue</Label>
               <Input id="venue" value={formData.venue} onChange={e => handleInputChange('venue', e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="registrationFee">Registration Fee (₹)</Label>
+              <Input id="registrationFee" type="number" value={formData.registrationFee} onChange={e => handleInputChange('registrationFee', e.target.value)} />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>

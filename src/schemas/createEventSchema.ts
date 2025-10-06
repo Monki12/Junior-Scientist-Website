@@ -7,6 +7,10 @@ export const createEventSchema = z.object({
     errorMap: () => ({ message: "Please select a valid category." })
   }),
   shortDescription: z.string().max(250, "Keep the short description under 250 characters.").optional(),
+  registrationFee: z.preprocess(
+    (val) => (val === "" ? undefined : Number(val)),
+    z.number({ invalid_type_error: "Fee must be a number." }).min(0).optional()
+  ),
 });
 
 export type CreateEventFormData = z.infer<typeof createEventSchema>;
