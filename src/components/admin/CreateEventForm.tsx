@@ -21,13 +21,13 @@ interface CreateEventFormProps {
 }
 
 const eventImageMap: Record<string, { src: string; alt: string; dataAiHint: string }> = {
-    'catapultikon': { src: '/images/catalogopng.png', alt: 'Catapultikon Banner', dataAiHint: 'event catapult' },
+    'catapultikon': { src: '/images/catalogopng.jpg', alt: 'Catapultikon Banner', dataAiHint: 'event catapult' },
     'exquizit': { src: '/images/EXQUIZITLogo.png', alt: 'Exquizit Banner', dataAiHint: 'event quiz' },
-    'jso': { src: '/images/jso.png', alt: 'JSO Banner', dataAiHint: 'event science' },
-    'modelothon': { src: '/images/jsologo.png', alt: 'Modelothon Banner', dataAiHint: 'event model' },
-    'mathamaze': { src: '/images/mathamazelogo.png', alt: 'Mathamaze Banner', dataAiHint: 'event math' },
-    'mun': { src: '/images/munlogo.png', alt: 'MUN Banner', dataAiHint: 'event debate' },
-    'arduino': { src: '/images/new event logo black ver.png', alt: 'Arduino Event Banner', dataAiHint: 'event circuit' },
+    'jso': { src: '/images/jso.jpg', alt: 'JSO Banner', dataAiHint: 'event science' },
+    'modelothon': { src: '/images/jsologo.jpg', alt: 'Modelothon Banner', dataAiHint: 'event model' },
+    'mathamaze': { src: '/images/mathamazelogo.jpg', alt: 'Mathamaze Banner', dataAiHint: 'event math' },
+    'mun': { src: '/images/munlogo.jpg', alt: 'MUN Banner', dataAiHint: 'event debate' },
+    'arduino': { src: '/images/new event logo blac....png', alt: 'Arduino Event Banner', dataAiHint: 'event circuit' },
 };
 
 
@@ -59,8 +59,8 @@ export default function CreateEventForm({ onSuccess }: CreateEventFormProps) {
       const lowerCaseTitle = data.title.toLowerCase();
       
       let mainImage = {
-        src: 'https://placehold.co/600x400.png',
-        alt: 'Default event banner',
+        src: '/images/jsologo.jpg',
+        alt: 'Junior Scientist Event Banner',
         dataAiHint: 'event banner',
       };
 
