@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -47,13 +48,24 @@ service cloud.firestore {
     
     // --- EVENT-SPECIFIC HELPER FUNCTIONS ---
     function isManagerForEvent(eventId) {
+      let eventDoc = get(/databases/$(database)/documents/subEvents/$(eventId)).data;
       return isSignedIn() && (
         isOverallHeadOrAdmin() ||
         (
           getUserRole(request.auth.uid) == 'event_representative' &&
-          getUserData(request.auth.uid).assignedEventUids != null &&
-          eventId in getUserData(request.auth.uid).assignedEventUids
+          eventDoc.eventReps.hasAny([request.auth.uid])
         ) ||
+        (
+          getUserRole(request.auth.uid) == 'organizer' &&
+          eventDoc.organizerUids.hasAny([request.auth.uid])
+        )
+      );
+    }
+    
+    function hasDataAccessForEvent(eventId) {
+       return isSignedIn() && (
+        isOverallHeadOrAdmin() ||
+        isManagerForEvent(eventId) ||
         (
           getUserRole(request.auth.uid) == 'organizer' &&
           getUserData(request.auth.uid).studentDataEventAccess != null &&
@@ -121,7 +133,7 @@ service cloud.firestore {
     
     match /subEvents/{eventId} {
       allow read: if true;
-      allow write: if isOverallHeadOrAdmin();
+      allow write: if isManagerForEvent(eventId);
     }
 
     match /event_registrations/{registrationId} {
@@ -132,10 +144,10 @@ service cloud.firestore {
         return doc.data.subEventId;
       }
       
-      allow read: if isStaff() || isOwner() || isManagerForEvent(getSubEventId(resource));
+      allow read: if isOwner() || hasDataAccessForEvent(getSubEventId(resource));
       allow create: if isStudent() && request.resource.data.userId == request.auth.uid;
-      allow update: if isManagerForEvent(getSubEventId(request.resource)) || (isOwner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['registrationStatus']) && request.resource.data.registrationStatus == 'cancelled');
-      allow delete: if isManagerForEvent(getSubEventId(resource));
+      allow update: if hasDataAccessForEvent(getSubEventId(request.resource)) || (isOwner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['registrationStatus']) && request.resource.data.registrationStatus == 'cancelled');
+      allow delete: if hasDataAccessForEvent(getSubEventId(resource));
     }
 
     match /event_teams/{teamId} {
@@ -146,8 +158,9 @@ service cloud.firestore {
     }
 
     match /notifications/{notificationId} {
-        allow read: if isSignedIn() && request.auth.uid == resource.data.userId;
-        allow write: if isStaff();
+        allow read, update: if isSignedIn() && request.auth.uid == resource.data.userId;
+        allow create: if isStaff();
+        allow delete: if isOverallHeadOrAdmin();
     }
     
     match /systemPreferences/columnDefinitions/studentData/{columnId} {
