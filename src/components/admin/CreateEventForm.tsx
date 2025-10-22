@@ -28,6 +28,7 @@ const eventImageMap: Record<string, { src: string; alt: string; dataAiHint: stri
     'mathamaze': { src: '/images/logos/mathamazelogo.jpg', alt: 'Mathamaze Banner', dataAiHint: 'event math' },
     'mun': { src: '/images/logos/munlogo.jpg', alt: 'MUN Banner', dataAiHint: 'event debate' },
     'arduino': { src: '/images/logos/new event logo black ver.png', alt: 'Arduino Event Banner', dataAiHint: 'event circuit' },
+    'default': { src: '/images/logos/jsologo.jpg', alt: 'Junior Scientist Event Banner', dataAiHint: 'event banner' },
 };
 
 
@@ -58,14 +59,10 @@ export default function CreateEventForm({ onSuccess }: CreateEventFormProps) {
       const slug = data.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
       const lowerCaseTitle = data.title.toLowerCase();
       
-      let mainImage = {
-        src: '/images/logos/jsologo.jpg',
-        alt: 'Junior Scientist Event Banner',
-        dataAiHint: 'event banner',
-      };
+      let mainImage = eventImageMap['default'];
 
       for (const key in eventImageMap) {
-          if (lowerCaseTitle.includes(key)) {
+          if (key !== 'default' && lowerCaseTitle.includes(key)) {
               mainImage = eventImageMap[key];
               break;
           }
