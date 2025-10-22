@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { useState, useEffect, FormEvent } from 'react';
@@ -24,8 +23,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Loader2, Save, Trash2, CalendarIcon, ChevronDown, Trash } from 'lucide-react';
+import { Loader2, Save, Trash2, CalendarIcon, ChevronDown, Trash, CheckCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 
 const ReactQuill = dynamic(() => import('@/components/admin/QuillEditorWrapper'), { 
   ssr: false,
@@ -36,6 +36,17 @@ const ReactQuill = dynamic(() => import('@/components/admin/QuillEditorWrapper')
     </div>
   ),
 });
+
+const eventImageMap: Record<string, { src: string; alt: string; dataAiHint: string }> = {
+    'catapultikon': { src: '/images/catalogopng.jpg', alt: 'Catapultikon Banner', dataAiHint: 'event catapult' },
+    'exquizit': { src: '/images/EXQUIZITLogo.png', alt: 'Exquizit Banner', dataAiHint: 'event quiz' },
+    'jso': { src: '/images/jso.jpg', alt: 'JSO Banner', dataAiHint: 'event science' },
+    'modelothon': { src: '/images/jsologo.jpg', alt: 'Modelothon Banner', dataAiHint: 'event model' },
+    'mathamaze': { src: '/images/mathamazelogo.jpg', alt: 'Mathamaze Banner', dataAiHint: 'event math' },
+    'mun': { src: '/images/munlogo.jpg', alt: 'MUN Banner', dataAiHint: 'event debate' },
+    'arduino': { src: '/images/new event logo blac....png', alt: 'Arduino Event Banner', dataAiHint: 'event circuit' },
+    'default': { src: '/images/jsologo.jpg', alt: 'Junior Scientist Event Banner', dataAiHint: 'event banner' },
+};
 
 interface EditEventFormProps {
   event: SubEvent;
@@ -82,7 +93,9 @@ export function EditEventForm({ event }: EditEventFormProps) {
     const file = e.target.files?.[0];
     if (file) {
       setMainImageFile(file);
-      setMainImagePreview(URL.createObjectURL(file));
+      const previewUrl = URL.createObjectURL(file);
+      setMainImagePreview(previewUrl);
+      setFormData((prev: any) => ({ ...prev, mainImage: { ...prev.mainImage, src: previewUrl } }));
     }
   };
 
@@ -99,6 +112,16 @@ export function EditEventForm({ event }: EditEventFormProps) {
     setGalleryImageFiles(files => files.filter((_, i) => i !== index));
     setGalleryPreviews(previews => previews.filter((_, i) => i !== index));
   };
+  
+  const handleSelectDefaultImage = (imageKey: string) => {
+    const selectedImage = eventImageMap[imageKey];
+    if (selectedImage) {
+        setMainImageFile(null); // Clear any uploaded file
+        setMainImagePreview(selectedImage.src);
+        setFormData((prev: any) => ({ ...prev, mainImage: selectedImage }));
+    }
+  };
+
 
   const syncBoardMembers = async (boardId: string, assignedUids: string[]) => {
     try {
@@ -264,18 +287,44 @@ export function EditEventForm({ event }: EditEventFormProps) {
 
         <Card className="shadow-lg mt-6">
           <CardHeader><CardTitle>Media</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-6">
             <div>
-                <Label htmlFor="mainImageFile">Main Event Image</Label>
-                <Input id="mainImageFile" type="file" accept="image/*" onChange={handleMainImageFileChange} />
-                 <Label htmlFor="mainImageDataAiHint" className="text-xs text-muted-foreground mt-1 block">AI Hint (1-2 keywords for image search)</Label>
-                <Input id="mainImageDataAiHint" value={formData.mainImage.dataAiHint || ''} onChange={e => setFormData({...formData, mainImage: {...formData.mainImage, dataAiHint: e.target.value}})} />
+                <Label>Main Event Image</Label>
                 {mainImagePreview && (
-                    <div className="mt-2 relative w-full h-40 rounded-md overflow-hidden border">
+                    <div className="mt-2 mb-4 relative w-full h-48 rounded-md overflow-hidden border-2 border-primary">
                         <Image src={mainImagePreview} alt="Event image preview" fill style={{ objectFit: 'cover' }} />
                     </div>
                 )}
+                 <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">Select a default banner or upload a new one.</p>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                        {Object.entries(eventImageMap).map(([key, image]) => (
+                            <button
+                                type="button"
+                                key={key}
+                                onClick={() => handleSelectDefaultImage(key)}
+                                className={cn(
+                                    "relative aspect-video rounded-md overflow-hidden border-2 transition-all",
+                                    formData.mainImage.src === image.src && !mainImageFile ? 'border-primary ring-2 ring-primary' : 'border-transparent hover:border-primary/50'
+                                )}
+                            >
+                                <Image src={image.src} alt={image.alt} fill style={{objectFit: 'cover'}} />
+                                {formData.mainImage.src === image.src && !mainImageFile && (
+                                    <div className="absolute inset-0 bg-primary/70 flex items-center justify-center">
+                                        <CheckCircle className="h-6 w-6 text-primary-foreground" />
+                                    </div>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                 </div>
+
+                <div className="mt-4">
+                    <Label htmlFor="mainImageFile">Upload Custom Image</Label>
+                    <Input id="mainImageFile" type="file" accept="image/*" onChange={handleMainImageFileChange} />
+                </div>
             </div>
+
             <div>
                 <Label htmlFor="galleryImageFiles">Gallery Images (optional)</Label>
                 <Input id="galleryImageFiles" type="file" accept="image/*" multiple onChange={handleGalleryFilesChange} />
@@ -396,4 +445,5 @@ export function EditEventForm({ event }: EditEventFormProps) {
       </AlertDialog>
     </>
   );
-}
+
+    
