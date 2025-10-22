@@ -166,7 +166,7 @@ export function EditEventForm({ event }: EditEventFormProps) {
         const uploadedGalleryUrls: SubEvent['galleryImages'] = [...formData.galleryImages];
         for (const file of galleryImageFiles) {
             const galleryImageRef = ref(storage, `event_images/${slug}/gallery/${file.name}_${Date.now()}`);
-            await uploadBytes(galleryImageRef, file);
+            await uploadBytes(galleryImageRef, galleryImageRef);
             const url = await getDownloadURL(galleryImageRef);
             uploadedGalleryUrls.push({ src: url, alt: file.name, dataAiHint: 'event gallery' });
         }
@@ -445,5 +445,4 @@ export function EditEventForm({ event }: EditEventFormProps) {
       </AlertDialog>
     </>
   );
-
-    
+}
