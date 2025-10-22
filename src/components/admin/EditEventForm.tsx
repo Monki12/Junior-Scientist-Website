@@ -45,7 +45,7 @@ const eventImageMap: Record<string, { src: string; alt: string; dataAiHint: stri
     'mathamaze': { src: '/images/logos/mathamazelogo.jpg', alt: 'Mathamaze Banner', dataAiHint: 'event math' },
     'mun': { src: '/images/logos/munlogo.jpg', alt: 'MUN Banner', dataAiHint: 'event debate' },
     'arduino': { src: '/images/logos/new event logo black ver.png', alt: 'Arduino Event Banner', dataAiHint: 'event circuit' },
-    'default': { src: '/images/logos/jsologo.jpg', alt: 'Junior Scientist Event Banner', dataAiHint: 'event banner' },
+    'default': { src: '/images/logos/logo-white.png', alt: 'Junior Scientist Event Banner', dataAiHint: 'event banner' },
     'science-fair': { src: '/images/img0.jpg', alt: 'Science fair project', dataAiHint: 'science fair' },
     'microscope': { src: '/images/img1.jpg', alt: 'Girl uses a microscope', dataAiHint: 'student microscope' },
     'chemistry': { src: '/images/img2.jpg', alt: 'Chemistry experiment', dataAiHint: 'student experiment' },
@@ -311,7 +311,7 @@ export function EditEventForm({ event }: EditEventFormProps) {
                                 )}
                             >
                                 <Image src={image.src} alt={image.alt} fill style={{objectFit: 'cover'}} />
-                                <div className="absolute inset-0 bg-black/30 flex items-center justify-center p-1">
+                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center p-1">
                                   <p className="text-white text-xs font-bold text-center capitalize drop-shadow-md">{key.replace(/-/g, ' ')}</p>
                                 </div>
                                 {(formData.mainImage.src === image.src && !mainImageFile) && (
@@ -449,3 +449,5 @@ export function EditEventForm({ event }: EditEventFormProps) {
     </>
   );
 }
+
+    
