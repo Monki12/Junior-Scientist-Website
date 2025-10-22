@@ -309,7 +309,7 @@ export function EditEventForm({ event }: EditEventFormProps) {
                                 )}
                             >
                                 <Image src={image.src} alt={image.alt} fill style={{objectFit: 'cover'}} />
-                                <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                                <div className="absolute inset-0 bg-black/30 flex items-center justify-center p-1">
                                   <p className="text-white text-xs font-bold text-center capitalize drop-shadow-md">{key}</p>
                                 </div>
                                 {(formData.mainImage.src === image.src && !mainImageFile) && (
