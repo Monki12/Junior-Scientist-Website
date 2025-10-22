@@ -20,6 +20,17 @@ interface CreateEventFormProps {
   onSuccess?: () => void;
 }
 
+const eventImageMap: Record<string, { src: string; alt: string; dataAiHint: string }> = {
+    'catapultikon': { src: '/images/catalogopng.png', alt: 'Catapultikon Banner', dataAiHint: 'event catapult' },
+    'exquizit': { src: '/images/EXQUIZITLogo.png', alt: 'Exquizit Banner', dataAiHint: 'event quiz' },
+    'jso': { src: '/images/jso.png', alt: 'JSO Banner', dataAiHint: 'event science' },
+    'modelothon': { src: '/images/jsologo.png', alt: 'Modelothon Banner', dataAiHint: 'event model' },
+    'mathamaze': { src: '/images/mathamazelogo.png', alt: 'Mathamaze Banner', dataAiHint: 'event math' },
+    'mun': { src: '/images/munlogo.png', alt: 'MUN Banner', dataAiHint: 'event debate' },
+    'arduino': { src: '/images/new event logo black ver.png', alt: 'Arduino Event Banner', dataAiHint: 'event circuit' },
+};
+
+
 export default function CreateEventForm({ onSuccess }: CreateEventFormProps) {
   const { toast } = useToast();
   const { userProfile } = useAuth();
@@ -45,6 +56,20 @@ export default function CreateEventForm({ onSuccess }: CreateEventFormProps) {
     setIsSubmitting(true);
     try {
       const slug = data.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+      const lowerCaseTitle = data.title.toLowerCase();
+      
+      let mainImage = {
+        src: 'https://placehold.co/600x400.png',
+        alt: 'Default event banner',
+        dataAiHint: 'event banner',
+      };
+
+      for (const key in eventImageMap) {
+          if (lowerCaseTitle.includes(key)) {
+              mainImage = eventImageMap[key];
+              break;
+          }
+      }
 
       // 1. Create the Event
       const newEventData = {
@@ -53,11 +78,7 @@ export default function CreateEventForm({ onSuccess }: CreateEventFormProps) {
         superpowerCategory: data.superpowerCategory,
         shortDescription: data.shortDescription || `A new event in the ${data.superpowerCategory} category.`,
         detailedDescription: '<p>Welcome to the event! Use the edit page to add a full description, rules, and schedule.</p>',
-        mainImage: {
-          src: 'https://placehold.co/600x400.png',
-          alt: 'Default event banner',
-          dataAiHint: 'event banner',
-        },
+        mainImage: mainImage,
         galleryImages: [],
         deadline: null,
         eventDate: null,
