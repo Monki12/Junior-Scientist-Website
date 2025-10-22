@@ -38,19 +38,22 @@ const ReactQuill = dynamic(() => import('@/components/admin/QuillEditorWrapper')
 });
 
 const eventImageMap: Record<string, { src: string; alt: string; dataAiHint: string }> = {
-    'catapultikon': { src: '/images/logos/catalogopng.jpg', alt: 'Catapultikon Banner', dataAiHint: 'event catapult' },
-    'exquizit': { src: '/images/logos/EXQUIZITLogo.png', alt: 'Exquizit Banner', dataAiHint: 'event quiz' },
-    'jso': { src: '/images/logos/jso.jpg', alt: 'JSO Banner', dataAiHint: 'event science' },
-    'modelothon': { src: '/images/logos/jsologo.jpg', alt: 'Modelothon Banner', dataAiHint: 'event model' },
-    'mathamaze': { src: '/images/logos/mathamazelogo.jpg', alt: 'Mathamaze Banner', dataAiHint: 'event math' },
-    'mun': { src: '/images/logos/munlogo.jpg', alt: 'MUN Banner', dataAiHint: 'event debate' },
-    'arduino': { src: '/images/logos/new event logo black ver.png', alt: 'Arduino Event Banner', dataAiHint: 'event circuit' },
-    'default': { src: '/images/logos/logo-white.png', alt: 'Junior Scientist Event Banner', dataAiHint: 'event banner' },
+    'catapultikon': { src: '/images/logos/catapultikon.png', alt: 'Catapultikon Banner', dataAiHint: 'event catapult' },
+    'exquizit': { src: '/images/logos/exquizit.png', alt: 'Exquizit Banner', dataAiHint: 'event quiz' },
+    'jso': { src: '/images/logos/jso.png', alt: 'JSO Banner', dataAiHint: 'event science' },
+    'modelothon': { src: '/images/logos/modelothon.png', alt: 'Modelothon Banner', dataAiHint: 'event model' },
+    'mathamaze': { src: '/images/logos/mathamaze.png', alt: 'Mathamaze Banner', dataAiHint: 'event math' },
+    'mun': { src: '/images/logos/mun.png', alt: 'MUN Banner', dataAiHint: 'event debate' },
+    'arduino': { src: '/images/logos/arduino.png', alt: 'Arduino Event Banner', dataAiHint: 'event circuit' },
+    'default': { src: '/images/logos/jsologo.jpg', alt: 'Junior Scientist Event Banner', dataAiHint: 'event banner' },
     'science-fair': { src: '/images/img0.jpg', alt: 'Science fair project', dataAiHint: 'science fair' },
     'microscope': { src: '/images/img1.jpg', alt: 'Girl uses a microscope', dataAiHint: 'student microscope' },
     'chemistry': { src: '/images/img2.jpg', alt: 'Chemistry experiment', dataAiHint: 'student experiment' },
     'robotics': { src: '/images/img3.jpg', alt: 'Robot at a STEM camp', dataAiHint: 'student robot' },
     'qr-code': { src: '/images/ayush_qr.jpg', alt: 'Payment QR Code', dataAiHint: 'payment qr' },
+    'logo-black': { src: '/images/logos/logo-black.png', alt: 'Junior Scientist Logo Black', dataAiHint: 'logo' },
+    'logo-white': { src: '/images/logos/logo-white.png', alt: 'Junior Scientist Logo White', dataAiHint: 'logo' },
+    'new-event-logo': { src: '/images/logos/new event logo black ver.png', alt: 'New Event Logo', dataAiHint: 'logo' },
 };
 
 
@@ -449,5 +452,3 @@ export function EditEventForm({ event }: EditEventFormProps) {
     </>
   );
 }
-
-    
