@@ -22,6 +22,7 @@ export default function EditEventPage() {
   const { userProfile, loading: authLoading } = useAuth();
   const [event, setEvent] = useState<SubEvent | null>(null);
   const [loadingEvent, setLoadingEvent] = useState(true);
+  const [isAuthorized, setIsAuthorized] = useState(false);
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -48,18 +49,22 @@ export default function EditEventPage() {
   }, [eventSlug]);
 
   useEffect(() => {
-    if (!authLoading && userProfile) {
+    if (!authLoading && userProfile && event) {
       const canManageGlobally = userProfile.role === 'overall_head' || userProfile.role === 'admin';
-      if (!canManageGlobally) {
+      const isManagerForEvent = userProfile.role === 'event_representative' && (event.eventReps || []).includes(userProfile.uid);
+      
+      if (canManageGlobally || isManagerForEvent) {
+          setIsAuthorized(true);
+      } else {
         toast({ title: "Access Denied", description: "You are not authorized to edit this event.", variant: "destructive" });
         router.push(`/events/manage/${eventSlug}`);
       }
     } else if (!authLoading && !userProfile) {
       router.push(`/login?redirect=/events/manage/${eventSlug}/edit`);
     }
-  }, [userProfile, authLoading, router, eventSlug, toast]);
+  }, [userProfile, authLoading, router, eventSlug, event, toast]);
 
-  if (authLoading || loadingEvent || !userProfile) {
+  if (authLoading || loadingEvent || !userProfile || !isAuthorized) {
     return (
       <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
