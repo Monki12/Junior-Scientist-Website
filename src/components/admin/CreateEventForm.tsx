@@ -21,13 +21,13 @@ interface CreateEventFormProps {
 }
 
 const eventImageMap: Record<string, { src: string; alt: string; dataAiHint: string }> = {
-    'catapultikon': { src: '/images/catalogopng.jpg', alt: 'Catapultikon Banner', dataAiHint: 'event catapult' },
-    'exquizit': { src: '/images/EXQUIZITLogo.png', alt: 'Exquizit Banner', dataAiHint: 'event quiz' },
-    'jso': { src: '/images/jso.jpg', alt: 'JSO Banner', dataAiHint: 'event science' },
-    'modelothon': { src: '/images/jsologo.jpg', alt: 'Modelothon Banner', dataAiHint: 'event model' },
-    'mathamaze': { src: '/images/mathamazelogo.jpg', alt: 'Mathamaze Banner', dataAiHint: 'event math' },
-    'mun': { src: '/images/munlogo.jpg', alt: 'MUN Banner', dataAiHint: 'event debate' },
-    'arduino': { src: '/images/new event logo blac....png', alt: 'Arduino Event Banner', dataAiHint: 'event circuit' },
+    'catapultikon': { src: '/images/logos/catalogopng.jpg', alt: 'Catapultikon Banner', dataAiHint: 'event catapult' },
+    'exquizit': { src: '/images/logos/EXQUIZITLogo.png', alt: 'Exquizit Banner', dataAiHint: 'event quiz' },
+    'jso': { src: '/images/logos/jso.jpg', alt: 'JSO Banner', dataAiHint: 'event science' },
+    'modelothon': { src: '/images/logos/jsologo.jpg', alt: 'Modelothon Banner', dataAiHint: 'event model' },
+    'mathamaze': { src: '/images/logos/mathamazelogo.jpg', alt: 'Mathamaze Banner', dataAiHint: 'event math' },
+    'mun': { src: '/images/logos/munlogo.jpg', alt: 'MUN Banner', dataAiHint: 'event debate' },
+    'arduino': { src: '/images/logos/new event logo black ver.png', alt: 'Arduino Event Banner', dataAiHint: 'event circuit' },
 };
 
 
@@ -59,7 +59,7 @@ export default function CreateEventForm({ onSuccess }: CreateEventFormProps) {
       const lowerCaseTitle = data.title.toLowerCase();
       
       let mainImage = {
-        src: '/images/jsologo.jpg',
+        src: '/images/logos/jsologo.jpg',
         alt: 'Junior Scientist Event Banner',
         dataAiHint: 'event banner',
       };
