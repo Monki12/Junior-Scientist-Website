@@ -88,7 +88,10 @@ export default function ManageEventDashboardPage() {
     );
   }
   
+  const isManagerForEvent = userProfile.role === 'event_representative' && (event.eventReps || []).includes(userProfile.uid);
   const canManageGlobally = userProfile.role === 'overall_head' || userProfile.role === 'admin';
+  const canEditEvent = canManageGlobally || isManagerForEvent;
+
   const mockPendingTasksCount = 0; // Placeholder until tasks are fully integrated here
 
 
@@ -109,7 +112,7 @@ export default function ManageEventDashboardPage() {
             <div className="p-6 flex-grow">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3">
                     <h1 className="text-3xl font-bold text-primary">Manage Event: {event.title}</h1>
-                    {canManageGlobally && (
+                    {canEditEvent && (
                         <Button variant="outline" size="sm" asChild>
                            <Link href={`/events/manage/${eventSlug}/edit`}>
                              <Edit className="mr-2 h-4 w-4" /> Edit Event Settings
