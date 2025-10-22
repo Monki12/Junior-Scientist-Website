@@ -21,14 +21,14 @@ interface CreateEventFormProps {
 }
 
 const eventImageMap: Record<string, { src: string; alt: string; dataAiHint: string }> = {
-    'catapultikon': { src: '/images/logos/catalogopng.jpg', alt: 'Catapultikon Banner', dataAiHint: 'event catapult' },
-    'exquizit': { src: '/images/logos/EXQUIZITLogo.png', alt: 'Exquizit Banner', dataAiHint: 'event quiz' },
-    'jso': { src: '/images/logos/jso.jpg', alt: 'JSO Banner', dataAiHint: 'event science' },
-    'modelothon': { src: '/images/logos/jsologo.jpg', alt: 'Modelothon Banner', dataAiHint: 'event model' },
-    'mathamaze': { src: '/images/logos/mathamazelogo.jpg', alt: 'Mathamaze Banner', dataAiHint: 'event math' },
-    'mun': { src: '/images/logos/munlogo.jpg', alt: 'MUN Banner', dataAiHint: 'event debate' },
-    'arduino': { src: '/images/logos/new event logo black ver.png', alt: 'Arduino Event Banner', dataAiHint: 'event circuit' },
-    'default': { src: '/images/logos/jsologo.jpg', alt: 'Junior Scientist Event Banner', dataAiHint: 'event banner' },
+    'catapultikon': { src: '/logos/catalogopng.jpg', alt: 'Catapultikon Banner', dataAiHint: 'event catapult' },
+    'exquizit': { src: '/logos/EXQUIZITLogo.png', alt: 'Exquizit Banner', dataAiHint: 'event quiz' },
+    'jso': { src: '/logos/jso.jpg', alt: 'JSO Banner', dataAiHint: 'event science' },
+    'modelothon': { src: '/logos/jsologo.jpg', alt: 'Modelothon Banner', dataAiHint: 'event model' },
+    'mathamaze': { src: '/logos/mathamazelogo.jpg', alt: 'Mathamaze Banner', dataAiHint: 'event math' },
+    'mun': { src: '/logos/munlogo.jpg', alt: 'MUN Banner', dataAiHint: 'event debate' },
+    'arduino': { src: '/logos/new event logo black ver.png', alt: 'Arduino Event Banner', dataAiHint: 'event circuit' },
+    'default': { src: '/logos/jsologo.jpg', alt: 'Junior Scientist Event Banner', dataAiHint: 'event banner' },
 };
 
 
