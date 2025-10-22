@@ -297,19 +297,22 @@ export function EditEventForm({ event }: EditEventFormProps) {
                 )}
                  <div className="space-y-2">
                     <p className="text-sm text-muted-foreground">Select a default banner or upload a new one.</p>
-                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
                         {Object.entries(eventImageMap).map(([key, image]) => (
                             <button
                                 type="button"
                                 key={key}
                                 onClick={() => handleSelectDefaultImage(key)}
                                 className={cn(
-                                    "relative aspect-video rounded-md overflow-hidden border-2 transition-all",
+                                    "relative aspect-video rounded-md overflow-hidden border-2 transition-all group",
                                     formData.mainImage.src === image.src && !mainImageFile ? 'border-primary ring-2 ring-primary' : 'border-transparent hover:border-primary/50'
                                 )}
                             >
                                 <Image src={image.src} alt={image.alt} fill style={{objectFit: 'cover'}} />
-                                {formData.mainImage.src === image.src && !mainImageFile && (
+                                <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                                  <p className="text-white text-xs font-bold text-center capitalize drop-shadow-md">{key}</p>
+                                </div>
+                                {(formData.mainImage.src === image.src && !mainImageFile) && (
                                     <div className="absolute inset-0 bg-primary/70 flex items-center justify-center">
                                         <CheckCircle className="h-6 w-6 text-primary-foreground" />
                                     </div>
@@ -333,7 +336,7 @@ export function EditEventForm({ event }: EditEventFormProps) {
                     {formData.galleryImages.map((image: {src: string, alt: string}, index: number) => (
                         <div key={index} className="relative group">
                             <Image src={image.src} alt={image.alt} width={100} height={100} className="w-full h-24 object-cover rounded-md" />
-                            <Button type="button" size="icon" variant="destructive" className="absolute top-1 right-1 h-6 w-6 opacity-70 group-hover:opacity-100" onClick={() => handleInputChange('galleryImages', formData.galleryImages.filter((_: any, i: number) => i !== index))}>
+                            <Button type="button" size="icon" variant="destructive" className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleInputChange('galleryImages', formData.galleryImages.filter((_: any, i: number) => i !== index))}>
                                 <Trash className="h-4 w-4" />
                             </Button>
                         </div>
@@ -342,7 +345,7 @@ export function EditEventForm({ event }: EditEventFormProps) {
                     {galleryPreviews.map((src, index) => (
                         <div key={index} className="relative group">
                             <Image src={src} alt={`Gallery preview ${index + 1}`} width={100} height={100} className="w-full h-24 object-cover rounded-md" />
-                            <Button type="button" size="icon" variant="destructive" className="absolute top-1 right-1 h-6 w-6 opacity-70 group-hover:opacity-100" onClick={() => removeGalleryPreview(index)}>
+                            <Button type="button" size="icon" variant="destructive" className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removeGalleryPreview(index)}>
                                 <Trash className="h-4 w-4" />
                             </Button>
                         </div>
