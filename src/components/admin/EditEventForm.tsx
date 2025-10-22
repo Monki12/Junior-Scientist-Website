@@ -46,7 +46,13 @@ const eventImageMap: Record<string, { src: string; alt: string; dataAiHint: stri
     'mun': { src: '/images/logos/munlogo.jpg', alt: 'MUN Banner', dataAiHint: 'event debate' },
     'arduino': { src: '/images/logos/new event logo black ver.png', alt: 'Arduino Event Banner', dataAiHint: 'event circuit' },
     'default': { src: '/images/logos/jsologo.jpg', alt: 'Junior Scientist Event Banner', dataAiHint: 'event banner' },
+    'science-fair': { src: '/images/img0.jpg', alt: 'Science fair project', dataAiHint: 'science fair' },
+    'microscope': { src: '/images/img1.jpg', alt: 'Girl uses a microscope', dataAiHint: 'student microscope' },
+    'chemistry': { src: '/images/img2.jpg', alt: 'Chemistry experiment', dataAiHint: 'student experiment' },
+    'robotics': { src: '/images/img3.jpg', alt: 'Robot at a STEM camp', dataAiHint: 'student robot' },
+    'qr-code': { src: '/images/ayush_qr.jpg', alt: 'Payment QR Code', dataAiHint: 'payment qr' },
 };
+
 
 interface EditEventFormProps {
   event: SubEvent;
@@ -95,7 +101,7 @@ export function EditEventForm({ event }: EditEventFormProps) {
       setMainImageFile(file);
       const previewUrl = URL.createObjectURL(file);
       setMainImagePreview(previewUrl);
-      setFormData((prev: any) => ({ ...prev, mainImage: { ...prev.mainImage, src: previewUrl } }));
+      setFormData((prev: any) => ({ ...prev, mainImage: { src: previewUrl, alt: 'Custom Upload', dataAiHint: 'custom event banner' } }));
     }
   };
 
@@ -126,11 +132,8 @@ export function EditEventForm({ event }: EditEventFormProps) {
   const syncBoardMembers = async (boardId: string, assignedUids: string[]) => {
     try {
       const boardRef = doc(db, 'boards', boardId);
-      // Using a loop with arrayUnion is safer than overwriting the whole array
-      // if multiple updates could happen, but here we can just set it.
-      // However, to be more robust, we'll merge the assigned UIDs with existing ones.
       const boardSnap = await getDocs(query(collection(db, 'boards'), where('eventId', '==', event.id)));
-      if(boardSnap.empty) return; // No board to update
+      if(boardSnap.empty) return; 
       
       const boardDocRef = boardSnap.docs[0].ref;
       await updateDoc(boardDocRef, {
@@ -166,7 +169,7 @@ export function EditEventForm({ event }: EditEventFormProps) {
         const uploadedGalleryUrls: SubEvent['galleryImages'] = [...formData.galleryImages];
         for (const file of galleryImageFiles) {
             const galleryImageRef = ref(storage, `event_images/${slug}/gallery/${file.name}_${Date.now()}`);
-            await uploadBytes(galleryImageRef, galleryImageRef);
+            await uploadBytes(galleryImageRef, file);
             const url = await getDownloadURL(galleryImageRef);
             uploadedGalleryUrls.push({ src: url, alt: file.name, dataAiHint: 'event gallery' });
         }
@@ -184,7 +187,6 @@ export function EditEventForm({ event }: EditEventFormProps) {
         const eventRef = doc(db, 'subEvents', event.id);
         await updateDoc(eventRef, dataToSave);
         
-        // Sync members to the event's board
         const allAssignedUids = [...new Set([...dataToSave.organizerUids, ...dataToSave.eventReps])];
         await syncBoardMembers(event.id, allAssignedUids);
 
@@ -310,7 +312,7 @@ export function EditEventForm({ event }: EditEventFormProps) {
                             >
                                 <Image src={image.src} alt={image.alt} fill style={{objectFit: 'cover'}} />
                                 <div className="absolute inset-0 bg-black/30 flex items-center justify-center p-1">
-                                  <p className="text-white text-xs font-bold text-center capitalize drop-shadow-md">{key}</p>
+                                  <p className="text-white text-xs font-bold text-center capitalize drop-shadow-md">{key.replace(/-/g, ' ')}</p>
                                 </div>
                                 {(formData.mainImage.src === image.src && !mainImageFile) && (
                                     <div className="absolute inset-0 bg-primary/70 flex items-center justify-center">
@@ -332,7 +334,6 @@ export function EditEventForm({ event }: EditEventFormProps) {
                 <Label htmlFor="galleryImageFiles">Gallery Images (optional)</Label>
                 <Input id="galleryImageFiles" type="file" accept="image/*" multiple onChange={handleGalleryFilesChange} />
                 <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                    {/* Existing gallery images */}
                     {formData.galleryImages.map((image: {src: string, alt: string}, index: number) => (
                         <div key={index} className="relative group">
                             <Image src={image.src} alt={image.alt} width={100} height={100} className="w-full h-24 object-cover rounded-md" />
@@ -341,7 +342,6 @@ export function EditEventForm({ event }: EditEventFormProps) {
                             </Button>
                         </div>
                     ))}
-                    {/* New gallery image previews */}
                     {galleryPreviews.map((src, index) => (
                         <div key={index} className="relative group">
                             <Image src={src} alt={`Gallery preview ${index + 1}`} width={100} height={100} className="w-full h-24 object-cover rounded-md" />
@@ -385,7 +385,7 @@ export function EditEventForm({ event }: EditEventFormProps) {
                             <ChevronDown className="ml-2 h-4 w-4 opacity-50"/>
                         </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-full">
+                    <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">
                         {allStaff.map(user => (
                         <DropdownMenuCheckboxItem key={user.uid} checked={formData.organizerUids.includes(user.uid)} onCheckedChange={checked => {
                             const newUids = checked ? [...formData.organizerUids, user.uid] : formData.organizerUids.filter((uid:string) => uid !== user.uid);
@@ -404,8 +404,8 @@ export function EditEventForm({ event }: EditEventFormProps) {
                             <ChevronDown className="ml-2 h-4 w-4 opacity-50"/>
                         </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-full">
-                        {allStaff.filter(u => u.role === 'event_representative').map(user => (
+                    <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">
+                        {allStaff.filter(u => u.role === 'event_representative' || u.role === 'overall_head' || u.role === 'admin').map(user => (
                         <DropdownMenuCheckboxItem key={user.uid} checked={formData.eventReps.includes(user.uid)} onCheckedChange={checked => {
                             const newUids = checked ? [...formData.eventReps, user.uid] : formData.eventReps.filter((uid:string) => uid !== user.uid);
                             handleInputChange('eventReps', newUids);
